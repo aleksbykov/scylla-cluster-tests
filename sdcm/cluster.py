@@ -2653,7 +2653,8 @@ class BaseMonitorSet(object):
                 screenshots = []
                 for i, url in enumerate(url_list_screenshots):
                     version = self.monitoring_version.replace('.', '-')
-                    grafana_url = url.format(node_ip=node.public_ip_address,
+                    grafana_url = url.format(
+                        node_ip=node.public_ip_address,
                         grafana_port=self.grafana_port,
                         scylla_pgk=scylla_pkg,
                         version=version,
