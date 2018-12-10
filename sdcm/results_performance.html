@@ -101,8 +101,10 @@
         <li><a href={{ grafana_snapshot }}>Download Grafana Screenshot</a></li>
         {% endif %}
     </ul>
-    {% if grafana_snapshot %}
+    {% if grafana_snapshots %}
     <h3>Grafana Screenshot:</h3>
+    {% for grafana_snapshot in grafana_snapshots %}
     <img src="{{ grafana_snapshot }}"  height="50%" width="50%">
+    {% endfor %}
     {% endif %}
 {% endblock %}

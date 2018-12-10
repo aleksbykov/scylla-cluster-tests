@@ -2642,21 +2642,31 @@ class BaseMonitorSet(object):
             return
         start_time = str(test_start_time).split('.')[0] + '000'
 
+        url_list_screenshots = [
+            "http://{node_ip}:{grafana_port}/dashboard/db/{scylla_pkg}-per-server-metrics-nemesis-{version}?from={st}&to=now",
+            'http://{node_ip}:{grafana_port}/dashboard/db/{scylla_pkg}-overview-metrics-{version}?from={st}&to=now'
+        ]
         try:
             self.install_phantom_js()
             scylla_pkg = 'scylla-enterprise' if self.is_enterprise else 'scylla'
             for n, node in enumerate(self.nodes):
-                version = self.monitoring_version.replace('.', '-')
-                grafana_url = "http://%s:%s/dashboard/db/%s-per-server-metrics-nemesis-%s?from=%s&to=now" % (
-                    node.public_ip_address, self.grafana_port, scylla_pkg, version, start_time)
-                datetime_now = datetime.now().strftime("%Y%m%d_%H%M%S")
-                snapshot_path = os.path.join(node.logdir,
-                                             "grafana-screenshot-%s-%s.png" % (datetime_now, n))
-                process.run("cd phantomjs-2.1.1-linux-x86_64 && "
-                            "bin/phantomjs r.js \"%s\" \"%s\" 1920px" % (
-                                grafana_url, snapshot_path), shell=True)
+                screenshots = []
+                for i, url in enumerate(url_list_screenshots):
+                    version = self.monitoring_version.replace('.', '-')
+                    grafana_url = url.format(node_ip=node.public_ip_address,
+                        grafana_port=self.grafana_port,
+                        scylla_pgk=scylla_pkg,
+                        version=version,
+                        st=start_time)
+                    datetime_now = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    snapshot_path = os.path.join(node.logdir,
+                                                 "grafana-screenshot-%s-%s-%s.png" % (datetime_now, n, i))
+                    process.run("cd phantomjs-2.1.1-linux-x86_64 && "
+                                "bin/phantomjs r.js \"%s\" \"%s\" 1920px" % (
+                                    grafana_url, snapshot_path), shell=True)
                 # since there is only one monitoring node returning here
-                return self.upload_file_to_s3(snapshot_path)
+                    screenshots.append(self.upload_file_to_s3(snapshot_path))
+                return screenshots
 
         except Exception, details:
             self.log.error('Error taking monitor snapshot: %s',
