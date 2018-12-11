@@ -171,6 +171,8 @@ class LongevityTest(ClusterTester):
         for stress in stress_queue:
             self.verify_stress_thread(queue=stress)
 
+        self.update_test_details()
+
     def _create_counter_table(self):
         """
         workaround for the issue https://github.com/scylladb/scylla-tools-java/issues/32
