@@ -1,4 +1,4 @@
-test_duration: 10 # [minutes] + 10 minutes (more than 1800 keep-alive)
+test_duration: 30 # [minutes] + 10 minutes (more than 1800 keep-alive)
 prepare_write_cmd: "cassandra-stress write no-warmup cl=QUORUM n=3000 -schema 'replication(factor=3)' -port jmx=6868 -mode cql3 native -rate threads=1 -pop seq=1..3000"
 stress_read_cmd: ["cassandra-stress read no-warmup cl=QUORUM duration=10m -schema 'replication(factor=3)' -port jmx=6868 -mode cql3 native -rate threads=1 -pop 'dist=gauss(1..3000,1500,150)'"]
 
@@ -10,13 +10,13 @@ n_loaders: 1
 n_monitor_nodes: 1
 monitor_branch: 'branch-2.0' # In case you would like to run the test with newer monitoring branch e.g. master
 keyspace_num: 1
-user_prefix: 'sample-configuration-tst'
+user_prefix: 'aleksbykov-samples-tests-not-jenkins'
 nemesis_class_name: 'NoOpMonkey' # no nemesis will be applied
-nemesis_interval: 5
+nemesis_interval: 10
 nemesis_during_prepare: 'true'
 failure_post_behavior: destroy
 space_node_threshold: 167000
-store_results_in_elasticsearch: False
+store_results_in_elasticsearch: True
 # if enabling sst3 feature during upgrade test
 test_sst3: False
 # user_agent that is used for downloading files from s3
@@ -34,7 +34,7 @@ scylla_mgmt_repo: 'http://downloads.scylladb.com.s3.amazonaws.com/manager/rpm/un
 
 # email definitions to send regression report
 send_email: true
-email_recipients: ['bentsi@scylladb.com']
+email_recipients: ['alex.bykov@scylladb.com']
 
 backends: !mux
     aws: !mux
@@ -48,9 +48,9 @@ backends: !mux
             region_name: 'us-east-1'
             security_group_ids: 'sg-c5e1f7a0'
             subnet_id: 'subnet-ec4a72c4'
-            ami_id_db_scylla: 'ami-b4f8b4cb'  # Scylla 2.2 AMI
-            ami_id_monitor: 'ami-b4f8b4cb'  # Scylla 2.2 AMI
-            ami_id_loader: 'ami-b4f8b4cb'  # Scylla 2.2 AMI
+            ami_id_db_scylla: 'ami-0ce5cc382826db8a5'
+            ami_id_loader: 'ami-0ce5cc382826db8a5'
+            ami_id_monitor: 'ami-0ce5cc382826db8a5'
             aws_root_disk_size_monitor: 10  # GB
             ami_db_scylla_user: 'centos'
             ami_loader_user: 'centos'
@@ -72,6 +72,7 @@ backends: !mux
         gce_root_disk_type_monitor: 'pd-standard'
         gce_root_disk_size_monitor: 50
         gce_n_local_ssd_disk_monitor: 0
+        scylla_repo: 'http://downloads.scylladb.com.s3.amazonaws.com/rpm/centos/scylla-3.0.repo'
         us_east_1:
           gce_datacenter: 'us-east1-b'
 
