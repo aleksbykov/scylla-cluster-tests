@@ -2648,6 +2648,7 @@ class BaseMonitorSet(object):
         ]
 
         screenshot_url_tmpl = "http://{node_ip}:{grafana_port}/dashboard/db/{scylla_pkg}-{scr_name}-{version}?from={st}&to=now"
+
         try:
             self.install_phantom_js()
             scylla_pkg = 'scylla-enterprise' if self.is_enterprise else 'scylla'
