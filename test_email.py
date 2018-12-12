@@ -178,6 +178,6 @@ def test_logevity_2scr(id):
     print doc['_source']['test_details']['grafana_snapshot']
 
 if __name__ == "__main__":
-    # test_html_template_integrity()
+    test_html_template_integrity()
     # test_perf_analyzer()
-    test_logevity_2scr('20181211-161748-295118')
+    # test_logevity_2scr('20181211-161748-295118')
