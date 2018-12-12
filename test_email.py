@@ -180,4 +180,4 @@ def test_logevity_2scr(id):
 if __name__ == "__main__":
     test_html_template_integrity()
     # test_perf_analyzer()
-    # test_logevity_2scr('20181211-161748-295118')
+    test_logevity_2scr('20181212-123412-841873')

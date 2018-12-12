@@ -2644,7 +2644,7 @@ class BaseMonitorSet(object):
 
         screenshot_names = [
             'per-server-metrics-nemesis',
-            'overview-metric'
+            'overview-metrics'
         ]
 
         screenshot_url_tmpl = "http://{node_ip}:{grafana_port}/dashboard/db/{scylla_pkg}-{scr_name}-{version}?from={st}&to=now"

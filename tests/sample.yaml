@@ -1,4 +1,4 @@
-test_duration: 30 # [minutes] + 10 minutes (more than 1800 keep-alive)
+test_duration: 15 # [minutes] + 10 minutes (more than 1800 keep-alive)
 prepare_write_cmd: "cassandra-stress write no-warmup cl=QUORUM n=3000 -schema 'replication(factor=3)' -port jmx=6868 -mode cql3 native -rate threads=1 -pop seq=1..3000"
 stress_read_cmd: ["cassandra-stress read no-warmup cl=QUORUM duration=10m -schema 'replication(factor=3)' -port jmx=6868 -mode cql3 native -rate threads=1 -pop 'dist=gauss(1..3000,1500,150)'"]
 
