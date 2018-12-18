@@ -1,8 +1,8 @@
-test_duration: 15 # [minutes] + 10 minutes (more than 1800 keep-alive)
+test_duration: 10 # [minutes] + 10 minutes (more than 1800 keep-alive)
 prepare_write_cmd: "cassandra-stress write no-warmup cl=QUORUM n=3000 -schema 'replication(factor=3)' -port jmx=6868 -mode cql3 native -rate threads=1 -pop seq=1..3000"
-stress_read_cmd: ["cassandra-stress read no-warmup cl=QUORUM duration=10m -schema 'replication(factor=3)' -port jmx=6868 -mode cql3 native -rate threads=1 -pop 'dist=gauss(1..3000,1500,150)'"]
+stress_read_cmd: ["cassandra-stress read no-warmup cl=QUORUM duration=30m -schema 'replication(factor=3)' -port jmx=6868 -mode cql3 native -rate threads=1 -pop 'dist=gauss(1..3000,1500,150)'"]
 
-stress_cmd: ["cassandra-stress mixed cl=QUORUM duration=10m -schema 'replication(factor=3) compaction(strategy=SizeTieredCompactionStrategy)' -port jmx=6868 -mode cql3 native -rate threads=2 -pop seq=1..3000 -log interval=5"
+stress_cmd: ["cassandra-stress mixed cl=QUORUM duration=30m -schema 'replication(factor=3) compaction(strategy=SizeTieredCompactionStrategy)' -port jmx=6868 -mode cql3 native -rate threads=2 -pop seq=1..3000 -log interval=5"
              ]
 n_db_nodes: 3
 n_loaders: 1
@@ -48,9 +48,9 @@ backends: !mux
             region_name: 'us-east-1'
             security_group_ids: 'sg-c5e1f7a0'
             subnet_id: 'subnet-ec4a72c4'
-            ami_id_db_scylla: 'ami-0ce5cc382826db8a5'
-            ami_id_loader: 'ami-0ce5cc382826db8a5'
-            ami_id_monitor: 'ami-0ce5cc382826db8a5'
+            ami_id_db_scylla: 'ami-0e65d237b0cb77217'
+            ami_id_loader: 'ami-0e65d237b0cb77217'
+            ami_id_monitor: 'ami-0e65d237b0cb77217'
             aws_root_disk_size_monitor: 10  # GB
             ami_db_scylla_user: 'centos'
             ami_loader_user: 'centos'

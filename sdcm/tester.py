@@ -678,6 +678,10 @@ class ClusterTester(db_stats.TestStatsMixin, Test):
         if duration is None:
             duration = self.params.get('test_duration')
         timeout = duration * 60 + 600
+
+        if 'duration' in stress_cmd:
+            stress_cmd = re.sub('duration=[\d]+m', 'duration={}s'.format(timeout), stress_cmd)
+
         if self.create_stats:
             self.update_stress_cmd_details(stress_cmd, prefix, stresser="cassandra-stress", aggregate=stats_aggregate_cmds)
         return self.loaders.run_stress_thread(stress_cmd, timeout,
