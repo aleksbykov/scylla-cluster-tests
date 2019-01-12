@@ -8,13 +8,14 @@ import logging
 import requests
 import json
 import yaml
+import shutil
 from textwrap import dedent
 from math import sqrt
 
 from requests import ConnectionError
 
 from es import ES
-from utils import get_job_name, retrying
+from utils import get_job_name, retrying, remove_comments, S3Storage
 
 logger = logging.getLogger(__name__)
 
@@ -317,6 +318,20 @@ class TestStatsMixin(Stats):
         test_details['prometheus_report'] = ""
         return test_details
 
+    def get_system_details(self):
+        system_details = {}
+        for node in self.db_cluster.nodes:
+            node_system_info = {}
+            node_system_info[node.name] = {
+                'cpu_model': node.get_cpumodel(),
+                'sys_info': node.get_system_info(),
+            }
+            system_details.update(node_system_info)
+        archive_file = self.build_archive()
+        s3_link_to_archive = S3Storage.upload_file_to_s3(file_path=archive_file)
+        system_details['sys_info_data_url'] = s3_link_to_archive
+        return system_details
+
     def create_test_stats(self, sub_type=None):
         self._test_index = self.__class__.__name__.lower()
         self._test_id = self._create_test_id()
@@ -330,6 +345,7 @@ class TestStatsMixin(Stats):
             self._stats['test_details']['test_name'] = self.params.id.name
         for stat in self.PROMETHEUS_STATS:
             self._stats['results'][stat] = {}
+        self._stats['system_details'] = self.get_system_details()
         self.create()
 
     def update_stress_cmd_details(self, cmd, prefix='', stresser="cassandra-stress", aggregate=True):
@@ -402,6 +418,7 @@ class TestStatsMixin(Stats):
                     continue
                 try:
                     summary += float(stat[key])
+                # TODO: Add exact Exception type.
                 except:
                     average_stats[key] = stat[key]
             if key not in average_stats:
@@ -412,6 +429,20 @@ class TestStatsMixin(Stats):
             self._stats['results']['stats_average'] = average_stats
         if total_stats:
             self._stats['results']['stats_total'] = total_stats
+
+    def build_archive(self):
+        download_files = ['/proc/meminfo', '/proc/cpuinfo', '/proc/interrupts', '/proc/vmstat']
+        storing_dir = os.path.join(self.db_cluster.logdir, 'system_data')
+        os.mkdir(storing_dir)
+        for node in self.db_cluster.nodes:
+            src_dir = node.prepare_files_for_archive(download_files)
+            node.receive_files(src=src_dir, dst=storing_dir)
+            with open(os.path.join(storing_dir, node.name, 'installed_pkgs'), 'w') as pkg_list_file:
+                pkg_list_file.write(node.get_installed_packages())
+        self.log.info('Creating archive....')
+        archive = shutil.make_archive(self.db_cluster.logdir, 'zip', root_dir=storing_dir)
+        self.log.info('Path to archive file: %s' % archive)
+        return archive
 
     def update_test_details(self, errors=None, coredumps=None, scylla_conf=False):
         if self.create_stats:
@@ -428,9 +459,9 @@ class TestStatsMixin(Stats):
                 res = node.remoter.run('grep ^SCYLLA_ARGS /etc/sysconfig/scylla-server', verbose=True)
                 self._stats['test_details']['scylla_args'] = res.stdout.strip()
                 res = node.remoter.run('cat /etc/scylla.d/io.conf', verbose=True)
-                self._stats['test_details']['io_conf'] = res.stdout.strip()
+                self._stats['test_details']['io_conf'] = remove_comments(res.stdout.strip())
                 res = node.remoter.run('cat /etc/scylla.d/cpuset.conf', verbose=True)
-                self._stats['test_details']['cpuset_conf'] = res.stdout.strip()
+                self._stats['test_details']['cpuset_conf'] = remove_comments(res.stdout.strip())
 
             self._stats['status'] = self.status
             update_data.update({'status': self._stats['status'], 'test_details': self._stats['test_details']})
@@ -439,4 +470,3 @@ class TestStatsMixin(Stats):
             if coredumps:
                 update_data.update({'coredumps': coredumps})
             self.update(update_data)
-

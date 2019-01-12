@@ -15,9 +15,9 @@ import os
 import logging
 import time
 import datetime
+import requests
 from functools import wraps
 from enum import Enum
-
 
 
 logger = logging.getLogger('avocado.test')
@@ -140,3 +140,36 @@ def get_data_dir_path(*args):
 
 def get_job_name():
     return os.environ.get('JOB_NAME', 'local_run')
+
+
+def remove_comments(data):
+    """Remove comments line from data
+
+    Remove any string which is start from # in data
+
+    Arguments:
+        data {str} -- data expected the command output, file contents
+    """
+    return '\n'.join([i.strip() for i in data.split('\n') if not i.startswith('#')])
+
+
+class S3Storage(object):
+    @staticmethod
+    def generate_s3_url(file_path):
+        job_name = get_job_name()
+        file_name = os.path.basename(os.path.normpath(file_path))
+        return "https://cloudius-jenkins-test.s3.amazonaws.com/{job_name}/{file_name}".format(**locals())
+
+    @classmethod
+    def upload_file_to_s3(cls, file_path):
+        try:
+            s3_url = cls.generate_s3_url(file_path)
+            with open(file_path) as fh:
+                mydata = fh.read()
+                logger.info("Uploading '{file_path}' to {s3_url}".format(**locals()))
+                response = requests.put(s3_url, data=mydata)
+                logger.debug(response)
+                return s3_url if response.ok else ""
+        except Exception as e:
+            logger.debug("Unable to upload to S3: %s" % e)
+            return ""
