@@ -1414,6 +1414,14 @@ server_encryption_options:
                 self.remoter.run('cp -r %s %s' % (f, new_full_path))
         return root_dir
 
+    def get_console_output(self):
+        #TODO add GCE
+        raise NotImplementedError('Derived classes must implement get_console_output')
+
+    def get_console_screenshot(self):
+        #TODO add GCE
+        raise NotImplementedError('Derived classes must implement get_console_screenshot')
+
 
 class BaseCluster(object):
 

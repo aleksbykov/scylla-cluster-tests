@@ -11,6 +11,7 @@ import yaml
 import shutil
 from textwrap import dedent
 from math import sqrt
+from base64 import decodestring
 
 from requests import ConnectionError
 
@@ -327,9 +328,6 @@ class TestStatsMixin(Stats):
                 'sys_info': node.get_system_info(),
             }
             system_details.update(node_system_info)
-        archive_file = self.build_archive()
-        s3_link_to_archive = S3Storage.upload_file_to_s3(file_path=archive_file)
-        system_details['sys_info_data_url'] = s3_link_to_archive
         return system_details
 
     def create_test_stats(self, sub_type=None):
@@ -430,15 +428,20 @@ class TestStatsMixin(Stats):
         if total_stats:
             self._stats['results']['stats_total'] = total_stats
 
-    def build_archive(self):
-        download_files = ['/proc/meminfo', '/proc/cpuinfo', '/proc/interrupts', '/proc/vmstat']
+    def build_archive(self, files_to_archive):
         storing_dir = os.path.join(self.db_cluster.logdir, 'system_data')
         os.mkdir(storing_dir)
         for node in self.db_cluster.nodes:
-            src_dir = node.prepare_files_for_archive(download_files)
+            src_dir = node.prepare_files_for_archive(files_to_archive)
             node.receive_files(src=src_dir, dst=storing_dir)
             with open(os.path.join(storing_dir, node.name, 'installed_pkgs'), 'w') as pkg_list_file:
                 pkg_list_file.write(node.get_installed_packages())
+            with open(os.path.join(storing_dir, node.name, 'console_output'), 'w') as co:
+                co.write(node.get_console_output())
+            with open(os.path.join(storing_dir, node.name, 'console_screenshot.jpg'), 'wb') as cscrn:
+                imagedata = node.get_console_screenshot()
+                cscrn.write(decodestring(imagedata))
+
         self.log.info('Creating archive....')
         archive = shutil.make_archive(self.db_cluster.logdir, 'zip', root_dir=storing_dir)
         self.log.info('Path to archive file: %s' % archive)
@@ -462,9 +465,19 @@ class TestStatsMixin(Stats):
                 self._stats['test_details']['io_conf'] = remove_comments(res.stdout.strip())
                 res = node.remoter.run('cat /etc/scylla.d/cpuset.conf', verbose=True)
                 self._stats['test_details']['cpuset_conf'] = remove_comments(res.stdout.strip())
-
             self._stats['status'] = self.status
-            update_data.update({'status': self._stats['status'], 'test_details': self._stats['test_details']})
+
+            if 'system_details' in self._stats.keys():
+                files_to_archive = ['/proc/meminfo', '/proc/cpuinfo', '/proc/interrupts', '/proc/vmstat']
+                archive = self.build_archive(files_to_archive)
+                s3_link_to_archive = S3Storage.upload_file_to_s3(file_path=archive)
+                self._stats['system_details'].update({'sys_info_data_url': s3_link_to_archive})
+
+            update_data.update(
+                {'status': self._stats['status'],
+                 'test_details': self._stats['test_details'],
+                 'system_details': self._stats['system_details']
+                 })
             if errors:
                 update_data.update({'errors': errors})
             if coredumps:

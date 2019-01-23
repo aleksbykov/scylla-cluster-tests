@@ -405,6 +405,23 @@ class AWSNode(cluster.BaseNode):
         self._spot_aws_termination_task = Thread(target=self.monitor_aws_termination_thread)
         self._spot_aws_termination_task.start()
 
+    def get_console_output(self):
+        """Get instance console Output
+
+        Get console output of instance which is printed during initiating and loading
+        Get only last 64KB of output data.
+        """
+        output = self._ec2_service.meta.client.get_console_output(
+            InstanceId=self._instance.id,
+        )
+        return output['Output']
+
+    def get_console_screenshot(self):
+        imagedata = self._ec2_service.meta.client.get_console_screenshot(
+            InstanceId=self._instance.id
+        )
+        return imagedata['ImageData']
+
 
 class ScyllaAWSCluster(cluster.BaseScyllaCluster, AWSCluster):
 
