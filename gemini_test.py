@@ -49,7 +49,7 @@ class GeminiTest(ClusterTester):
         if result['status'] == 'FAILED':
             self.fail(result['results'])
 
-    def test_random_load_with_nemesis(self):
+    def test_load_random_with_nemesis(self):
         prepared_results = self._prepare_test_results()
 
         cmd = self.params.get('gemini_cmd')
