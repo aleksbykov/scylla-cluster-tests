@@ -3413,7 +3413,7 @@ class BaseMonitorSet(object):
 
             # remove those jobs if exists, for support of 'reuse_cluster: true'
             def remove_sct_metrics(x):
-                return x['job_name'] not in ['stress_metrics', 'sct_metrics']
+                return x['job_name'] not in ['stress_metrics', 'sct_metrics', 'gemini_metrics']
             templ_yaml["scrape_configs"] = filter(remove_sct_metrics, templ_yaml["scrape_configs"])
 
             scrape_configs = templ_yaml["scrape_configs"]
@@ -3428,6 +3428,7 @@ class BaseMonitorSet(object):
             if self.sct_ip_port:
                 scrape_configs.append(dict(job_name="sct_metrics", honor_labels=True,
                                            static_configs=[dict(targets=[self.sct_ip_port])]))
+
             with open(local_template, "w") as fo:
                 yaml.safe_dump(templ_yaml, fo, default_flow_style=False)  # to remove tag !!python/unicode
             node.send_files(src=local_template, dst=prometheus_yaml_template, delete_dst=True, verbose=True)

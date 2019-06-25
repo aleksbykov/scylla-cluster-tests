@@ -8,7 +8,7 @@ import re
 import time
 
 from sdcm.sct_events import GeminiToolEvent, GeminiToolLogEvent, Severity
-from sdcm.utils import FileFollowerThread
+from sdcm.utils.common import FileFollowerThread
 
 LOGGER = logging.getLogger(__name__)
 
@@ -48,6 +48,9 @@ class GeminiToolEventsPublisher(FileFollowerThread):
                     break
             if self.stopped():
                 break
+
+
+class GeminiStressThread(object):
 
     def __init__(self, test_cluster, oracle_cluster, loaders, gemini_cmd, timeout=None, outputdir=None):
         self.loaders = loaders

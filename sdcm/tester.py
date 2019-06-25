@@ -820,7 +820,7 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):
                                   loaders=self.loaders,
                                   gemini_cmd=cmd,
                                   timeout=timeout,
-                                  outputdir=self.outputdir).run()
+                                  outputdir=self.logdir).run()
 
     def kill_stress_thread(self):
         if self.loaders:  # the test can fail on provision step and loaders are still not provisioned
