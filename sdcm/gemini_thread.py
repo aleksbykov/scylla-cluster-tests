@@ -49,9 +49,6 @@ class GeminiToolEventsPublisher(FileFollowerThread):
             if self.stopped():
                 break
 
-
-class GeminiStressThread(object):
-
     def __init__(self, test_cluster, oracle_cluster, loaders, gemini_cmd, timeout=None, outputdir=None):
         self.loaders = loaders
         self.gemini_cmd = gemini_cmd
@@ -119,6 +116,7 @@ class GeminiStressThread(object):
         command_result = []
 
         LOGGER.debug('Wait for %s gemini threads results', len(self.loaders.nodes))
+
         for future in concurrent.futures.as_completed(self.result_futures, timeout=self.timeout):
             results.append(future.result())
 
