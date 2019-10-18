@@ -131,8 +131,11 @@ def teardown_on_exception(method):
     def wrapper(*args, **kwargs):
         try:
             return method(*args, **kwargs)
-        except Exception:
+        except Exception as details:
             TEST_LOG.exception("Exception in %s. Will call tearDown", method.__name__)
+            with open(os.path.join(cluster.Setup.logdir(), "events_log", "critical.log"), "a+") as crit_log:
+                crit_log.write("Exception in %s. Will call tearDown\n" % method.__name__)
+                crit_log.write("%s" % details)
             args[0].tearDown()
             raise
     return wrapper

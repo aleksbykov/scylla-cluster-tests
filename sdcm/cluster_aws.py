@@ -734,6 +734,8 @@ class ScyllaAWSCluster(cluster.BaseScyllaCluster, AWSCluster):
                 broadcast=node.private_ip_address,
                 listen_on_all_interfaces=True,
             ))
+        if self.params.get('ip_ssh_connections') == "ipv6":
+            setup_params['append_conf'] = "enable_ipv6_dns_lookup: true"
 
         node.config_setup(**setup_params)
 

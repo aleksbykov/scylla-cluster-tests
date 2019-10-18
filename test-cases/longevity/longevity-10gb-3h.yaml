@@ -16,6 +16,8 @@ space_node_threshold: 64424
 ip_ssh_connections: "ipv6"
 
 
-post_behavior_db_nodes: destroy
-post_behavior_loader_nodes: destroy
-post_behavior_monitor_nodes: destroy
+post_behavior_db_nodes: keep-on-failure
+post_behavior_loader_nodes: keep-on-failure
+post_behavior_monitor_nodes: keep-on-failure
+
+email_recipients: ["alex.bykov@scylladb.com"]
