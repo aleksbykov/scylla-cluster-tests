@@ -1297,3 +1297,20 @@ def get_testrun_status(test_id=None, logdir=None):
             status = f.read().split()
 
     return status
+
+
+def reassign_ipv6address(remoter):
+    import re
+
+    ip_v6_regexp = re.compile(r"2a05:d018:223:f00:[a-f0-9:]+")
+
+    result = remoter.run("sudo ip -6 addr show scope global", ignore_status=True)
+
+    ipaddress = ip_v6_regexp.findall(result.stdout)
+    remoter.run("sudo ip -6 addr del {0}/128 dev eth0".format(ipaddress[0]), ignore_status=True)
+    time.sleep(15)
+    # remoter.run("sudo ip -6 addr add {0}/64 dev eth0 valid_lft forever".format(ipaddress[0]), ignore_status=True)
+
+    remoter.run("sudo ip -6 addr del {0}/64 dev eth0".format(ipaddress[0]), ignore_status=True)
+    remoter.run(
+        "sudo ip -6 addr add {0}/64 dev eth0 valid_lft forever preferred_lft forever".format(ipaddress[0]), ignore_status=True)

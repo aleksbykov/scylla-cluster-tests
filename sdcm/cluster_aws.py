@@ -15,7 +15,7 @@ import boto3
 
 from sdcm import cluster
 from sdcm import ec2_client
-from sdcm.utils.common import retrying, list_instances_aws
+from sdcm.utils.common import retrying, list_instances_aws, reassign_ipv6address
 from sdcm.sct_events import SpotTerminationEvent, DbEventsFilter
 from sdcm import wait
 from sdcm.remote import LocalCmdRunner
@@ -723,17 +723,24 @@ class ScyllaAWSCluster(cluster.BaseScyllaCluster, AWSCluster):
             alternator_port=self.params.get('alternator_port'),
             seed_address=seed_address
         )
+
+        if self.params.get('ip_ssh_connections') == "ipv6":
+            node_ip_address = node.ip_address
+        else:
+            node_ip_address = node.public_ip_address,
+
         if cluster.Setup.INTRA_NODE_COMM_PUBLIC:
             setup_params.update(dict(
-                broadcast=node.public_ip_address,
+                broadcast=node_ip_address,
             ))
 
         if self.aws_extra_network_interface:
             setup_params.update(dict(
                 seed_address=seed_address,
-                broadcast=node.private_ip_address,
+                broadcast=node_ip_address,
                 listen_on_all_interfaces=True,
             ))
+
         if self.params.get('ip_ssh_connections') == "ipv6":
             setup_params['append_conf'] = "enable_ipv6_dns_lookup: true"
 
@@ -772,6 +779,7 @@ class ScyllaAWSCluster(cluster.BaseScyllaCluster, AWSCluster):
         if not cluster.Setup.REUSE_CLUSTER:
 
             node.wait_ssh_up(verbose=verbose)
+            reassign_ipv6address(node.remoter)  # pylint: disable=no-member
             wait.wait_for(scylla_ami_setup_done, step=10, timeout=300)
             node.install_scylla_debuginfo()
 
@@ -779,6 +787,7 @@ class ScyllaAWSCluster(cluster.BaseScyllaCluster, AWSCluster):
                 if not endpoint_snitch:
                     endpoint_snitch = "Ec2MultiRegionSnitch"
                 node.datacenter_setup(self.datacenter)
+            reassign_ipv6address(node.remoter)  # pylint: disable=no-member
             self.node_config_setup(node, seed_address, endpoint_snitch)
 
             node.stop_scylla_server(verify_down=False)
