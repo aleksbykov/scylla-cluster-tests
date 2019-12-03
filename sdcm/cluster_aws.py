@@ -417,7 +417,7 @@ class AWSNode(cluster.BaseNode):
                           'user': ami_username,
                           'key_file': credentials.key_file}
         self._spot_aws_termination_task = None
-
+        self._wait_public_ip()
         super(AWSNode, self).__init__(name=name,
                                       parent_cluster=parent_cluster,
                                       ssh_login_info=ssh_login_info,
@@ -426,7 +426,7 @@ class AWSNode(cluster.BaseNode):
                                       dc_idx=dc_idx)
         if len(self._instance.network_interfaces) == 2:
             self.allocate_and_attach_elastic_ip()
-        self._wait_public_ip()
+
         if not cluster.Setup.REUSE_CLUSTER:
             tags_list = create_tags_list()
             tags_list.append({'Key': 'Name', 'Value': name})

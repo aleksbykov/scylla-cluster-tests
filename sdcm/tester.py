@@ -267,6 +267,7 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
 
         if self.create_stats:
             self.create_test_stats()
+            self.start_time = self._stats["test_details"]["start_time"]
 
         # change RF of system_auth
         system_auth_rf = self.params.get('system_auth_rf', default=3)
@@ -289,7 +290,6 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
         cluster.Setup.reuse_cluster(False)
         if self.monitors.nodes:
             self.prometheus_db = PrometheusDBStats(host=self.monitors.nodes[0].public_ip_address)
-        self.start_time = time.time()
 
         self.db_cluster.validate_seeds_on_all_nodes()
 

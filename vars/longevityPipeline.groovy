@@ -135,7 +135,7 @@ def call(Map pipelineParams) {
                                     env
 
                                     echo "Start send email ..."
-                                    ./docker/env/hydra.sh send-email --logdir /sct --email-recipients "qa@scylladb.com"
+                                    ./docker/env/hydra.sh send-email --logdir /sct --email-recipients "alex.bykov@scylladb.com"
                                     echo "Email sent"
                                     """
                                 }
