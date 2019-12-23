@@ -731,34 +731,35 @@ class Nemesis(object):  # pylint: disable=too-many-instance-attributes,too-many-
         """
             Alters a non-system table compaction strategy from ICS to any-other and vise versa.
         """
-        list_additional_params = get_compaction_random_additional_params()
-        ks_cfs = get_non_system_ks_cf_list(loader_node=random.choice(self.loaders.nodes),
-                                           db_node=self.target_node)
-        if not ks_cfs:
-            self.log.error('Non-system keyspace and table are not found. toggle_tables_ics nemesis can\'t run')
-            return
-        keyspace_table = random.choice(ks_cfs)
-        keyspace, table = keyspace_table.split('.')
-        cur_compaction_strategy = get_compaction_strategy(node=self.target_node, keyspace=keyspace,
-                                                          table=table)
-        if cur_compaction_strategy != CompactionStrategy.INCREMENTAL:
-            new_compaction_strategy = CompactionStrategy.INCREMENTAL
-        else:
-            new_compaction_strategy = random.choice([strategy for strategy in list(
-                CompactionStrategy) if strategy != CompactionStrategy.INCREMENTAL])
-        new_compaction_strategy_as_dict = {'class': new_compaction_strategy.value}
+        self.log.warngin('Disabled for LCS only using')
+        # list_additional_params = get_compaction_random_additional_params()
+        # ks_cfs = get_non_system_ks_cf_list(loader_node=random.choice(self.loaders.nodes),
+        #                                    db_node=self.target_node)
+        # if not ks_cfs:
+        #     self.log.error('Non-system keyspace and table are not found. toggle_tables_ics nemesis can\'t run')
+        #     return
+        # keyspace_table = random.choice(ks_cfs)
+        # keyspace, table = keyspace_table.split('.')
+        # cur_compaction_strategy = get_compaction_strategy(node=self.target_node, keyspace=keyspace,
+        #                                                   table=table)
+        # if cur_compaction_strategy != CompactionStrategy.INCREMENTAL:
+        #     new_compaction_strategy = CompactionStrategy.INCREMENTAL
+        # else:
+        #     new_compaction_strategy = random.choice([strategy for strategy in list(
+        #         CompactionStrategy) if strategy != CompactionStrategy.INCREMENTAL])
+        # new_compaction_strategy_as_dict = {'class': new_compaction_strategy.value}
 
-        if new_compaction_strategy in [CompactionStrategy.INCREMENTAL, CompactionStrategy.SIZE_TIERED]:
-            for param in list_additional_params:
-                new_compaction_strategy_as_dict.update(param)
-        cmd = "ALTER TABLE {keyspace_table} WITH compaction = {new_compaction_strategy_as_dict};".format(**locals())
-        self.log.debug("Toggle table ICS query to execute: {}".format(cmd))
-        try:
-            self.target_node.run_cqlsh(cmd)
-        except UnexpectedExit as unexpected_exit:
-            if "Unable to find compaction strategy" in str(unexpected_exit):
-                raise UnsupportedNemesis("for this nemesis to work, you need ICS supported scylla version.")
-            raise unexpected_exit
+        # if new_compaction_strategy in [CompactionStrategy.INCREMENTAL, CompactionStrategy.SIZE_TIERED]:
+        #     for param in list_additional_params:
+        #         new_compaction_strategy_as_dict.update(param)
+        # cmd = "ALTER TABLE {keyspace_table} WITH compaction = {new_compaction_strategy_as_dict};".format(**locals())
+        # self.log.debug("Toggle table ICS query to execute: {}".format(cmd))
+        # try:
+        #     self.target_node.run_cqlsh(cmd)
+        # except UnexpectedExit as unexpected_exit:
+        #     if "Unable to find compaction strategy" in str(unexpected_exit):
+        #         raise UnsupportedNemesis("for this nemesis to work, you need ICS supported scylla version.")
+        #     raise unexpected_exit
 
     def modify_table_compaction(self):
         """
@@ -766,10 +767,11 @@ class Nemesis(object):  # pylint: disable=too-many-instance-attributes,too-many-
             default: compaction = {'class': 'SizeTieredCompactionStrategy'}
         """
         # TODO: Sub-properties for each of compaction strategies should also be tested
-        strategies = ("SizeTieredCompactionStrategy", "DateTieredCompactionStrategy",
-                      "TimeWindowCompactionStrategy", "LeveledCompactionStrategy")
-        prop_val = {"class": random.choice(strategies)}
-        self._modify_table_property(name="compaction", val=str(prop_val))
+        # strategies = ("SizeTieredCompactionStrategy", "DateTieredCompactionStrategy",
+        #               "TimeWindowCompactionStrategy", "LeveledCompactionStrategy")
+        # prop_val = {"class": random.choice(strategies)}
+        # self._modify_table_property(name="compaction", val=str(prop_val))
+        self.log.warning("Disable for LCS only using")
 
     def modify_table_compression(self):
         """
