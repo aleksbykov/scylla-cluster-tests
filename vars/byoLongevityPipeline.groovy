@@ -60,7 +60,7 @@ def call() {
                    description: 'cloud path for RPMs, s3:// or gs://',
                    name: 'update_db_packages')
 
-            string(defaultValue: "${pipelineParams.get('email_recipients', 'qa@scylladb.com')}",
+            string(defaultValue: "qa@scylladb.com",
                    description: 'email recipients of email report',
                    name: 'email_recipients')
         }
@@ -143,7 +143,7 @@ def call() {
                             wrap([$class: 'BuildUser']) {
                                 dir('scylla-cluster-tests') {
                                     def aws_region = groovy.json.JsonOutput.toJson(params.aws_region)
-                                    def test_config = groovy.json.JsonOutput.toJson(pipelineParams.test_config)
+                                    def test_config = groovy.json.JsonOutput.toJson(params.test_config)
 
                                     sh """
                                     #!/bin/bash
@@ -172,7 +172,7 @@ def call() {
                             wrap([$class: 'BuildUser']) {
                                 dir('scylla-cluster-tests') {
                                     def aws_region = groovy.json.JsonOutput.toJson(params.aws_region)
-                                    def test_config = groovy.json.JsonOutput.toJson(pipelineParams.test_config)
+                                    def test_config = groovy.json.JsonOutput.toJson(params.test_config)
 
                                     sh """
                                     #!/bin/bash
