@@ -136,30 +136,6 @@ def call() {
                     }
                 }
             }
-            stage('Send email with result') {
-                steps {
-                    catchError(stageResult: 'FAILURE') {
-                        script {
-                            wrap([$class: 'BuildUser']) {
-                                dir('scylla-cluster-tests') {
-                                    def email_recipients = groovy.json.JsonOutput.toJson(pipelineParams.get('email_recipients', 'qa@scylladb.com'))
-
-                                    sh """
-                                    #!/bin/bash
-
-                                    set -xe
-                                    env
-
-                                    echo "Start send email ..."
-                                    ./docker/env/hydra.sh send-email --logdir /sct --email-recipients "${email_recipients}"
-                                    echo "Email sent"
-                                    """
-                                }
-                            }
-                        }
-                    }
-                }
-            }
             stage('Collect log data') {
                 steps {
                     catchError(stageResult: 'FAILURE') {
@@ -167,7 +143,7 @@ def call() {
                             wrap([$class: 'BuildUser']) {
                                 dir('scylla-cluster-tests') {
                                     def aws_region = groovy.json.JsonOutput.toJson(params.aws_region)
-                                    def test_config = groovy.json.JsonOutput.toJson(pipelineParams.test_config)
+                                    def test_config = groovy.json.JsonOutput.toJson(params.test_config)
 
                                     sh """
                                     #!/bin/bash
@@ -196,7 +172,7 @@ def call() {
                             wrap([$class: 'BuildUser']) {
                                 dir('scylla-cluster-tests') {
                                     def aws_region = groovy.json.JsonOutput.toJson(params.aws_region)
-                                    def test_config = groovy.json.JsonOutput.toJson(pipelineParams.test_config)
+                                    def test_config = groovy.json.JsonOutput.toJson(params.test_config)
 
                                     sh """
                                     #!/bin/bash
@@ -211,8 +187,32 @@ def call() {
                                     export SCT_POST_BEHAVIOR_MONITOR_NODES="${params.post_behavior_monitor_nodes}"
 
                                     echo "start clean resources ..."
-                                    ./docker/env/hydra.sh clean-resources --config-file "${test_config}" --logdir /sct
+                                    ./docker/env/hydra.sh clean-resources --logdir /sct
                                     echo "end clean resources"
+                                    """
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            stage('Send email with result') {
+                steps {
+                    catchError(stageResult: 'FAILURE') {
+                        script {
+                            wrap([$class: 'BuildUser']) {
+                                dir('scylla-cluster-tests') {
+                                    def email_recipients = groovy.json.JsonOutput.toJson(params.email_recipients)
+
+                                    sh """
+                                    #!/bin/bash
+
+                                    set -xe
+                                    env
+
+                                    echo "Start send email ..."
+                                    ./docker/env/hydra.sh send-email --logdir /sct --email-recipients "${email_recipients}"
+                                    echo "Email sent"
                                     """
                                 }
                             }
