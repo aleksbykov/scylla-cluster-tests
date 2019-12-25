@@ -741,16 +741,26 @@ class Nemesis(object):  # pylint: disable=too-many-instance-attributes,too-many-
         keyspace, table = keyspace_table.split('.')
         cur_compaction_strategy = get_compaction_strategy(node=self.target_node, keyspace=keyspace,
                                                           table=table)
-        if cur_compaction_strategy != CompactionStrategy.INCREMENTAL:
-            new_compaction_strategy = CompactionStrategy.INCREMENTAL
+        # if cur_compaction_strategy != CompactionStrategy.INCREMENTAL:
+        #     new_compaction_strategy = CompactionStrategy.INCREMENTAL
+        # else:
+        #     new_compaction_strategy = random.choice([strategy for strategy in list(
+        #         CompactionStrategy) if strategy != CompactionStrategy.INCREMENTAL])
+        # new_compaction_strategy_as_dict = {'class': new_compaction_strategy.value}
+
+        # if new_compaction_strategy in [CompactionStrategy.INCREMENTAL, CompactionStrategy.SIZE_TIERED]:
+        #     for param in list_additional_params:
+        #         new_compaction_strategy_as_dict.update(param)
+        if cur_compaction_strategy != CompactionStrategy.LEVELED:
+            new_compaction_strategy = CompactionStrategy.LEVELED
         else:
-            new_compaction_strategy = random.choice([strategy for strategy in list(
-                CompactionStrategy) if strategy != CompactionStrategy.INCREMENTAL])
+            new_compaction_strategy = CompactionStrategy.SIZE_TIERED
         new_compaction_strategy_as_dict = {'class': new_compaction_strategy.value}
 
-        if new_compaction_strategy in [CompactionStrategy.INCREMENTAL, CompactionStrategy.SIZE_TIERED]:
+        if new_compaction_strategy in [CompactionStrategy.SIZE_TIERED]:
             for param in list_additional_params:
                 new_compaction_strategy_as_dict.update(param)
+
         cmd = "ALTER TABLE {keyspace_table} WITH compaction = {new_compaction_strategy_as_dict};".format(**locals())
         self.log.debug("Toggle table ICS query to execute: {}".format(cmd))
         try:
