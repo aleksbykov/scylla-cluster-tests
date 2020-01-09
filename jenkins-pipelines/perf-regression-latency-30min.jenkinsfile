@@ -8,8 +8,9 @@ longevityPipeline(
 
     backend: 'aws',
     aws_region: 'us-east-1',
-    test_name: 'performance_regression_test.PerformanceRegressionTest.test_latency',
-    test_config: 'tests/perf-regression-latency-500gb-30min.yaml',
+    test_name: 'performance_regression_test.PerformanceRegressionTest',
+    test_config: 'test-cases/performance/perf-regression-latency-500gb-30min.yaml',
+    sub_tests: ['test_latency']
 
-    timeout: [time: 60, unit: 'MINUTES']
+    timeout: [time: 180, unit: 'MINUTES']
 )
