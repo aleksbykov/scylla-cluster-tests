@@ -1,9 +1,9 @@
-test_duration: 180
-stress_cmd: ["cassandra-stress write cl=QUORUM duration=180m -schema 'replication(factor=3) compaction(strategy=SizeTieredCompactionStrategy)' -port jmx=6868 -mode cql3 native -rate threads=1000 -pop seq=1..10000000 -log interval=5"
+test_duration: 12
+stress_cmd: ["cassandra-stress write cl=QUORUM duration=10m -schema 'replication(factor=3) compaction(strategy=SizeTieredCompactionStrategy)' -port jmx=6868 -mode cql3 native -rate threads=1000 -pop seq=1..10000000 -log interval=5"
              ]
 
-n_db_nodes: 6
-n_loaders: 2
+n_db_nodes: 3
+n_loaders: 1
 n_monitor_nodes: 1
 
 instance_type_db: 'i3.4xlarge'
@@ -13,3 +13,5 @@ nemesis_interval: 5
 
 user_prefix: 'longevity-10gb-3h'
 space_node_threshold: 64424
+
+monitor_branch: 'branch-3.1'
