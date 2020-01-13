@@ -44,6 +44,7 @@ from sdcm import wait
 from sdcm.utils.common import log_run_info, retrying, get_data_dir_path, Distro, verify_scylla_repo_file, S3Storage, \
     get_latest_gemini_version, get_my_ip, makedirs, normalize_ipv6_url
 from sdcm.utils.thread import raise_event_on_failure
+from sdcm.utils.remotewebbrowser import RemoteWebDriverContainer
 from sdcm.sct_events import Severity, CoreDumpEvent, CassandraStressEvent, DatabaseLogEvent, \
     ClusterHealthValidatorEvent, set_grafana_url
 from sdcm.auto_ssh import start_auto_ssh, RSYSLOG_SSH_TUNNEL_LOCAL_PORT
@@ -408,6 +409,10 @@ class BaseNode():  # pylint: disable=too-many-instance-attributes,too-many-publi
             except Exception:  # pylint: disable=broad-except
                 return "no_booted_yet"
         return self._short_hostname
+
+    @property
+    def ssh_login_info(self):
+        return self._ssh_login_info
 
     @property
     def database_log(self):
@@ -3563,6 +3568,7 @@ class BaseMonitorSet():  # pylint: disable=too-many-public-methods,too-many-inst
         self.local_metrics_addr = start_metrics_server()  # start prometheus metrics server locally and return local ip
         self.sct_ip_port = self.set_local_sct_ip()
         self.grafana_port = 3000
+        self.remote_webdriver_port = 4444
         self.monitor_branch = self.params.get('monitor_branch')
         self._monitor_install_path_base = None
         self.phantomjs_installed = False
@@ -3621,6 +3627,8 @@ class BaseMonitorSet():  # pylint: disable=too-many-public-methods,too-many-inst
             self.configure_scylla_monitoring(node)
             self.restart_scylla_monitoring(sct_metrics=True)
             set_grafana_url("http://{}:{}".format(normalize_ipv6_url(node.external_address), self.grafana_port))
+            self.stop_selenium_remote_webdriver(node)
+            self.start_selenium_remote_webdriver(node)
             return
 
         self.install_scylla_monitoring(node)
@@ -3640,6 +3648,8 @@ class BaseMonitorSet():  # pylint: disable=too-many-public-methods,too-many-inst
             node.remoter.run('sudo apt-get install screen -y')
         if self.params.get("use_mgmt", default=None):
             self.install_scylla_manager(node, auth_token=self.mgmt_auth_token)
+
+        self.start_selenium_remote_webdriver(node)
 
     def install_scylla_manager(self, node, auth_token):
         if self.params.get('use_mgmt', default=None):
@@ -3877,9 +3887,20 @@ class BaseMonitorSet():  # pylint: disable=too-many-public-methods,too-many-inst
         self.save_sct_dashboards_config(node)
         self.save_monitoring_version(node)
 
+    @retrying(n=3, sleep_time=10, allowed_exceptions=(Failure, UnexpectedExit),
+              message="Waiting for restarting selenium remote webdriver")
+    def start_selenium_remote_webdriver(self, node):
+        self.log.debug("Start docker container with selenium chrome driver")
+        RemoteWebDriverContainer(node).run()
+
+    def stop_selenium_remote_webdriver(self, node):
+        self.log.debug("Delete docker container with selenium chrome driver")
+        RemoteWebDriverContainer(node).kill()
+
     def save_monitoring_version(self, node):
         node.remoter.run(
-            'echo "{0.monitor_branch}:{0.monitoring_version}" > {0.monitor_install_path}/monitor_version'.format(self), ignore_status=True)
+            'echo "{0.monitor_branch}:{0.monitoring_version}" > \
+            {0.monitor_install_path}/monitor_version'.format(self), ignore_status=True)
 
     def add_sct_dashboards_to_grafana(self, node):
         sct_dashboard_json = "scylla-dash-per-server-nemesis.{0.monitoring_version}.json".format(self)
