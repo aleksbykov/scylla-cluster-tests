@@ -1,0 +1,72 @@
+#
+# Keyspace info
+#
+keyspace: keyspace1
+
+#
+# The CQL for creating a keyspace (optional if it already exists)
+#
+keyspace_definition: |
+  CREATE KEYSPACE keyspace1 WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3};
+
+#
+# Table info
+#
+table: standard1
+
+#
+# The CQL for creating a table you wish to stress (optional if it already exists)
+#
+table_definition: |
+  CREATE TABLE standard1 (
+        name text,
+        choice boolean,
+        date timestamp,
+        address inet,
+        dbl double,
+        lval bigint,
+        ival int,
+        uid timeuuid,
+        value blob,
+        PRIMARY KEY((name,choice), date, address, dbl, lval, ival, uid)
+  ) WITH COMPACT STORAGE
+    AND compaction = {'class': 'TimeWindowCompactionStrategy',
+                      'compaction_window_unit': 'MINUTES',
+                      'compaction_window_size': '1'}
+    AND comment='A table of many types to test wide rows'
+
+columnspec:
+  - name: name
+    size: uniform(1..10)
+    population: uniform(1..10M)     # the range of unique values to select for the field (default is 100Billion)
+  - name: date
+    cluster: fixed(288)
+  - name: lval
+    population: gaussian(1..1000)
+    cluster: uniform(1..4)
+  - name: value
+    size: fixed(10000)
+
+insert:
+  partitions: fixed(1)     # number of unique partitions to update in a single operation
+                                  # if batchcount > 1, multiple batches will be used but all partitions will
+                                  # occur in all batches (unless they finish early); only the row counts will vary
+  batchtype: UNLOGGED               # type of batch to use
+  select: uniform(1..10)/10       # uniform chance any single generated CQL row will be visited in a partition;
+                                  # generated for each partition independently, each time we visit it
+
+#
+# A list of queries you wish to run against the schema
+#
+queries:
+   inputdata:
+      cql: insert into standard1 (name, choice, date, address, dbl, lval, ival, uid, value) VALUES (?, ?, toTimestamp(now()), ?, ?, ?, ?, ?, ?)
+   simple1:
+      cql: select * from standard1 where name = ? and choice = ? LIMIT 100
+      fields: samerow             # samerow or multirow (select arguments from the same row, or randomly from all rows in the partition)
+   range1:
+      cql: select * from standard1 where name = ? and choice = ? and date >= ? LIMIT 100
+      fields: multirow            # samerow or multirow (select arguments from the same row, or randomly from all rows in the partition)
+
+
+# cassandra-stress user profile=/tmp/c-s_profile_twcs.yaml ops'(inputdata=3,simple1=1,range1)' cl=QUORUM duration=50m -port jmx=6868 -mode cql3 native -rate threads=100

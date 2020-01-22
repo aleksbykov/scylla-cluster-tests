@@ -1512,6 +1512,26 @@ class Nemesis():  # pylint: disable=too-many-instance-attributes,too-many-public
         finally:
             self.target_node.remoter.run("sudo /sbin/ifup eth1")
 
+    def disrupt_check_sstable_time_window(self):
+        self._set_current_disruption("CheckSStableTimeWindow")
+        ks = "keyspace1"
+        cf = "standard1"
+        data_dir = "/var/lib/scylla/data/"
+        search_path = os.path.join(data_dir, ks)
+        result = self.target_node.remoter.run(
+            fr"ls {search_path}/{cf}-* | grep '\-Statistics.db'",
+            ignore_status=True)
+        if result.stdout:
+            for sstable in result.stdout.strip().split():
+                sstable_stats = sstable.strip()
+                sstable_statistics = self.target_node.remoter.run(
+                    fr"sstablemetadata {search_path}/{cf}-*/{sstable_stats} | grep -e 'Minimum timestamp\|Maximum timestamp'",
+                    ignore_status=True)
+                sstable_statistics = [row.split(":")[1].strip()
+                                      for row in sstable_statistics.stdout.strip().split("\n")]
+                self.log.info("Time window for SStable: %s is: %s", sstable_stats,
+                              (int(sstable_stats[1]) / 10000000 - int(sstable_stats[0]) / 1000000))
+
 
 class NotSpotNemesis(Nemesis):
     def set_target_node(self):
@@ -2080,6 +2100,16 @@ class StopStartInterfacesNetworkMonkey(Nemesis):
     @log_time_elapsed_and_status
     def disrupt(self):
         self.disrupt_network_start_stop_interface()
+
+
+class CheckSSTableTimeWindowMonkey(Nemesis):
+    disruptive = False
+    networking = False
+    run_with_gemini = False
+
+    @log_time_elapsed_and_status
+    def disrupt(self):
+        self.disrupt_check_sstable_time_window()
 
 
 class DisruptiveMonkey(Nemesis):

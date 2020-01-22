@@ -1,0 +1,29 @@
+test_duration: 60
+
+stress_cmd: ["cassandra-stress user profile=/tmp/c-s_profile_twcs.yaml ops'(inputdata=1,simple1=1,range1=1)' cl=QUORUM duration=50m -port jmx=6868 -mode cql3 native -rate threads=10"]
+
+cs_user_profiles:
+  - 'data_dir/c-s_profile_twcs.yaml'
+cs_duration: 50
+
+n_db_nodes: 3
+n_loaders: 1
+n_monitor_nodes: 1
+
+instance_type_db: 'i3.4xlarge'
+# Seems the c5.xlarge type is small for this load - I receive OOM on 2 loaders
+instance_type_loader: 'c4.2xlarge'
+
+nemesis_class_name: 'CheckSSTableTimeWindowMonkey'
+nemesis_interval: 5
+
+user_prefix: 'longevity-twcs-50gb-2d'
+
+
+monitor_branch: 'branch-3.1'
+ip_ssh_connections: 'public'
+send_email: true
+email_recipients: ['alex.bykov@scylladb.com']
+
+store_results_in_elasticsearch: False
+logs_transport: 'ssh'
