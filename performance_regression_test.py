@@ -127,7 +127,7 @@ class PerformanceRegressionTest(ClusterTester):  # pylint: disable=too-many-publ
             self.log.debug(debug_message)
 
         if save_stats:
-            self.create_test_stats(sub_type=sub_type)
+            self.create_test_stats(sub_type=sub_type, with_timestamp=True)
         stress_queue = self.run_stress_thread(stress_cmd=stress_cmd, stress_num=stress_num, keyspace_num=keyspace_num,
                                               prefix=prefix, stats_aggregate_cmds=False)
         results = self.get_stress_results(queue=stress_queue, store_results=True)

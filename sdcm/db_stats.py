@@ -334,7 +334,6 @@ class TestStatsMixin(Stats):
     @staticmethod
     def _create_test_id(doc_id_with_timestamp=False):
         """Return doc_id equal unified test-id
-
         Generate doc_id for ES document as unified global test-id
         if doc_id_with_timestamp is true, create ES
         document with global test_id + timestamp
@@ -349,6 +348,7 @@ class TestStatsMixin(Stats):
         doc_id = Setup.test_id()
         if doc_id_with_timestamp:
             doc_id += "_{}".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
+
         return doc_id
 
     def _init_stats(self):

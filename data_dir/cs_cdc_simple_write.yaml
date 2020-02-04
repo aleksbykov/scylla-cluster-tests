@@ -1,0 +1,41 @@
+keyspace: cdc_keyspace
+
+keyspace_definition: |
+
+  CREATE KEYSPACE IF NOT EXISTS cdc_keyspace WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3};
+
+table: test_cdc
+
+table_definition: |
+
+  CREATE TABLE IF NOT EXISTS test_cdc (
+    userid bigint,
+    firstname text,
+    lastname varchar,
+    PRIMARY KEY(userid)
+  );
+
+
+columnspec:
+  - name: userid
+    population: exp(1..1000000)
+
+  - name: firstname
+    size: fixed(50)
+    population: gaussian(1..20000)
+
+  - name: lastname
+    size: fixed(50)
+    population: gaussian(1..20000)
+
+insert:
+  partitions: fixed(1)
+  batchtype: UNLOGGED
+
+queries:
+  write:
+    cql: insert into test_cdc (userid, firstname, lastname) values (?, ?, ?)
+    fields: samerow
+  read_cdc_log:
+    cql: select _userid, _firstname, _last_name from test_cdc_scylla_cdc_log LIMIT 100
+    fields: multirow

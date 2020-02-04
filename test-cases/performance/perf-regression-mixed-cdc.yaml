@@ -1,0 +1,43 @@
+test_duration: 30
+
+# stress_cmd_w: "cassandra-stress user profile=/tmp/cs_cdc_simple_write.yaml ops'(write=1)' no-warmup cl=QUORUM duration=15m -port jmx=6868 -mode cql3 native -rate threads=100"
+stress_cmd_w: "cassandra-stress write no-warmup cl=QUORUM duration=15m -schema 'replication(factor=3)' -port jmx=6868 -mode cql3 native -rate threads=100 -pop seq=1..3000000"
+# stress_cmd_m: "cassandra-stress user profile=/tmp/cs_cdc_simple_write.yaml ops'(write=1, read_cdc_log)' no-warmup cl=QUORUM duration=15m -port jmx=6868 -mode cql3 native -rate threads=100"
+
+n_db_nodes: 3
+n_loaders: 1
+n_monitor_nodes: 1
+
+instance_type_loader: 'c4.2xlarge'
+instance_type_monitor: 't3.small'
+instance_type_db: 'i3.4xlarge'
+
+user_prefix: 'staging-perf-cdc'
+space_node_threshold: 644245094
+
+
+store_perf_results: true
+append_scylla_args: '--blocked-reactor-notify-ms 4'
+
+
+append_scylla_yaml: |
+  experimental_features:
+    - cdc
+
+monitor_branch: 'branch-3.1'
+ip_ssh_connections: 'public'
+
+send_email: false
+# email_recipients: ['alex.bykov@scylladb.com', 'bentsi@scylladb.com', 'roy@scylladb.com']
+email_recipients: ['alex.bykov@scylladb.com']
+logs_transport: ssh
+
+collect_logs: false
+
+backtrace_decoding: false
+
+execute_post_behavior: false
+post_behavior_db_nodes: keep # keep-on-failure/destroy
+# # post_behavior_db_nodes: destroy # keep-on-failure/destroy
+post_behavior_loader_nodes: keep # keep-on-failure/destroy
+post_behavior_monitor_nodes: keep # keep-on-failure/destroy
