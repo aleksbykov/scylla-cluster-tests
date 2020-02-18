@@ -608,7 +608,7 @@ class PerformanceResultsAnalyzer(BaseResultsAnalyzer):
                 group_by_version[version] = dict(tests=SortedDict(), stats_best=dict(), best_test_id=dict())
                 group_by_version[version]['stats_best'] = {k: 0 for k in self.PARAMS}
                 group_by_version[version]['best_test_id'] = {k: version_info["commit_id"] for k in self.PARAMS}
-            group_by_version[version]['tests'][version_info['date']] = curr_test_stats
+            group_by_version[version]['tests'][version_info['date']] = {"test_stats": curr_test_stats, "version": version_info}
             old_best = group_by_version[version]['stats_best']
             group_by_version[version]['stats_best'] =\
                 {k: self._get_best_value(k, curr_test_stats[k], old_best[k])
@@ -618,7 +618,7 @@ class PerformanceResultsAnalyzer(BaseResultsAnalyzer):
                 if k in curr_test_stats and k in old_best and\
                         group_by_version[version]['stats_best'][k] == curr_test_stats[k]:
                     group_by_version[version]['best_test_id'][k] = version_info["commit_id"]
-
+        return group_by_version
         res_list = list()
         # compare with the best in the test version and all the previous versions
         test_version_info = self._test_version(doc)
@@ -631,11 +631,15 @@ class PerformanceResultsAnalyzer(BaseResultsAnalyzer):
                                group_by_version[version]['stats_best'],
                                version,
                                group_by_version[version]['best_test_id'])
-            res_list.append(cmp_res)
+            latest_res = self.cmp(test_stats,
+                                  group_by_version[version]["tests"][-1]["test_stats"],
+                                  version,
+                                  group_by_version[version]["tests"][-1]["version"])
+            res_list.append({"best": cmp_res, "latest": latest_res})
         if not res_list:
             self.log.info('No test results to compare with')
             return False
-
+        return res_list
         # send results by email
         full_test_name = doc["_source"]["test_details"]["test_name"]
         test_start_time = datetime.utcfromtimestamp(float(doc["_source"]["test_details"]["start_time"]))
