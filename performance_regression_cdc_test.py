@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from sortedcontainers import SortedDict
 
-from sdcm.cluster import BaseNode, UnexpectedExit, Failure
+from sdcm.cluster import BaseNode, UnexpectedExit, Failure, Setup
 from sdcm.results_analyze import QueryFilter, QueryFilterCS, PerformanceResultsAnalyzer
 from sdcm.db_stats import TestStatsMixin
 from sdcm.logcollector import GrafanaScreenShot, GrafanaSnapshot
@@ -32,14 +32,14 @@ class CDCQueryFilterCS(QueryFilterCS, CDCQueryFilter):
         return self._PROFILE_PARAMS if 'profiles' in self.test_name else self._PARAMS
 
 
-class CDCPerformanceResultAnalyzer(PerformanceResultsAnalyzer):
-    def __init__(self, es_index, es_doc_type, send_email, email_recipients, logger=None):  # pylint: disable=too-many-arguments
+class CDCPerformanceResultsAnalyzer(PerformanceResultsAnalyzer):
+    def __init__(self, es_index, es_doc_type, send_email, email_recipients, logger=None, performance_email_template=None):  # pylint: disable=too-many-arguments
         super(PerformanceResultsAnalyzer, self).__init__(
             es_index=es_index,
             es_doc_type=es_doc_type,
             send_email=send_email,
             email_recipients=email_recipients,
-            email_template_fp="results_performance_cdc.html",
+            email_template_fp=performance_email_template,
             logger=logger
         )
 
@@ -224,8 +224,8 @@ class CDCPerformanceResultAnalyzer(PerformanceResultsAnalyzer):
                        )
         self.log.debug('Regression analysis:')
         self.log.debug(PP.pformat(results))
-        test_name = full_test_name.split('.', 1)[1]  # Example: longevity_test.py:LongevityTest.test_custom_time
-        subject = 'Performance Regression Compare Results - {} - {}'.format(test_name, test_version)
+        # test_name = full_test_name.split('.', 1)[1]  # Example: longevity_test.py:LongevityTest.test_custom_time
+        subject = 'Performance Regression Compare Results - {} - {}'.format(full_test_name, test_version)
         html = self.render_to_html(results)
         self.send_email(subject, html)
 
@@ -347,11 +347,11 @@ class PerformanceRegressionCDCTest(PerformanceRegressionTest):
     def test_write(self):
         self.keyspace = "keyspace1"
         self.table = "standard1"
-
+        main_test_id = Setup.test_id()
         write_cmd = self.params.get("stress_cmd_w")
 
         baseline_doc_id = self._workload_cdc(write_cmd, 2,
-                                             test_name="test_write_with_cdc_disabled",
+                                             test_name="test_write",
                                              sub_type="cdc_disabled",
                                              check_regression=False)
 
@@ -367,7 +367,7 @@ class PerformanceRegressionCDCTest(PerformanceRegressionTest):
         node1.run_cqlsh(f"ALTER TABLE {self.keyspace}.{self.table} WITH cdc = {{'enabled': true}}")
 
         cdc_enabled_doc_id = self._workload_cdc(write_cmd, 2,
-                                                test_name="test_mixed_with_cdc_enabled",
+                                                test_name="test_write",
                                                 sub_type="cdc_enabled",
                                                 check_regression=False)
 
@@ -388,13 +388,29 @@ class PerformanceRegressionCDCTest(PerformanceRegressionTest):
         node1.run_cqlsh(f"ALTER TABLE {self.keyspace}.{self.table} WITH cdc = {{'enabled': true, 'preimage': true}}")
 
         cdc_preimage_doc_id = self._workload_cdc(write_cmd, 2,
-                                                 test_name="test_mixed_with_cdc_preimage",
+                                                 test_name="test_write",
                                                  sub_type="cdc_preimage_enabled",
                                                  check_regression=False)
 
         self.wait_no_compactions_running()
 
-        self.check_regression()
+        # self.check_regression()
+        results_analyzer = PerformanceResultsAnalyzer(es_index=self._test_index,
+                                                      es_doc_type=self._es_doc_type,
+                                                      send_email=True,
+                                                      email_recipients=self.params.get('email_recipients', default=None),
+                                                      performance_email_template="results_performance_cdc.html")
+        is_gce = bool(self.params.get('cluster_backend') == 'gce')
+        try:
+            # results_analyzer.check_regression_cdc(test_id=self._test_id,
+            #                                       base_test_id=self._test_id.split("_", 1)[0],
+            #                                       is_gce=is_gce)
+            results_analyzer.check_regression_with_subtest_baseline(test_id=cdc_preimage_doc_id,
+                                                                    base_test_id=main_test_id,
+                                                                    subtest_baseline="cdc_disabled",
+                                                                    is_gce=is_gce)
+        except Exception as ex:  # pylint: disable=broad-except
+            self.log.exception('Failed to check regression: %s', ex)
 
     def test_mixed(self):  # pylint: disable=too-many-locals
         self.keyspace = "keyspace1"
@@ -446,7 +462,7 @@ class PerformanceRegressionCDCTest(PerformanceRegressionTest):
             self.log.debug(debug_message)
 
         if save_stats:
-            self.create_test_stats(sub_type=sub_type, doc_id_with_timestamp=True)
+            self.create_test_stats(sub_type=sub_type, doc_id_with_timestamp=True, test_name=test_name)
 
         stress_queue = self.run_stress_thread(stress_cmd=stress_cmd, stress_num=stress_num, keyspace_num=keyspace_num,
                                               prefix=prefix, stats_aggregate_cmds=False)
@@ -520,16 +536,22 @@ if __name__ == "__main__":
     logging.basicConfig(level="DEBUG")
     LOGGER = logging.getLogger("CDCPerfTest")
 
-    perf_analyzer = CDCPerformanceResultAnalyzer("performanceregressioncdctest",
-                                                 "test_stats",
-                                                 True,
-                                                 # ["alex.bykov@scylladb.com", "roy@scylladb.com"],
-                                                 ['alex.bykov@scylladb.com'],
-                                                 # ["alex.bykov@scylladb.com", 'piotr@scylladb.com',
-                                                 #  'piodul@scylladb.com', 'amos@scylladb.com', "roy@scylladb.com"],
-                                                 logger=LOGGER)
+    perf_analyzer = CDCPerformanceResultsAnalyzer("performanceregressioncdctest",
+                                                  "test_stats",
+                                                  True,
+                                                  # ["alex.bykov@scylladb.com", "roy@scylladb.com"],
+                                                  ['alex.bykov@scylladb.com'],
+                                                  # ["alex.bykov@scylladb.com", 'piotr@scylladb.com',
+                                                  #  'piodul@scylladb.com', 'amos@scylladb.com', "roy@scylladb.com"],
+                                                  performance_email_template="results_performance_cdc.html",
+                                                  logger=LOGGER)
 
+    perf_analyzer.check_regression_with_subtest_baseline(
+        test_id="63c59791-8f44-4071-9bc3-460bea31a8fc_20200304_064956_421667",
+        base_test_id="63c59791-8f44-4071-9bc3-460bea31a8fc",
+        subtest_baseline="cdc_disabled",
+        is_gce=False)
     perf_analyzer.check_regression_cdc(
-        "c1e38846-3377-4a1a-8289-6311cc9a295b_20200227_133205_661373",
-        "c1e38846-3377-4a1a-8289-6311cc9a295b",
+        "63c59791-8f44-4071-9bc3-460bea31a8fc_20200304_064956_421667",
+        "63c59791-8f44-4071-9bc3-460bea31a8fc",
         False)

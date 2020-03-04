@@ -124,7 +124,7 @@ class PerformanceQueryFilter(QueryFilter):
                 break
 
         if not job_filter_query:
-            job_filter_query = r'test_details.job_name.keyword: {} '.format(
+            job_filter_query = r'test_details.job_name.keyword: "{}"'.format(
                 self.test_doc['_source']['test_details']['job_name'])
 
         return job_filter_query
@@ -415,13 +415,17 @@ class PerformanceResultsAnalyzer(BaseResultsAnalyzer):
 
     PARAMS = TestStatsMixin.STRESS_STATS
 
-    def __init__(self, es_index, es_doc_type, send_email, email_recipients, logger=None):  # pylint: disable=too-many-arguments
+    def __init__(self, es_index, es_doc_type, send_email, email_recipients, logger=None, performance_email_template=None):  # pylint: disable=too-many-arguments
+        if performance_email_template:
+            email_template = performance_email_template
+        else:
+            email_template = "results_performance.html"
         super(PerformanceResultsAnalyzer, self).__init__(
             es_index=es_index,
             es_doc_type=es_doc_type,
             send_email=send_email,
             email_recipients=email_recipients,
-            email_template_fp="results_performance.html",
+            email_template_fp=email_template,
             logger=logger
         )
 
@@ -693,6 +697,7 @@ class PerformanceResultsAnalyzer(BaseResultsAnalyzer):
 
         # filter tests
         query = self._query_filter(doc, is_gce)
+        print(query)
         self.log.debug(query)
         if not query:
             return False
@@ -716,7 +721,7 @@ class PerformanceResultsAnalyzer(BaseResultsAnalyzer):
         # Example:
         # group_by_type = {
         #     "version": {
-        #           "cdc_disabled|cdc_enabled|cdc_pre_image": {
+        #           "sub_type": {
         #               "tests": {  # SortedDict(),
         #                   "20180726": {
         #                       "latency 99th percentile": 10.3,
@@ -791,6 +796,9 @@ class PerformanceResultsAnalyzer(BaseResultsAnalyzer):
                     group_by_version_sub_type[version][sub_type]['best_test_id'][
                         k] = f"Commit: {version_info['commit_id']}, Date: {version_info['date']}"
 
+        print(PP.pformat(current_tests))
+        print(PP.pformat(group_by_version_sub_type))
+
         current_res_list = list()
         versions_res_list = list()
 
@@ -830,6 +838,8 @@ class PerformanceResultsAnalyzer(BaseResultsAnalyzer):
                                              group_by_version_sub_type[version][sub_type]['best_test_id'])
             versions_res_list.append({version: cmp_res})
 
+        print(PP.pformat(current_res_list))
+        print(PP.pformat(versions_res_list))
         # send results by email
         full_test_name = doc["_source"]["test_details"]["test_name"]
         test_start_time = datetime.utcfromtimestamp(float(doc["_source"]["test_details"]["start_time"]))
@@ -855,10 +865,10 @@ class PerformanceResultsAnalyzer(BaseResultsAnalyzer):
                        )
         self.log.debug('Regression analysis:')
         self.log.debug(PP.pformat(results))
-        test_name = full_test_name.split('.', 1)[1]  # Example: longevity_test.py:LongevityTest.test_custom_time
-        subject = 'Performance Regression Compare Results - {} - {}'.format(test_name, test_version)
+        # test_name = full_test_name.split('.', 1)[1]  # Example: longevity_test.py:LongevityTest.test_custom_time
+        subject = 'Performance Regression Compare Results - {} - {}'.format(full_test_name, test_version)
         if ycsb:
-            subject = '(Alternator) Performance Regression - {} - {}'.format(test_name, test_version)
+            subject = '(Alternator) Performance Regression - {} - {}'.format(full_test_name, test_version)
         html = self.render_to_html(results, template='results_performance_baseline.html')
         self.send_email(subject, html)
 
