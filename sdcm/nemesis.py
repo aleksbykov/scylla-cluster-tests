@@ -1738,7 +1738,7 @@ class Nemesis():  # pylint: disable=too-many-instance-attributes,too-many-public
 
 
 class NotSpotNemesis(Nemesis):
-    def set_target_node(self):
+    def set_target_node(self, node=None):
 
         if isinstance(self.cluster, ScyllaAWSCluster):
             non_seed_nodes = [node for node in self.cluster.nodes
