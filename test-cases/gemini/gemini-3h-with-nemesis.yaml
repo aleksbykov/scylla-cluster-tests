@@ -8,7 +8,7 @@ instance_type_db: 'i3.large'
 user_prefix: 'gemini-with-nemesis-3h-normal'
 store_results_in_elasticsearch: False
 
-nemesis_class_name: 'GeminiChaosMonkey'
+nemesis_class_name: 'GrowShrinkClusterNemesis'
 nemesis_interval: 5
 
 # gemini
