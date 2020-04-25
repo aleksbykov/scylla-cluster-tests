@@ -87,10 +87,10 @@ class GeminiStressThread():  # pylint: disable=too-many-instance-attributes
         test_node = random.choice(self.test_cluster.nodes)
         oracle_node = random.choice(self.oracle_cluster.nodes) if self.oracle_cluster else None
 
-        cmd = "/$HOME/{} --test-cluster={} --outfile {} --seed {} ".format(self.gemini_cmd.strip(),
-                                                                           test_node.ip_address,
-                                                                           self.gemini_result_file,
-                                                                           seed)
+        cmd = "/$HOME/{} --test-cluster={} --outfile {} --seed {} -v ".format(self.gemini_cmd.strip(),
+                                                                              test_node.ip_address,
+                                                                              self.gemini_result_file,
+                                                                              seed)
         if oracle_node:
             cmd += "--oracle-cluster={} ".format(oracle_node.ip_address)
         if table_options:
