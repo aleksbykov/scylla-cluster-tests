@@ -986,6 +986,9 @@ class SCTConfiguration(dict):
         dict(name="availability_zone", env="SCT_AVAILABILITY_ZONE",
              type=str,
              help="Availability zone to use. Same for multi-region scenario."),
+        dict(name="stress_cdc_log_reader_batching_enable", env="SCT_STRESS_CDC_LOG_READER_BATCHING_ENABLE",
+             type=boolean,
+             help="""retrieving data from multiple streams in one poll"""),
     ]
 
     required_params = ['cluster_backend', 'test_duration', 'n_db_nodes', 'n_loaders', 'use_preinstalled_scylla',
