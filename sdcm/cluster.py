@@ -2606,8 +2606,8 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
             return result
         except Exception as details:  # pylint: disable=broad-except
             self.log.critical(f"Command '{cmd}' error: {details}")
-            if coredump_on_timeout and isinstance(details, CommandTimedOut):
-                self.generate_coredump_file()
+            # if coredump_on_timeout and isinstance(details, CommandTimedOut):
+            self.generate_coredump_file()
             raise
 
     def check_node_health(self):
