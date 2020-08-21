@@ -34,7 +34,7 @@ from invoke import UnexpectedExit
 from cassandra import ConsistencyLevel  # pylint: disable=ungrouped-imports
 
 from sdcm.cluster_aws import ScyllaAWSCluster
-from sdcm.cluster import SCYLLA_YAML_PATH, NodeSetupTimeout, NodeSetupFailed
+from sdcm.cluster import SCYLLA_YAML_PATH, NodeSetupTimeout, NodeSetupFailed, BaseNode
 from sdcm.group_common_events import ignore_alternator_client_errors, ignore_no_space_errors
 from sdcm.mgmt import TaskStatus
 from sdcm.utils.common import remote_get_file, get_db_tables, generate_random_string, \
@@ -448,6 +448,23 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self._set_current_disruption('CorruptThenRebuild %s' % self.target_node)
         self._destroy_data_and_restart_scylla()
         # try to save the node
+        found_iter = self.target_node.follow_system_log(patterns=["seastar::named_semaphore_timed_out", "Semaphore timed out: smp_service_group"])
+
+        def follow_log():
+            
+            found = list(found_iter)
+            self.log.info("Found required messages: %s", found)
+            if found:
+                self.target_node.generate_coredump_file(restart_scylla=True)
+            return bool(found)
+
+        @raise_event_on_failure
+        def monitor_log_for_semaphore_timeout():
+            wait.wait_for(follow_log, step=1, text="Searching semaphore timeout...", timeout=3600, throw_exc=True)
+
+        th = threading.Thread(target=monitor_log_for_semaphore_timeout, daemon=True)
+        th.start()
+
         self.repair_nodetool_rebuild()
 
     def disrupt_nodetool_drain(self):
