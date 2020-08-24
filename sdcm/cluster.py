@@ -2608,6 +2608,7 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
             self.log.critical(f"Command '{cmd}' error: {details}")
             # if coredump_on_timeout and isinstance(details, CommandTimedOut):
             self.generate_coredump_file()
+            CoreDumpEvent("see above", "see above", deatils, self, severity_critical=True)
             raise
 
     def check_node_health(self):
