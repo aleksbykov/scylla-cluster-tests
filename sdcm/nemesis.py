@@ -27,7 +27,8 @@ import os
 import re
 import traceback
 import json
-from typing import List, Optional, Type, Callable, Tuple, Dict, Set, Union
+from typing import List, Optional, Type, Callable, Tuple, Dict, Set, Union, Iterator
+
 from functools import wraps, partial
 from collections import defaultdict, Counter, namedtuple
 from concurrent.futures import ThreadPoolExecutor
@@ -81,6 +82,8 @@ from sdcm.argus_test_run import ArgusTestRun
 from sdcm.wait import wait_for
 from test_lib.compaction import CompactionStrategy, get_compaction_strategy, get_compaction_random_additional_params
 from test_lib.cql_types import CQLTypeBuilder
+from argus.db.db_types import NemesisStatus, NemesisRunInfo, NodeDescription  # pylint: disable=import-error
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -183,6 +186,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             'cqlstress_lwt_example': '*'  # Ignore LWT user-profile tables
         }
         self.es_publisher = NemesisElasticSearchPublisher(self.tester)
+        self.sequence_disrupt_iter = None
 
     @classmethod
     def add_disrupt_method(cls, func=None):
@@ -1254,6 +1258,43 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         else:
             self.log.info('Nemesis stack is empty - setting termination_event')
             self.termination_event.set()
+
+    def call_sequence_disrupt_method(self, disrupt_methods: List[str]):
+
+        def get_obj_method_by_name(method_name: str) -> Callable:
+
+            return [attr[1] for attr in inspect.getmembers(self) if
+                    attr[0] == method_name and callable(attr[1])][0]
+
+        def create_iterator(methods_names: List[str]) -> Iterator:
+            disrupt_methods = list(map(get_obj_method_by_name, methods_names))
+            self.log.info("List of running disrupt methods in sequence: %s", [
+                          disrupt_method.__name__ for disrupt_method in disrupt_methods])
+            return iter(disrupt_methods)
+
+        if not self.sequence_disrupt_iter:
+            self.sequence_disrupt_iter = create_iterator(disrupt_methods)
+
+        try:
+            disrupt_method = next(self.sequence_disrupt_iter)
+        except StopIteration:
+            self.sequence_disrupt_iter = create_iterator(disrupt_methods)
+            disrupt_method = next(self.sequence_disrupt_iter)
+
+        disrupt_method_name = disrupt_method.__name__.replace('disrupt_', '')
+        self.log.info(">>>>>>>>>>>>>Started random_disrupt_method %s" % disrupt_method_name)
+        self.metrics_srv.event_start(disrupt_method_name)
+        try:
+            disrupt_method()
+        except Exception as exc:  # pylint: disable=broad-except
+            error_msg = "Exception in random_disrupt_method %s: %s", disrupt_method_name, exc
+            self.log.error(error_msg)
+            self.error_list.append(error_msg)
+            raise
+        else:
+            self.log.info("<<<<<<<<<<<<<Finished random_disrupt_method %s" % disrupt_method_name)
+        finally:
+            self.metrics_srv.event_stop(disrupt_method_name)
 
     @latency_calculator_decorator
     def repair_nodetool_repair(self, node=None, publish_event=True):
@@ -2997,7 +3038,7 @@ def disrupt_method_wrapper(method):  # pylint: disable=too-many-statements
     """
 
     def argus_create_nemesis_info(nemesis: Nemesis, class_name: str,
-                                  method_name: str, start_time: int | float) -> NemesisRunInfo | None:
+                                  method_name: str, start_time: Union[int, float]) -> NemesisRunInfo | None:
         try:
             run = ArgusTestRun.get()
             node_desc = NodeDescription(ip=nemesis.target_node.public_ip_address,
@@ -4125,3 +4166,20 @@ class StartStopValidationCompaction(Nemesis):
 
     def disrupt(self):
         self.disrupt_start_stop_validation_compaction()
+
+
+class ReproduceIssue8030Monkey(Nemesis):
+    disruptive = True
+    disrupt_nemesis_sequence = [
+        "disrupt_stop_start_scylla_server",
+        "disrupt_nodetool_refresh",
+        "disrupt_abort_repair",
+        "disrupt_terminate_and_replace_node",
+        "disrupt_grow_shrink_cluster",
+        "disrupt_terminate_and_replace_node",
+        "disrupt_nodetool_decommission",
+        "disrupt_remove_node_then_add_node",
+    ]
+
+    def disrupt(self):
+        self.call_sequence_disrupt_method(disrupt_methods=self.disrupt_nemesis_sequence)
