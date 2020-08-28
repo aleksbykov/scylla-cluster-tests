@@ -11,9 +11,13 @@ n_monitor_nodes: 1
 
 instance_type_db: 'i3.2xlarge'
 
-nemesis_class_name: 'ChaosMonkey'
+nemesis_class_name: 'ReproduceIssue8030Monkey'
 nemesis_interval: 5
 nemesis_during_prepare: false
-space_node_threshold: 64424
+space_node_threshold: 189372825600
 
-user_prefix: 'longevity-twcs-3h'
+user_prefix: 'longevity-twcs-3h-reproduce'
+
+nemesis_add_node_cnt: 2
+
+append_scylla_args: '--blocked-reactor-notify-ms 10 --abort-on-lsa-bad-alloc 1 --abort-on-seastar-bad-alloc --abort-on-internal-error 1 --abort-on-ebadf 1 --enable-sstable-key-validation 1'
