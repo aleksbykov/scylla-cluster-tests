@@ -26,7 +26,7 @@ import os
 import re
 import traceback
 
-from typing import List, Optional
+from typing import List, Optional, Callable, Iterator
 from collections import OrderedDict, defaultdict
 from functools import wraps, partial
 
@@ -116,6 +116,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             # TODO: issue https://github.com/scylladb/scylla/issues/6074. Waiting for dev conclusions
             'cqlstress_lwt_example': '*'  # Ignore LWT user-profile tables
         }
+        self.sequence_disrupt_iter = None
 
     @classmethod
     def add_disrupt_method(cls, func=None):
@@ -731,6 +732,42 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 self._random_sequence = multiple_disrupt_methods
             # consume the random sequence
             disrupt_method = self._random_sequence.pop()
+
+        disrupt_method_name = disrupt_method.__name__.replace('disrupt_', '')
+        self.log.info(">>>>>>>>>>>>>Started random_disrupt_method %s" % disrupt_method_name)
+        self.metrics_srv.event_start(disrupt_method_name)
+        try:
+            disrupt_method()
+        except Exception as exc:  # pylint: disable=broad-except
+            error_msg = "Exception in random_disrupt_method %s: %s", disrupt_method_name, exc
+            self.log.error(error_msg)
+            self.error_list.append(error_msg)
+            raise
+        else:
+            self.log.info("<<<<<<<<<<<<<Finished random_disrupt_method %s" % disrupt_method_name)
+        finally:
+            self.metrics_srv.event_stop(disrupt_method_name)
+
+    def call_sequence_disrupt_method(self, disrupt_methods: List[str]):
+
+        def get_obj_method_by_name(method_name: str) -> Callable:
+
+            return [attr[1] for attr in inspect.getmembers(self) if
+                    attr[0] == method_name and callable(attr[1])][0]
+
+        def create_iterator(methods_names: List[str]) -> Iterator:
+            disrupt_methods = list(map(get_obj_method_by_name, methods_names))
+            self.log.info("List of running disrupt methods in sequence: %s", [disrupt_method.__name__ for disrupt_method in disrupt_methods])
+            return iter(disrupt_methods)
+
+        if not self.sequence_disrupt_iter:
+            self.sequence_disrupt_iter = create_iterator(disrupt_methods)
+
+        try:
+            disrupt_method = next(self.sequence_disrupt_iter)
+        except StopIteration:
+            self.sequence_disrupt_iter = create_iterator(disrupt_methods)
+            disrupt_method = next(self.sequence_disrupt_iter)
 
         disrupt_method_name = disrupt_method.__name__.replace('disrupt_', '')
         self.log.info(">>>>>>>>>>>>>Started random_disrupt_method %s" % disrupt_method_name)
@@ -2859,3 +2896,33 @@ class MemoryStressMonkey(Nemesis):
     @log_time_elapsed_and_status
     def disrupt(self):
         self.disrupt_memory_stress()
+
+
+class ReproduceIssue7117Monkey(Nemesis):
+    disruptive = True
+    disrupt_nemesis_sequence = [
+        "disrupt_network_reject_thrift",
+        "disrupt_nodetool_cleanup",
+        "disrupt_soft_reboot_node",
+        "disrupt_abort_repair",
+        "disrupt_stop_wait_start_scylla_server",
+        "disrupt_snapshot_operations",
+        "disrupt_nodetool_enospc",
+        "disrupt_mgmt_repair_cli",
+        "disrupt_rebuild_streaming_err",
+        "disrupt_decommission_streaming_err",
+        "disrupt_abort_repair",
+        "disrupt_restart_with_resharding",
+        "disrupt_no_corrupt_repair",
+        "disrupt_abort_repair",
+        "disrupt_destroy_data_then_repair",
+        "disrupt_nodetool_refresh",
+        "disrupt_multiple_hard_reboot_node",
+        "disrupt_kill_scylla",
+        "disrupt_grow_shrink_cluster"
+
+    ]
+
+    @log_time_elapsed_and_status
+    def disrupt(self):
+        self.call_sequence_disrupt_method(disrupt_methods=self.disrupt_nemesis_sequence)

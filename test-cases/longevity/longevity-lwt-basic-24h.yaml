@@ -12,9 +12,13 @@ round_robin: true
 
 instance_type_db: 'i3.2xlarge'
 
-nemesis_class_name: 'ChaosMonkey'
+nemesis_class_name: 'ReproduceIssue7117Monkey'
 nemesis_interval: 5
 nemesis_during_prepare: false
 space_node_threshold: 64424
 
-user_prefix: 'longevity-lwt-24h'
+user_prefix: 'reproduce-7117-longevity-lwt-24h'
+
+update_db_packages: gs://scratch.scylladb.com/bdenes/7117/
+
+
