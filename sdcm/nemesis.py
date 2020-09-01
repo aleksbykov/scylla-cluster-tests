@@ -449,22 +449,22 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self._set_current_disruption('CorruptThenRebuild %s' % self.target_node)
         self._destroy_data_and_restart_scylla()
         # try to save the node
-        found_iter = self.target_node.follow_system_log(patterns=["seastar::named_semaphore_timed_out", "Semaphore timed out: smp_service_group"])
+        # found_iter = self.target_node.follow_system_log(patterns=["seastar::named_semaphore_timed_out", "Semaphore timed out: smp_service_group"])
 
-        def follow_log():
+        # def follow_log():
             
-            found = list(found_iter)
-            self.log.info("Found required messages: %s", found)
-            if found:
-                self.target_node.generate_coredump_file(restart_scylla=True)
-            return bool(found)
+        #     found = list(found_iter)
+        #     self.log.info("Found required messages: %s", found)
+        #     if found:
+        #         self.target_node.generate_coredump_file(restart_scylla=True)
+        #     return bool(found)
 
-        @raise_event_on_failure
-        def monitor_log_for_semaphore_timeout():
-            wait.wait_for(follow_log, step=1, text="Searching semaphore timeout...", timeout=3600, throw_exc=True)
+        # @raise_event_on_failure
+        # def monitor_log_for_semaphore_timeout():
+        #     wait.wait_for(follow_log, step=1, text="Searching semaphore timeout...", timeout=3600, throw_exc=True)
 
-        th = threading.Thread(target=monitor_log_for_semaphore_timeout, daemon=True)
-        th.start()
+        # th = threading.Thread(target=monitor_log_for_semaphore_timeout, daemon=True)
+        # th.start()
 
         self.repair_nodetool_rebuild()
 
@@ -2921,6 +2921,25 @@ class ReproduceIssue7117Monkey(Nemesis):
         "disrupt_kill_scylla",
         "disrupt_grow_shrink_cluster"
 
+    ]
+
+    @log_time_elapsed_and_status
+    def disrupt(self):
+        self.call_sequence_disrupt_method(disrupt_methods=self.disrupt_nemesis_sequence)
+
+
+class ReproduceIssue6645Monkey(Nemesis):
+    disruptive = True
+    disrupt_nemesis_sequence = [
+        "disrupt_destroy_data_then_rebuild",
+        "disrupt_destroy_data_then_repair",
+        "disrupt_rebuild_streaming_err",
+        "disrupt_decommission_streaming_err",
+        "disrupt_abort_repair",
+        "disrupt_no_corrupt_repair",
+        "disrupt_destroy_data_then_repair",
+        "disrupt_nodetool_refresh",
+        "disrupt_grow_shrink_cluster"
     ]
 
     @log_time_elapsed_and_status
