@@ -91,7 +91,8 @@ class PerformanceRegressionCDCTest(PerformanceRegressionTest):
         self.keyspace = "keyspace1"
         self.table = "standard1"
         write_cmd = self.params.get("stress_cmd_w")
-        update_es = None
+        update_es = False
+        enable_batching = False
 
         if use_cdclog_reader:
             self.cdclog_reader_cmd = self.params.get('stress_cdclog_reader_cmd')
