@@ -25,6 +25,9 @@ from cassandra import AlreadyExists, InvalidRequest
 
 
 from sdcm.tester import ClusterTester
+from sdcm.remote.local_cmd_runner import LocalCmdRunner
+
+LOCALRUNNER = LocalCmdRunner()
 
 
 class LongevityTest(ClusterTester):
@@ -372,6 +375,27 @@ class LongevityTest(ClusterTester):
                 batch_params['stress_cmd'] += [params['stress_cmd']]
 
             self._run_all_stress_cmds(stress_queue, params=batch_params)
+
+            for node in self.db_cluster.nodes:
+                result = node.remoter.run("netstat -atn |  wc -l", timeout=300, ignore_status=True, verbose=True)
+                self.log.info(
+                    "Number of opened tcp sockets on node %s[%s]: %s", node.name, node.ip_address, result.stdout)
+                result = node.remoter.run("netstat -an |  wc -l", timeout=300, ignore_status=True, verbose=True)
+                self.log.info(
+                    "Number of opened all sockets on node %s[%s]: %s", node.name, node.ip_address, result.stdout)
+
+            for node in self.loaders.nodes:
+                result = node.remoter.run("netstat -atn |  wc -l", timeout=300, ignore_status=True, verbose=True)
+                self.log.info(
+                    "Number of opened tcp sockets on node %s[%s]: %s", node.name, node.ip_address, result.stdout)
+                result = node.remoter.run("netstat -an |  wc -l", timeout=300, ignore_status=True, verbose=True)
+                self.log.info(
+                    "Number of opened all sockets on node %s[%s]: %s", node.name, node.ip_address, result.stdout)
+
+            result = LOCALRUNNER.run("ss -atn |  wc -l", timeout=300, ignore_status=True, verbose=True)
+            self.log.info("Number of opened tcp sockets on node %s[%s]: %s", node.name, node.ip_address, result.stdout)
+            result = LOCALRUNNER.run("netstat -an |  wc -l", timeout=300, ignore_status=True, verbose=True)
+            self.log.info("Number of opened all sockets on node %s[%s]: %s", node.name, node.ip_address, result.stdout)
 
     def _run_stress_in_batches(self, total_stress, batch_size, stress_cmd):
         stress_queue = list()
