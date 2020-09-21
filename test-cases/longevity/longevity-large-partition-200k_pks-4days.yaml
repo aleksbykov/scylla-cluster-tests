@@ -60,10 +60,10 @@ round_robin: true
 
 instance_type_db: 'i3en.3xlarge'
 
-nemesis_class_name: 'ChaosMonkey'
-nemesis_interval: 30
+nemesis_class_name: 'ReproduceIssue7208Monkey'
+nemesis_interval: 15
 
-user_prefix: 'longevity-large-partitions-200k-pks-4d'
+user_prefix: 'repo-7208-large-partitions-200k-pks-4d'
 
 space_node_threshold: 644245094
 
@@ -71,3 +71,5 @@ space_node_threshold: 644245094
 # if running on aws and use_mgmt is true, the monitor image should not contain scylla
 use_mgmt: true
 stop_test_on_stress_failure: false
+
+update_db_packages: "gs://scratch.scylladb.com/bdenes/7208/"

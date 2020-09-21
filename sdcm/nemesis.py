@@ -2985,3 +2985,29 @@ class ReproduceIssue7117Monkey(Nemesis):
     @log_time_elapsed_and_status
     def disrupt(self):
         self.call_sequence_disrupt_method(disrupt_methods=self.disrupt_nemesis_sequence)
+
+
+class ReproduceIssue7208Monkey(Nemesis):
+    disruptive = True
+    disrupt_nemesis_sequence = [
+        "disrupt_delete_by_rows_range",
+        "disrupt_mgmt_backup",
+        "disrupt_repair_streaming_err",
+        "disrupt_abort_repair",
+        "disrupt_stop_wait_start_scylla_server",
+        "disrupt_rebuild_streaming_err",
+        "disrupt_decommission_streaming_err",
+        "disrupt_abort_repair",
+        "disrupt_restart_with_resharding",
+        "disrupt_no_corrupt_repair",
+        "disrupt_destroy_data_then_repair",
+        "disrupt_nodetool_refresh",
+        "disrupt_multiple_hard_reboot_node",
+        "disrupt_kill_scylla",
+        "disrupt_grow_shrink_cluster"
+
+    ]
+
+    @log_time_elapsed_and_status
+    def disrupt(self):
+        self.call_sequence_disrupt_method(disrupt_methods=self.disrupt_nemesis_sequence)
