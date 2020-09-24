@@ -16,13 +16,17 @@ n_monitor_nodes: 1
 
 instance_type_db: 'i3.4xlarge'
 
-nemesis_class_name: 'ChaosMonkey'
+nemesis_class_name: 'NodeTerminateAndReplace'
 nemesis_interval: 30
 
-user_prefix: 'longevity-mv-si-4d'
+user_prefix: 'repro-7249-longevity-mv-si-4d'
 
 space_node_threshold: 644245
 
 # scylla-manager configuration
 # if running on aws and use_mgmt is true, the monitor image should not contain scylla
 use_mgmt: true
+
+append_scylla_args: '--blocked-reactor-notify-ms 20 --abort-on-lsa-bad-alloc 1 --abort-on-seastar-bad-alloc --abort-on-internal-error 1 --abort-on-ebadf 1 --enable-sstable-key-validation 1'
+
+hinted_handoff: 'disabled'
