@@ -21,10 +21,10 @@ table_definition: |
     PRIMARY KEY(userid)
   );
 
-# extra_definitions:
-#   - CREATE INDEX IF NOT EXISTS  users_last_name_ind ON sec_index.users (last_name)
-#   - CREATE INDEX IF NOT EXISTS  users_first_name_ind ON sec_index.users (first_name)
-#   - CREATE INDEX IF NOT EXISTS  users_initials_ind ON sec_index.users (initials)
+extra_definitions:
+  - CREATE INDEX IF NOT EXISTS  users_last_name_ind ON sec_index.users (last_name)
+  - CREATE INDEX IF NOT EXISTS  users_first_name_ind ON sec_index.users (first_name)
+  - CREATE INDEX IF NOT EXISTS  users_initials_ind ON sec_index.users (initials)
 
 columnspec:
   - name: userid
@@ -61,18 +61,18 @@ queries:
     cql: select * from sec_index.users where userid = ?
     fields: samerow
   si_read2:
-    # cql: select * from sec_index.users where first_name = ?
-    cql: select * from sec_index.users where userid = ?
+    cql: select * from sec_index.users where first_name = ?
+    # cql: select * from sec_index.users where userid = ?
     fields: samerow
   si_read3:
-    # cql: select * from sec_index.users where last_name = ?
-    cql: select * from sec_index.users where userid = ?
+    cql: select * from sec_index.users where last_name = ?
+    # cql: select * from sec_index.users where userid = ?
     fields: samerow
   si_read4:
-    # cql: select * from sec_index.users where first_name = ? and last_name = ? ALLOW FILTERING
-    cql: select * from sec_index.users where userid = ?
+    cql: select * from sec_index.users where first_name = ? and last_name = ? ALLOW FILTERING
+    # cql: select * from sec_index.users where userid = ?
     fields: samerow
   si_read5:
-    # cql: select userid, initials, first_name, last_name from sec_index.users where initials = ?
-    cql: select * from sec_index.users where userid = ?
+    cql: select userid, initials, first_name, last_name from sec_index.users where initials = ?
+    # cql: select * from sec_index.users where userid = ?
     fields: samerow
