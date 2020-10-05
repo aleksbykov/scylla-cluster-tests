@@ -9,7 +9,7 @@ n_monitor_nodes: 1
 
 instance_type_db: 'i3en.3xlarge'
 
-nemesis_class_name: 'ChaosMonkey'
+nemesis_class_name: 'NodeToolCleanupMonkey'
 nemesis_interval: 15
 
 user_prefix: 'longevity-large-collections-12h'
