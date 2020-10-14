@@ -2994,29 +2994,18 @@ class MemoryStressMonkey(Nemesis):
         self.disrupt_memory_stress()
 
 
-class ReproduceIssue7117Monkey(Nemesis):
+class ReproduceIssue7025Monkey(Nemesis):
     disruptive = True
     disrupt_nemesis_sequence = [
-        "disrupt_network_reject_thrift",
-        "disrupt_nodetool_cleanup",
         "disrupt_soft_reboot_node",
-        "disrupt_abort_repair",
-        "disrupt_stop_wait_start_scylla_server",
-        "disrupt_snapshot_operations",
-        "disrupt_nodetool_enospc",
-        "disrupt_mgmt_repair_cli",
         "disrupt_rebuild_streaming_err",
+        "disrupt_restart_then_repair_node",
         "disrupt_decommission_streaming_err",
+        "disrupt_destroy_data_then_repair",
         "disrupt_abort_repair",
+        "disrupt_destroy_data_then_rebuild",
         "disrupt_restart_with_resharding",
         "disrupt_no_corrupt_repair",
-        "disrupt_abort_repair",
-        "disrupt_destroy_data_then_repair",
-        "disrupt_nodetool_refresh",
-        "disrupt_multiple_hard_reboot_node",
-        "disrupt_kill_scylla",
-        "disrupt_grow_shrink_cluster"
-
     ]
 
     @log_time_elapsed_and_status
