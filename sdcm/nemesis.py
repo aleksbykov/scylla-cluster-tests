@@ -28,7 +28,7 @@ import traceback
 import json
 
 
-from typing import List, Optional, TypedDict, Type
+from typing import List, Optional, TypedDict, Type, Tuple
 from collections import OrderedDict, defaultdict, Counter, namedtuple
 from functools import wraps, partial
 
@@ -37,7 +37,7 @@ from invoke import UnexpectedExit
 from cassandra import ConsistencyLevel  # pylint: disable=ungrouped-imports
 
 from sdcm.cluster_aws import ScyllaAWSCluster
-from sdcm.cluster import SCYLLA_YAML_PATH, NodeSetupTimeout, NodeSetupFailed
+from sdcm.cluster import SCYLLA_YAML_PATH, NodeSetupTimeout, NodeSetupFailed, CDC_LOGTABLE_SUFFIX
 from sdcm.group_common_events import ignore_alternator_client_errors, ignore_no_space_errors
 from sdcm.mgmt import TaskStatus
 from sdcm.utils.common import remote_get_file, get_db_tables, generate_random_string, \
@@ -125,6 +125,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             # TODO: issue https://github.com/scylladb/scylla/issues/6074. Waiting for dev conclusions
             'cqlstress_lwt_example': '*'  # Ignore LWT user-profile tables
         }
+        self._cdc_stressor_cmd = "cdc-stressor -stream-query-round-duration 30s"
 
     @classmethod
     def add_disrupt_method(cls, func=None):
@@ -2398,6 +2399,165 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self.target_node.remoter.run(
             "stress-ng --vm-bytes $(awk '/MemTotal/{printf \"%d\\n\", $2 * 0.9;}' < /proc/meminfo)k --vm-keep -m 1 -t 100")
 
+    def disrupt_toggle_cdc_feature_properties_on_table(self):
+        """Manupulate cdc feature
+
+        randomly choose table and toggle cdc feature
+        with radomly generated cdc properties
+        """
+        self._set_current_disruption("ToggleCDCProperties")
+
+        if not self.tester.params.get("cdc_nemesis_enabled"):
+            self.log.warning("CDCStressor couldn't be run, executing cdc nemesis is disabled")
+            UnsupportedNemesis("CDCStressor couldn't be run, executing cdc nemesis is disabled")
+            return
+
+        def _generate_cdc_properties(cdc_enabled: bool) -> Tuple[str, str, str, int]:
+            """Generate random set of cdc properties
+
+            :param cdc_enabled: Was cdc enabled on table (True) or not (False)
+            :type cdc_enabled: bool
+            """
+            cdc_enabled = random.choice([True, False]) if cdc_enabled else True
+            preimage = random.choice([True, False]),
+            postimage = random.choice([True, False]),
+            ttl = random.randint(300, 3600)
+
+            return (cdc_enabled, preimage, postimage, ttl)
+
+        ks_tables_with_cdc = self.cluster.get_all_tables_with_cdc(self.target_node)
+        self.log.debug(f"Found next tables with enabled cdc feature: {ks_tables_with_cdc}")
+
+        if ks_tables_with_cdc:
+            ks, table = random.choice(ks_tables_with_cdc).split(".")
+            cdc_enabled, preimage, postimage, ttl = _generate_cdc_properties(cdc_enabled=True)
+        else:
+            ks_tables = self.cluster.get_non_system_ks_cf_list(self.target_node,
+                                                               filter_out_mv=True)
+            ks, table = random.choice(ks_tables).split(".")
+            cdc_enabled, preimage, postimage, ttl = _generate_cdc_properties(cdc_enabled=False)
+
+        self._alter_table_with_cdc_properties(ks, table, cdc_enabled, preimage, postimage, ttl)
+        self._verify_cdc_feature_status(ks, table, cdc_enabled, preimage, postimage, ttl)
+
+    def disrupt_run_cdcstressor_tool(self):
+        self._set_current_disruption(label="RunCDCStressorTool")
+
+        if not self.tester.params.get("cdc_nemesis_enabled"):
+            self.log.warning("CDCStressor couldn't be run, executing cdc nemesis is disabled")
+            UnsupportedNemesis("CDCStressor couldn't be run, executing cdc nemesis is disabled")
+            return
+
+        ks_tables_with_cdc = self.cluster.get_all_cdc_tables(self.target_node)
+        if not ks_tables_with_cdc:
+            self.log.warning("No cdc enabled on any table. Skipping")
+            UnsupportedNemesis("No cdc enabled on any table. Skipping")
+            return
+
+        cdc_stressor_cmd = self.tester.params.get("stress_cdclog_reader_cmd", self._cdc_stressor_cmd)
+
+        if " -duration" not in cdc_stressor_cmd:
+            read_time = random.randint(5, 20)
+            cdc_stressor_cmd += f" -duration {read_time}m "
+
+        ks, table = random.choice(ks_tables_with_cdc).split(".")
+
+        cdc_reader_thread = self.tester.run_cdclog_reader_thread(stress_cmd=cdc_stressor_cmd,
+                                                                 stress_num=1,
+                                                                 keyspace_name=ks,
+                                                                 base_table_name=table)
+
+        self.tester.verify_cdclog_reader_results(cdc_reader_thread, update_es=False)
+
+    def _alter_table_with_cdc_properties(self, keyspace: str, table: str, cdc_enabled: bool = True,
+                                         preimage: bool = False,
+                                         postimage: bool = False,
+                                         ttl: Optional[int] = None) -> None:
+        """Alter base table with cdc properties
+
+        Build valid query and alter table with cdc properties
+        :param keyspace: keyspace name
+        :type keyspace: str
+        :param table: base table name
+        :type table: str
+        :param cdc_enabled: is cdc enabled for base table, defaults to True
+        :type cdc_enabled: bool, optional
+        :param preimage: is preimage enabled for base table, defaults to False
+        :type preimage: bool, optional
+        :param postimage: is postimage enabled for base table, defaults to False
+        :type postimage: bool, optional
+        :param ttl: set ttl for scylla_cdc_log table, defaults to None
+        :type ttl: Optional[int], optional
+        """
+        cdc_enabled = "'enabled': true" if cdc_enabled else "'enabled': false"
+        preimage_enabled = "'preimage': true" if preimage else "'preimage': false"
+        postimage_enabled = "'postimage': true" if postimage else "'postimage': false"
+        ttl_enabled = f"'ttl': {ttl}" if ttl else "'ttl': 86400"
+
+        cdc_properties = f"cdc = {{ {cdc_enabled}, {preimage_enabled}, {postimage_enabled}, {ttl_enabled} }}"
+
+        cmd = f"ALTER TABLE {keyspace}.{table} WITH {cdc_properties};"
+        self.log.info(f"Alter command: {cmd}")
+        with self.cluster.cql_connection_patient(self.target_node) as session:
+            session.execute(cmd)
+        # wait applying cdc configuration
+        time.sleep(15)
+
+    def _verify_cdc_feature_status(self, keyspace, table,
+                                   cdc_enabled=True, preimage=False, postimage=False, ttl=86400):
+        """Verify that cdc was enabled for table
+
+        Verify that cdc was enabled/disabled for specific table
+         - check in keyspace description that cdc log table present/missing
+         - request from cdc log table one row with specific operation:
+            - INSERT/UPDATE : cdc_operation in (1,2): cdc was enabled
+            - PREIMAGE: cdc_operation = 0: if preimage was enabled
+            - POSTIMAGE: cdc_operation = 9: if postimage was enabled
+        :param keyspace: keyspace name
+        :type keyspace: str
+        :param table: base table name
+        :type table: str
+        :param cdc_enabled: enable cdc, defaults to True
+        :type cdc_enabled: bool, optional
+        :param preimage: enable preimage, defaults to False
+        :type preimage: bool, optional
+        :param postimage: enable postimage, defaults to False
+        :type postimage: bool, optional
+        :param ttl: set ttl for records in cdc log tables, defaults to 86400
+        :type ttl: number, optional
+        """
+
+        self.log.debug("Wait for cdc enabled and cdc log tables will be populated")
+        time.sleep(60)
+        output = self.target_node.run_cqlsh(f"desc keyspace {keyspace}")
+        self.log.debug(output.stdout)
+
+        cdc_log_table = f"{table}{CDC_LOGTABLE_SUFFIX}"
+        if not cdc_enabled:
+            assert f"{cdc_log_table}" not in output.stdout, "CDC log table stays in keyspace"
+            self.log.info(f"CDC feature was disabled on table {keyspace}{table}")
+        else:
+            assert f"{cdc_log_table}" in output.stdout
+            self.log.info(f"CDC feature was enabled on table {keyspace}{table}")
+
+            with self.cluster.cql_connection_patient(self.target_node) as session:
+                query = f"SELECT \"cdc$stream_id\", \"cdc$time\" FROM {keyspace}.{cdc_log_table} WHERE \"cdc$operation\" in (1,2) LIMIT 1 ALLOW FILTERING"
+                result = list(session.execute(query))
+                self.log.debug(result)
+                assert len(result) == 1, "CDC log table may be empty"
+
+                if preimage:
+                    query = f"SELECT \"cdc$stream_id\", \"cdc$time\" FROM {keyspace}.{cdc_log_table} WHERE \"cdc$operation\" = 0 LIMIT 1 ALLOW FILTERING"
+                    result = list(session.execute(query))
+                    self.log.debug(result)
+                    assert len(result) == 1, "No preimage operation were found"
+
+                if postimage:
+                    query = f"SELECT \"cdc$stream_id\", \"cdc$time\" FROM {keyspace}.{cdc_log_table} WHERE \"cdc$operation\" = 9 LIMIT 1 ALLOW FILTERING"
+                    result = list(session.execute(query))
+                    self.log.debug(result)
+                    assert len(result) == 1, "No postimage operation were found"
+
 
 class NotSpotNemesis(Nemesis):
     def set_target_node(self):
@@ -3215,6 +3375,19 @@ class SisyphusMonkey(Nemesis):
         self.call_next_nemesis()
 
 
+class ToggleCDCMonkey(Nemesis):
+    disruptive = False
+
+    def disrupt(self):
+        self.disrupt_toggle_cdc_feature_properties_on_table()
+
+
+class CDCStressorMonkey(Nemesis):
+
+    def disrupt(self):
+        self.disrupt_run_cdcstressor_tool()
+
+
 # Disable unstable streaming err nemesises
 #
 # class DecommissionStreamingErrMonkey(Nemesis):
@@ -3242,7 +3415,6 @@ class SisyphusMonkey(Nemesis):
 #     @log_time_elapsed_and_status
 #     def disrupt(self):
 #         self.disrupt_repair_streaming_err()
-
 DEPRECATED_LIST_OF_NEMESISES = [UpgradeNemesis, UpgradeNemesisOneNode, RollbackNemesis]
 
 COMPLEX_NEMESIS = [NoOpMonkey, ChaosMonkey,

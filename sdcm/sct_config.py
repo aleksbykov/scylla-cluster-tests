@@ -1013,6 +1013,10 @@ class SCTConfiguration(dict):
              type=boolean,
              help="""retrieving data from multiple streams in one poll"""),
 
+        dict(name="cdc_nemesis_enabled", env="SCT_CDC_NEMESIS_ENABLED",
+             type=boolean,
+             help="Run cdc nemesis to operate with cdc feature"),
+
         dict(name="use_legacy_cluster_init", env="SCT_USE_LEGACY_CLUSTER_INIT", type=bool,
              help="""Use legacy cluster initialization with autobootsrap disabled and parallel node setup"""),
         dict(name="availability_zone", env="SCT_AVAILABILITY_ZONE",

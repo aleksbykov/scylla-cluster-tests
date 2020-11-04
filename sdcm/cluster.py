@@ -88,6 +88,7 @@ RES_QUEUE = 'res_queue'
 WORKSPACE = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 SCYLLA_YAML_PATH = "/etc/scylla/scylla.yaml"
 SCYLLA_DIR = "/var/lib/scylla"
+CDC_LOGTABLE_SUFFIX = "_scylla_cdc_log"
 
 INSTANCE_PROVISION_ON_DEMAND = 'on_demand'
 SPOT_TERMINATION_CHECK_DELAY = 5
@@ -2961,11 +2962,11 @@ class BaseCluster:  # pylint: disable=too-many-instance-attributes,too-many-publ
                                   filter_out_table_with_counter=False, filter_out_mv=False, filter_empty_tables=True) -> List[str]:
         return self.get_any_ks_cf_list(db_node, filter_out_table_with_counter=filter_out_table_with_counter,
                                        filter_out_mv=filter_out_mv, filter_empty_tables=filter_empty_tables,
-                                       filter_out_system=True)
+                                       filter_out_system=True, filter_out_cdc_log_tables=True)
 
     def get_any_ks_cf_list(self, db_node,  # pylint: disable=too-many-arguments
                            filter_out_table_with_counter=False, filter_out_mv=False, filter_empty_tables=True,
-                           filter_out_system=False) -> List[str]:
+                           filter_out_system=False, filter_out_cdc_log_tables=False) -> List[str]:
         regular_column_names = ["keyspace_name", "table_name"]
         materialized_view_column_names = ["keyspace_name", "view_name"]
         regular_table_names, materialized_view_table_names = set(), set()
@@ -2989,6 +2990,8 @@ class BaseCluster:  # pylint: disable=too-many-instance-attributes,too-many-publ
                 if filter_out_system and getattr(row, column_names[0]).startswith(("system", "alternator_usertable")):
                     is_valid_table = False
                 elif is_column_type and (filter_out_table_with_counter and "counter" in row.type):
+                    is_valid_table = False
+                elif filter_out_cdc_log_tables and getattr(row, column_names[1]).endswith(CDC_LOGTABLE_SUFFIX):
                     is_valid_table = False
                 elif is_column_type and filter_empty_tables:
                     current_rows = 0
@@ -3019,6 +3022,17 @@ class BaseCluster:  # pylint: disable=too-many-instance-attributes,too-many-publ
             return []
 
         return list(regular_table_names - materialized_view_table_names)
+
+    def get_all_cdc_tables(self, db_node: BaseNode) -> List[str]:
+        all_ks_cf = self.get_any_ks_cf_list(db_node,
+                                            filter_out_system=True,
+                                            filter_out_mv=True)
+        self.log.debug(all_ks_cf)
+        ks_tables_with_cdc = [ks_cf_cdc.strip(CDC_LOGTABLE_SUFFIX)
+                              for ks_cf_cdc in all_ks_cf if ks_cf_cdc.endswith(CDC_LOGTABLE_SUFFIX)]
+        self.log.info(ks_tables_with_cdc)
+
+        return ks_tables_with_cdc
 
 
 class NodeSetupFailed(Exception):

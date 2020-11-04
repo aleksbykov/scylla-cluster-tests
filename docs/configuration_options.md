@@ -256,3 +256,4 @@
 | **<a href="#user-content-stress_before_upgrade" name="stress_before_upgrade">stress_before_upgrade</a>**  | Stress command to be run before upgrade (preapre stage) | N/A | SCT_STRESS_BEFORE_UPGRADE
 | **<a href="#user-content-stress_during_entire_upgrade" name="stress_during_entire_upgrade">stress_during_entire_upgrade</a>**  | Stress command to be run during the upgrade - user should take care for suitable duration | N/A | SCT_STRESS_DURING_ENTIRE_UPGRADE
 | **<a href="#user-content-stress_after_cluster_upgrade" name="stress_after_cluster_upgrade">stress_after_cluster_upgrade</a>**  | Stress command to be run after full upgrade - usually used to read the dataset for verification | N/A | SCT_STRESS_AFTER_CLUSTER_UPGRADE
+| **<a href="#user-content-cdc_nemesis_enabled" name="cdc_nemesis_enabled">cdc_nemesis_enabled</a>**  | Run cdc nemesis to operate with cdc feature | N/A | SCT_CDC_NEMESIS_ENABLED
