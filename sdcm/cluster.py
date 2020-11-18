@@ -3023,7 +3023,7 @@ class BaseCluster:  # pylint: disable=too-many-instance-attributes,too-many-publ
 
         return list(regular_table_names - materialized_view_table_names)
 
-    def get_all_cdc_tables(self, db_node: BaseNode) -> List[str]:
+    def get_all_tables_with_cdc(self, db_node: BaseNode) -> List[str]:
         all_ks_cf = self.get_any_ks_cf_list(db_node,
                                             filter_out_system=True,
                                             filter_out_mv=True)

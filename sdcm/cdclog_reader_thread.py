@@ -13,7 +13,6 @@ from sdcm.cluster import CDC_LOGTABLE_SUFFIX
 
 LOGGER = logging.getLogger(__name__)
 
-
 CDCLOG_READER_IMAGE = get_docker_stress_image_name(tool_name="cdcstressor")
 PP = pprint.PrettyPrinter(indent=2)
 

@@ -2448,7 +2448,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             UnsupportedNemesis("CDCStressor couldn't be run, executing cdc nemesis is disabled")
             return
 
-        ks_tables_with_cdc = self.cluster.get_all_cdc_tables(self.target_node)
+        ks_tables_with_cdc = self.cluster.get_all_tables_with_cdc(self.target_node)
         if not ks_tables_with_cdc:
             self.log.warning("No cdc enabled on any table. Skipping")
             UnsupportedNemesis("No cdc enabled on any table. Skipping")
@@ -3441,3 +3441,13 @@ class MemoryStressMonkey(Nemesis):
     @log_time_elapsed_and_status
     def disrupt(self):
         self.disrupt_memory_stress()
+
+
+class LimitedCdcMonkey(Nemesis):
+
+    @log_time_elapsed_and_status
+    def disrupt(self):
+        self.call_random_disrupt_method(
+            disrupt_methods=["disrupt_toggle_cdc_feature_properties_on_table",
+                             "disrupt_run_cdcstressor_tool",
+                             "disrupt_toggle_cdc_feature_properties_on_table"])
