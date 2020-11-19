@@ -20,8 +20,14 @@ round_robin: true
 
 instance_type_db: 'i3.4xlarge'
 
-nemesis_class_name: 'ChaosMonkey'
+nemesis_class_name: 'DecommissionMonkey'
 nemesis_interval: 5
 nemesis_during_prepare: false
 
-user_prefix: 'longevity-cdc-3d-400gb'
+user_prefix: 'repo-7562'
+
+append_scylla_args: '--blocked-reactor-notify-ms 50 --abort-on-lsa-bad-alloc 1 --abort-on-seastar-bad-alloc --abort-on-internal-error 1 --abort-on-ebadf 1 --enable-sstable-key-validation 1'
+
+append_scylla_yaml: |
+  compaction_large_row_warning_threshold_mb: 10
+  compaction_large_cell_warning_threshold_mb: 1
