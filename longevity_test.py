@@ -104,7 +104,7 @@ class LongevityTest(ClusterTester):
         Run cassandra-stress with params defined in data_dir/scylla.yaml
         """
         # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-
+        return
         self.db_cluster.add_nemesis(nemesis=self.get_nemesis_class(),
                                     tester_obj=self)
         stress_queue = list()
