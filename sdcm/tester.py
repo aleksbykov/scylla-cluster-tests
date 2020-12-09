@@ -716,6 +716,25 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
             else:
                 db_info['device_mappings'] = []
 
+        additional_ebs_volumes_num = self.params.get("aws_ebs_volume_num")
+        if additional_ebs_volumes_num > 0:
+            ebs = {"DeleteOnTermination": True,
+                   "VolumeType": self.params.get("aws_ebs_volume_type"),
+                   "VolumeSize": self.params.get('aws_ebs_volume_size')}
+
+            if ebs['VolumeType'] in ['io1', 'io2', 'gp3']:
+                ebs["Iops"] = self.params.get('aws_ebs_volume_iops')
+
+            for disk_char in "fghijklmnop"[:additional_ebs_volumes_num]:
+                ebs_volume = {
+                    "DeviceName": f"/dev/xvd{disk_char}",
+                    "Ebs": ebs
+                }
+
+                db_info['device_mappings'].append(ebs_volume)
+
+        self.log.debug(db_info['device_mappings'])
+
         if monitor_info['n_nodes'] is None:
             monitor_info['n_nodes'] = self.params.get('n_monitor_nodes')
         if monitor_info['type'] is None:

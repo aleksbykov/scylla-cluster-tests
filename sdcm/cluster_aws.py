@@ -841,7 +841,9 @@ class ScyllaAWSCluster(cluster.BaseScyllaCluster, AWSCluster):
         user_data_format_version = ami_tags.get('user_data_format_version', user_data_format_version)
 
         if parse_version(user_data_format_version) >= parse_version('2'):
-            user_data = dict(scylla_yaml=dict(cluster_name=name), start_scylla_on_first_boot=False)
+            user_data = dict(scylla_yaml=dict(cluster_name=name),
+                             start_scylla_on_first_boot=False,
+                             data_device=params.get("data_device"))
         else:
             user_data = ('--clustername %s '
                          '--totalnodes %s' % (name, sum(n_nodes)))

@@ -259,3 +259,7 @@
 | **<a href="#user-content-stress_after_cluster_upgrade" name="stress_after_cluster_upgrade">stress_after_cluster_upgrade</a>**  | Stress command to be run after full upgrade - usually used to read the dataset for verification | N/A | SCT_STRESS_AFTER_CLUSTER_UPGRADE
 | **<a href="#user-content-jepsen_scylla_repo" name="jepsen_scylla_repo">jepsen_scylla_repo</a>**  | Link to the git repository with Jepsen Scylla tests | https://github.com/jepsen-io/scylla.git | SCT_JEPSEN_SCYLLA_REPO
 | **<a href="#user-content-jepsen_test_cmd" name="jepsen_test_cmd">jepsen_test_cmd</a>**  | Jepsen test command (e.g., 'test-all') | test-all | SCT_JEPSEN_TEST_CMD
+| **<a href="#user-content-aws_ebs_volume_num" name="aws_ebs_volume_num">aws_ebs_volume_num</a>**  | Number of additional ebs volumes attached to instances | N/A | SCT_AWS_EBS_VOLUME_NUM
+| **<a href="#user-content-aws_ebs_volume_type" name="aws_ebs_volume_type">aws_ebs_volume_type</a>**  | Type of addtitional volumes: gp2|gp3|io2|io3 | N/A | SCT_AWS_EBS_VOLUME_IOPS
+| **<a href="#user-content-aws_ebs_volume_size" name="aws_ebs_volume_size">aws_ebs_volume_size</a>**  | Size of additional volume in GB | N/A | SCT_EBS_VOLUME_SIZE
+| **<a href="#user-content-aws_ebs_volume_iops" name="aws_ebs_volume_iops">aws_ebs_volume_iops</a>**  | Number of iops for ebs type io2|io3|gp3 | N/A | SCT_EBS_VOLUME_IOPS
