@@ -2371,7 +2371,13 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
         This function will run fstrim command all db nodes in the cluster to clear any bad state of the disks.
         :return:
         """
-        for node in self.db_cluster.nodes:
+        # if used ebs volumes with aws backend fstrim is not supported
+        # fstrim: /var/lib/scylla: the discard operation is not supported
+        if self.db_cluster.is_ebs_volumes_attached():
+            self.log.info("fstrim is not supported on aws ebs volumes")
+            return
+
+        for node in self.db_cluster.snodes:
             node.remoter.run('sudo fstrim -v /var/lib/scylla')
 
     @silence()

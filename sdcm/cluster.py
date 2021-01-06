@@ -4167,6 +4167,23 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         if host_ip is None:
             host_ip = self.nodes[0].ip_address
         return manager_tool.add_cluster(name=cluster_name, host=host_ip, auth_token=self.scylla_manager_auth_token)
+    def is_ebs_volumes_attached(self) -> bool:
+        """check data device type usage
+
+        check if scylla cluster uses the
+        ebs volumes for instance on aws cloud
+
+        :returns: if ebs volumes attached return true
+        :rtype: {bool}
+        """
+        backend = self.params.get('cluster_backend')
+        data_device_type = self.params.get("data_device")
+
+        if backend == "aws" and data_device_type == "attached":
+            self.log.info("fstrim is not supported for ebs volumes")
+            return True
+
+        return False
 
 
 class BaseLoaderSet():

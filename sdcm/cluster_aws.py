@@ -688,6 +688,9 @@ class AWSNode(cluster.BaseNode):
 
         need_to_setup = any(ss in self._instance.instance_type for ss in ("i2", "i3", ))
 
+        if self.parent_cluster.is_ebs_volumes_attached():
+            need_to_setup = False
+
         with ExitStack() as stack:
             if need_to_setup:
                 # There is no disk yet, lots of the errors here are acceptable, and we'll ignore them.
