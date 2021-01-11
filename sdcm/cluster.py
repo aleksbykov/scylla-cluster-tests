@@ -105,6 +105,12 @@ SPOT_TERMINATION_CHECK_DELAY = 5
 
 LOGGER = logging.getLogger(__name__)
 
+SUPPORTED_SCYLLA_INSTANCE_FAMILIES = ['i2', 'i3', 'i3en', 'c5d', 'm5d', 'm5ad', 'r5d', 'z1d']
+
+
+def is_supported_instance_family(instance_type):
+    return instance_type.split(".")[0] in SUPPORTED_SCYLLA_INSTANCE_FAMILIES
+
 
 def set_ip_ssh_connections(ip_type):
     # pylint: disable=global-statement
@@ -3926,6 +3932,13 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
                 node.stop_scylla_server(verify_down=False)
                 node.clean_scylla_data()
                 node.remoter.sudo(cmd="rm -f /etc/scylla/ami_disabled", ignore_status=True)
+                if not is_supported_instance_family(self.params.get("instance_type_db")):
+                    result = node.remoter.sudo(cmd="scylla_io_setup")
+                    if result.ok:
+                        self.log.info("Scylla_io_setup result: %s", result.stdout)
+                    else:
+                        self.log.error(result)
+                        raise Exception(f"{result.return_code}\n{result.stdout}\n{result.stderr}")
                 node.start_scylla_server(verify_up=False)
 
             # code to increase java heap memory to scylla-jmx (because of #7609)
