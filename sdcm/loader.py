@@ -62,7 +62,7 @@ class StressExporter(FileFollowerThread, metaclass=ABCMeta):
         ...
 
     def set_metric(self, name: str, value: float) -> None:
-        self.stress_metric.labels(0, self.instance_name, self.loader_idx, self.cpu_idx, name, self.keyspace).set(value)
+        self.stress_metric.labels(self.keyspace, 0, self.instance_name, self.loader_idx, self.cpu_idx, name).set(value)
 
     def clear_metrics(self) -> None:
         if self.stress_metric:
@@ -130,7 +130,7 @@ class CassandraStressExporter(StressExporter):
             self.METRICS_GAUGES[gauge_name] = self.metrics.create_gauge(
                 gauge_name,
                 'Gauge for cassandra stress metrics',
-                [f'cassandra_stress_{self.stress_operation}', 'instance', 'loader_idx', 'cpu_idx', 'type', 'keyspace'])
+                ['akeyspace', f'cassandra_stress_{self.stress_operation}', 'instance', 'loader_idx', 'cpu_idx', 'type'])
         return gauge_name
 
     def merics_position_in_log(self) -> MetricsPosition:
@@ -163,7 +163,7 @@ class ScyllaBenchStressExporter(StressExporter):
             self.METRICS_GAUGES[gauge_name] = self.metrics.create_gauge(
                 gauge_name,
                 'Gauge for scylla-bench stress metrics',
-                [f'scylla_bench_stress_{self.stress_operation}', 'instance', 'loader_idx', 'cpu_idx', 'type', 'keyspace'])
+                ['akeyspace', f'scylla_bench_stress_{self.stress_operation}', 'instance', 'loader_idx', 'cpu_idx', 'type'])
         return gauge_name
 
     def merics_position_in_log(self) -> MetricsPosition:
