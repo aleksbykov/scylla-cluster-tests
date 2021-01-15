@@ -2,6 +2,7 @@ import logging
 
 from datetime import datetime, timedelta
 
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -12,11 +13,13 @@ class QueryFilter():
     SETUP_PARAMS = ['n_db_nodes', 'n_loaders', 'n_monitor_nodes']
     SETUP_INSTANCE_PARAMS = ['instance_type_db', 'instance_type_loader', 'instance_type_monitor']
 
-    def __init__(self, test_doc, is_gce=False):
+    def __init__(self, test_doc, is_gce=False, use_wide_query=False, lastyear=False):
         self.test_doc = test_doc
         self.test_name = test_doc["_source"]["test_details"]["test_name"]
         self.is_gce = is_gce
         self.date_re = '/.*/'
+        self.use_wide_query = use_wide_query
+        self.lastyear = lastyear
 
     def setup_instance_params(self):
         return ['gce_' + param for param in self.SETUP_INSTANCE_PARAMS] if self.is_gce else self.SETUP_INSTANCE_PARAMS
@@ -44,9 +47,31 @@ class QueryFilter():
     def test_cmd_details(self):
         raise NotImplementedError('Derived classes must implement this method.')
 
+    def filter_by_dashboard_query(self):
+        if "throughput" in self.test_doc['_source']['test_details']['job_name']:
+            test_type = r'results.stats.op\ rate:*'
+        elif "latency" in self.test_doc['_source']['test_details']['job_name']:
+            test_type = r'results.stats.latency\ 99th\ percentile:*'
+        else:
+            test_type = ""
+        return test_type
+
+    def build_query(self):
+        query = [self.filter_test_details()]
+
+        if not self.use_wide_query:
+            query.append(self.filter_setup_details())
+        else:
+            query.append(self.filter_by_dashboard_query())
+
+        if self.lastyear:
+            query.append(self.filter_test_for_lastyear())
+
+        return " AND ".join([q for q in query if q])
+
     def __call__(self, *args, **kwargs):
         try:
-            return '{} AND {} AND {}'.format(self.filter_test_details(), self.filter_setup_details(), self.filter_test_for_lastyear())
+            return self.build_query()
         except KeyError:
             LOGGER.exception('Expected parameters for filtering are not found , test {}'.format(self.test_doc['_id']))
         return None
@@ -67,9 +92,9 @@ class PerformanceQueryFilter(QueryFilter):
 
     def filter_test_details(self):
         test_details = self.build_filter_job_name()
-        test_details += self.test_cmd_details()
-        test_details += ' AND test_details.time_completed: {}'.format(self.date_re)
-
+        if not self.use_wide_query:
+            test_details += self.test_cmd_details()
+            test_details += ' AND test_details.time_completed: {}'.format(self.date_re)
         test_details += ' AND {}'.format(self.build_filter_test_name())
         return test_details
 
@@ -234,6 +259,6 @@ class CDCQueryFilterCS(QueryFilterCS, CDCQueryFilter):
         return self._PROFILE_PARAMS if 'profiles' in self.test_name else self._PARAMS
 
 
-def query_filter(test_doc, is_gce):
+def query_filter(test_doc, is_gce, use_wide_query=False, lastyear=False):
     return PerformanceFilterScyllaBench(test_doc, is_gce)() if test_doc['_source']['test_details'].get('scylla-bench') \
-        else PerformanceFilterCS(test_doc, is_gce)()
+        else PerformanceFilterCS(test_doc, is_gce, use_wide_query, lastyear)()
