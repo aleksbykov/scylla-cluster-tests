@@ -105,7 +105,7 @@ SPOT_TERMINATION_CHECK_DELAY = 5
 
 LOGGER = logging.getLogger(__name__)
 
-SUPPORTED_SCYLLA_INSTANCE_FAMILIES = ['i2', 'i3', 'i3en', 'c5d', 'm5d', 'm5ad', 'r5d', 'z1d']
+SUPPORTED_SCYLLA_INSTANCE_FAMILIES = ['i2', 'i3', 'i3en', 'c5d', 'm5d', 'm5ad', 'r5d', 'z1d', 'r4']
 
 
 def is_supported_instance_family(instance_type):
@@ -3932,7 +3932,8 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
                 node.stop_scylla_server(verify_down=False)
                 node.clean_scylla_data()
                 node.remoter.sudo(cmd="rm -f /etc/scylla/ami_disabled", ignore_status=True)
-                if not is_supported_instance_family(self.params.get("instance_type_db")):
+                # if not is_supported_instance_family(self.params.get("instance_type_db")):
+                if self.is_ebs_volumes_attached():
                     result = node.remoter.sudo(cmd="scylla_io_setup")
                     if result.ok:
                         self.log.info("Scylla_io_setup result: %s", result.stdout)

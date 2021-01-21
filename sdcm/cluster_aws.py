@@ -845,8 +845,8 @@ class ScyllaAWSCluster(cluster.BaseScyllaCluster, AWSCluster):
 
         data_device_type = params.get("data_device")
 
-        if "i3" not in params.get("instance_type_db"):
-            data_device_type = "instance_store"
+        # if "i3" not in params.get("instance_type_db"):
+        #     data_device_type = "instance_store"
 
         if parse_version(user_data_format_version) >= parse_version('2'):
             user_data = dict(scylla_yaml=dict(cluster_name=name),
