@@ -29,3 +29,4 @@ db_type: mixed_scylla
 instance_type_db_oracle: 'i3.8xlarge'
 oracle_scylla_version: '3.3.2'
 append_scylla_args_oracle: '--enable-cache false'
+append_scylla_args: '--blocked-reactor-notify-ms 10 --abort-on-lsa-bad-alloc 1 --abort-on-seastar-bad-alloc --abort-on-internal-error 1 --abort-on-ebadf 1 --enable-sstable-key-validation 1 --dump-memory-diagnostics-on-alloc-failure-kind=always'
