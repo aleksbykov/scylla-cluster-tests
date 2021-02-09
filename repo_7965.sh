@@ -1,0 +1,1 @@
+SCT_CLUSTER_BACKEND=aws SCT_REGION_NAME=eu-north-1 SCT_CONFIG_FILES=test-cases/longevity/longevity-cdc-100gb-4h.yaml SCT_SCYLLA_VERSION=master:latest ./docker/env/hydra.sh run-test longevity_test.LongevityTest.test_custom_time
