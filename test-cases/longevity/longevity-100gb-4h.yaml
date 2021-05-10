@@ -22,3 +22,5 @@ space_node_threshold: 64424
 
 pre_create_schema: True
 sstable_size: 100
+
+use_mgmt: false
