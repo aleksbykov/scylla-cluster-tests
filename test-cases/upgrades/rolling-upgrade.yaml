@@ -49,3 +49,5 @@ gemini_cmd: "gemini -d --duration 2h \
 --table-options \"cdc={'enabled': true}\" --test-username cassandra --test-password cassandra"
 gemini_version: 'latest'
 gemini_schema_url: 'https://s3.amazonaws.com/scylla-gemini/Binaries/schema.json' # currently is not used
+
+use_mgmt: false
