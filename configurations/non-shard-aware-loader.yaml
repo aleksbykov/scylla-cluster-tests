@@ -1,0 +1,7 @@
+regions_data:
+  us-east-1:
+    ami_id_loader: 'ami-01784b575d450e3b2' # Loader dedicated AMI v9 with golang 1.13
+  eu-west-1:
+    ami_id_loader: 'ami-0cdfd6050090ab044' # Loader dedicated AMI v9 with golang 1.13
+  us-west-2:
+    ami_id_loader: 'ami-0d2703a09ffa20a1e' # Loader dedicated AMI v9 with golang 1.13
