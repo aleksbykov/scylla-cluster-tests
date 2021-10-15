@@ -24,6 +24,10 @@ def call(Map pipelineParams) {
                description: 'us-east-1|eu-west-1',
                name: 'aws_region')
 
+            string(defaultValue: "${pipelineParams.get('availability_zone', 'a')}",
+               description: 'a|b|c|d',
+               name: 'availability_zone')
+
             string(defaultValue: '', description: '', name: 'scylla_ami_id')
             string(defaultValue: '', description: '', name: 'scylla_version')
             string(defaultValue: '', description: '', name: 'scylla_repo')
@@ -102,6 +106,13 @@ def call(Map pipelineParams) {
                                                         else
                                                             export SCT_REGION_NAME=${pipelineParams.aws_region}
                                                         fi
+                                                        if [[ -n "${params.availability_zone}" ]]; then
+                                                            export SCT_AVAILABILITY_ZONE=${params.availability_zone}
+                                                        else
+                                                            export SCT_AVAILABILITY_ZONE="a"
+                                                        fi
+
+
                                                         export SCT_CONFIG_FILES=${pipelineParams.test_config}
                                                         export SCT_SCYLLA_MGMT_AGENT_REPO=${pipelineParams.mgmt_agent_repo}
                                                         export SCT_EMAIL_RECIPIENTS="${email_recipients}"
