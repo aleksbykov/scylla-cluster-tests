@@ -2554,6 +2554,11 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
 
     def wait_no_compactions_running(self, n=80, sleep_time=60):  # pylint: disable=invalid-name
         # Wait for up to 80 mins that there are no running compactions
+        # if ebs volume used, wait up to 14 hours
+        if self.db_cluster.is_additional_data_volume_used():
+            n = 480
+            sleep_time = 120
+
         @retrying(n=n, sleep_time=sleep_time, allowed_exceptions=(AssertionError,))
         def is_compactions_done():
             compaction_query = "sum(scylla_compaction_manager_compactions{})"
