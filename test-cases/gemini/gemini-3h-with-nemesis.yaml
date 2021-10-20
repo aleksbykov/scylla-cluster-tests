@@ -1,7 +1,7 @@
 test_duration: 300
 n_db_nodes: 3
 n_test_oracle_db_nodes: 1
-n_loaders: 3
+n_loaders: 1
 n_monitor_nodes: 1
 instance_type_db: 'i3.large'
 
@@ -15,7 +15,7 @@ nemesis_interval: 5
 #--async-objects-stabilization-backoff duration   Duration between attempts to validate result sets from MV and SI for example 10ms or 1s (default 10ms)
 # the below cmd runs about 3 hours
 gemini_cmd: "gemini -d --duration 1h \
--c 10 -m mixed -f --non-interactive --cql-features normal \
+-c 100 -m mixed -f --non-interactive --cql-features normal \
 --max-mutation-retries 50 --max-mutation-retries-backoff 5000ms \
 --async-objects-stabilization-attempts 50 --async-objects-stabilization-backoff 5000ms \
 --replication-strategy \"{'class': 'SimpleStrategy', 'replication_factor': '3'}\" \
