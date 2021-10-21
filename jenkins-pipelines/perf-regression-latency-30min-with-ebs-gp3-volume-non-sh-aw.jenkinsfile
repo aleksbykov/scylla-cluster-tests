@@ -10,5 +10,5 @@ perfRegressionParallelPipeline(
     test_config: '''["test-cases/performance/perf-regression-latency-500gb-30min.yaml","configurations/non-shard-aware-loader.yaml","configurations/ebs/ebs-gp3-2v-4tb-16k-iops.yaml"]''',
     sub_tests: ["test_latency"],
 
-    timeout: [time: 420, unit: "MINUTES"]
+    timeout: [time: 1800, unit: "MINUTES"]
 )
