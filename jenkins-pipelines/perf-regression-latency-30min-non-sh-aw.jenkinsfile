@@ -7,7 +7,7 @@ perfRegressionParallelPipeline(
     backend: "aws",
     aws_region: "us-east-1",
     test_name: "performance_regression_test.PerformanceRegressionTest",
-    test_config: '''["test-cases/performance/perf-regression-latency-500gb-30min.yaml","configurations/non-shard-aware-loader.yaml"]''',
+    test_config: '''["test-cases/performance/perf-regression-latency-500gb-30min.yaml","configurations/cs/ebs-latency-cmds.yaml","configurations/non-shard-aware-loader.yaml"]''',
     sub_tests: ["test_latency"],
 
     timeout: [time: 1800, unit: "MINUTES"]
