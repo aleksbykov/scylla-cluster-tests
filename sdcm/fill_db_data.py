@@ -1143,7 +1143,8 @@ class FillDatabaseData(ClusterTester):
                         [[x, x] for x in range(4 * 4 + 2, (4 + 1) * 4)]],
             'min_version': '',
             'max_version': '',
-            'skip': ''},
+            'skip': '',
+            'no_cdc': 'Possible regression queries'},
         {
             'name': "range_tombstones_compaction_test: Test deletion by 'composite prefix' "
                     "(range tombstones) with compaction",
@@ -1169,7 +1170,9 @@ class FillDatabaseData(ClusterTester):
                         [['%i%i' % (c1, c2)] for c1 in range(0, 4) for c2 in range(0, 2) if c1 != 1]],
             'min_version': '',
             'max_version': '',
-            'skip': ''},
+            'skip': '',
+            'no_cdc': "Possible regression queries"
+        },
         {
             'name': 'delete_row_test: Test deletion of rows',
             'create_tables': ["""CREATE TABLE delete_row_test (
@@ -3228,10 +3231,10 @@ class FillDatabaseData(ClusterTester):
                     # Referencing https://github.com/scylladb/scylla-enterprise/issues/1177#issuecomment-568762357
                     if 'list<' in item['create_tables'][0]:
                         time.sleep(1)
-                if item.get("cdc_tables"):
-                    with self._execute_and_log(f'Read CDC logs for test "{test_name}" in {{}} seconds'):
-                        for cdc_table in item["cdc_tables"]:
-                            item["cdc_tables"][cdc_table] = self.get_cdc_log_rows(session, cdc_table)
+                # if item.get("cdc_tables"):
+                #     with self._execute_and_log(f'Read CDC logs for test "{test_name}" in {{}} seconds'):
+                #         for cdc_table in item["cdc_tables"]:
+                #             item["cdc_tables"][cdc_table] = self.get_cdc_log_rows(session, cdc_table)
 
     def _run_db_queries(self, item, session):
         for i in range(len(item['queries'])):
@@ -3299,15 +3302,15 @@ class FillDatabaseData(ClusterTester):
                     with self._execute_and_log(f'Ran invalid queries for test "{test_name}" in {{}} seconds'):
                         self._run_invalid_queries(item, session)
 
-                if item.get("cdc_tables"):
-                    with self._execute_and_log(f'Read CDC tables for test "{test_name}" in {{}} seconds'):
-                        self._read_cdc_tables(item, session)
-                    # udpate cdc log tables after queries,
-                    # which could change base table content
-                    with self._execute_and_log(f'Update CDC tables for test "{test_name}" in {{}} seconds'):
-                        for cdc_table in item["cdc_tables"]:
-                            item["cdc_tables"][cdc_table] = self.get_cdc_log_rows(session, cdc_table)
-                            LOGGER.debug(item["cdc_tables"][cdc_table])
+                # if item.get("cdc_tables"):
+                #     with self._execute_and_log(f'Read CDC tables for test "{test_name}" in {{}} seconds'):
+                #         self._read_cdc_tables(item, session)
+                #     # udpate cdc log tables after queries,
+                #     # which could change base table content
+                #     with self._execute_and_log(f'Update CDC tables for test "{test_name}" in {{}} seconds'):
+                #         for cdc_table in item["cdc_tables"]:
+                #             item["cdc_tables"][cdc_table] = self.get_cdc_log_rows(session, cdc_table)
+                #             LOGGER.debug(item["cdc_tables"][cdc_table])
 
     def get_cdc_log_rows(self, session, cdc_log_table):
         return list(session.execute(f"select * from {self.base_ks}.{cdc_log_table}"))
