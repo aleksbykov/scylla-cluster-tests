@@ -3992,3 +3992,36 @@ class StartStopValidationCompaction(Nemesis):
 
     def disrupt(self):
         self.disrupt_start_stop_validation_compaction()
+
+
+class RaftTopologyChangesMonkey(Nemesis):
+    disruptive = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.disrupt_methods_list = [
+            'disrupt_grow_shrink_cluster',
+            'disrupt_terminate_and_replace_node',
+            'disrupt_nodetool_decommission',
+            'disrupt_nodetool_seed_decommission',
+            'disrupt_remove_node_then_add_node',
+        ]
+
+    def disrupt(self):
+        self.call_random_disrupt_method(disrupt_methods=self.disrupt_methods_list, predefined_sequence=True)
+
+
+class RaftSchemaChangesMonkey(Nemesis):
+    disruptive = False
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.disrupt_methods_list = [
+            'disrupt_modify_table',
+            'disrupt_add_drop_column',
+            'disrupt_toggle_table_ics',
+            'disrupt_toggle_cdc_feature_properties_on_table',
+        ]
+
+    def disrupt(self):
+        self.call_random_disrupt_method(disrupt_methods=self.disrupt_methods_list, predefined_sequence=True)
