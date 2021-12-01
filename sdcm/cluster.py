@@ -63,7 +63,7 @@ from sdcm.utils import alternator
 from sdcm.utils.common import deprecation, get_data_dir_path, verify_scylla_repo_file, S3Storage, get_my_ip, \
     get_latest_gemini_version, normalize_ipv6_url, download_dir_from_cloud, generate_random_string, ScyllaCQLSession, \
     SCYLLA_YAML_PATH, get_test_name, PageFetcher, update_authenticator, prepare_and_start_saslauthd_service, \
-    change_default_password
+    change_default_password, IO_PROPERTIES_PATH
 from sdcm.utils.distro import Distro
 from sdcm.utils.docker_utils import ContainerManager, NotFound
 
@@ -1717,6 +1717,9 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
     def remote_manager_yaml(self, path=SCYLLA_MANAGER_YAML_PATH):
         return self._remote_yaml(path=path)
 
+    def remote_io_properties_yaml(self, path=IO_PROPERTIES_PATH):
+        return self._remote_yaml(path=path)
+
     @staticmethod
     def get_openldap_config():
         if Setup.LDAP_ADDRESS is None:
@@ -1970,6 +1973,9 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
                     EOF
                     systemctl daemon-reload
                 """))
+
+        with self.remote_io_properties_yaml() as io_properties_yaml:
+            io_properties_yaml["disks"][0].update({"duplex": True})
 
     def config_client_encrypt(self):
         self.remoter.send_files(src='./data_dir/ssl_conf', dst='/tmp/')  # pylint: disable=not-callable
