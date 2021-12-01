@@ -484,7 +484,7 @@ class UpgradeTest(FillDatabaseData):
         dc_nodes = {}
         for node in nodes:
             dc_nodes.setdefault(node.dc_idx, []).append(node)
-        for dc in dc_nodes:  # pylint: disable=consider-using-dict-items
+        for dc in dc_nodes:  # pylint: disable=bad-option-value
             random.shuffle(dc_nodes[dc])
 
         return [x for x in chain.from_iterable(zip_longest(*dc_nodes.values())) if x]
@@ -555,15 +555,15 @@ class UpgradeTest(FillDatabaseData):
 
         # start gemini write workload
         # and cdc log reader
-        if self.version_cdc_support():
-            self.log.info("Start gemini and cdc stressor during upgrade")
-            gemini_thread = self.run_gemini(self.params.get("gemini_cmd"))
-            # Let to write_stress_during_entire_test complete the schema changes
-            self.metric_has_data(
-                metric_query='gemini_cql_requests', n=10)
+        # if self.version_cdc_support():
+        #     self.log.info("Start gemini and cdc stressor during upgrade")
+        #     gemini_thread = self.run_gemini(self.params.get("gemini_cmd"))
+        #     # Let to write_stress_during_entire_test complete the schema changes
+        #     self.metric_has_data(
+        #         metric_query='gemini_cql_requests', n=10)
 
-            cdc_reader_thread = self.run_cdclog_reader_thread(self.params.get("stress_cdclog_reader_cmd"),
-                                                              keyspace_name="ks1", base_table_name="table1")
+        #     cdc_reader_thread = self.run_cdclog_reader_thread(self.params.get("stress_cdclog_reader_cmd"),
+        #                                                       keyspace_name="ks1", base_table_name="table1")
 
         with ignore_upgrade_schema_errors():
 
@@ -744,10 +744,10 @@ class UpgradeTest(FillDatabaseData):
                                         'entire test, actual: %d' % (
                 error_factor, schema_load_error_num)
 
-        self.log.info('Step10 - Verify that gemini and cdc stressor are not failed during upgrade')
-        if self.version_cdc_support():
-            self.verify_gemini_results(queue=gemini_thread)
-            self.verify_cdclog_reader_results(cdc_reader_thread)
+        # self.log.info('Step10 - Verify that gemini and cdc stressor are not failed during upgrade')
+        # if self.version_cdc_support():
+        #     self.verify_gemini_results(queue=gemini_thread)
+        #     self.verify_cdclog_reader_results(cdc_reader_thread)
 
         self.log.info('all nodes were upgraded, and last workaround is verified.')
 
