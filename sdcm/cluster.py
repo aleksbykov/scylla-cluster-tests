@@ -3848,6 +3848,9 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         if new_scylla_bin:
             if node_list is None:
                 node_list = self.nodes
+            oracle_nodes = [node for node in node_list if "oracle" in node.name]
+            if oracle_nodes:
+                return
             self._update_db_packages(new_scylla_bin, node_list, start_service=start_service)
 
     def get_node_info_list(self, verification_node):
