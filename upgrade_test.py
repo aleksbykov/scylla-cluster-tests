@@ -27,7 +27,7 @@ from pkg_resources import parse_version
 
 from sdcm import wait
 from sdcm.cluster import BaseNode
-from sdcm.fill_db_data import FillDatabaseData
+from sdcm.fill_db_data import FillDatabaseData, calculate_time
 from sdcm.stress_thread import CassandraStressThread
 from sdcm.utils.version_utils import is_enterprise, get_node_supported_sstable_versions
 from sdcm.sct_events.system import InfoEvent
@@ -117,6 +117,7 @@ class UpgradeTest(FillDatabaseData):
     insert_rows = None
     truncate_entries_flag = False
 
+    @calculate_time
     def read_data_from_truncated_tables(self, session):
         session.execute("USE truncate_ks")
         truncate_query = 'SELECT COUNT(*) FROM {}'
@@ -127,6 +128,7 @@ class UpgradeTest(FillDatabaseData):
                              msg='Expected that there is no data in the table truncate_ks.{}, but found {} rows'
                              .format(table_name, count[0][0]))
 
+    @calculate_time
     def validate_truncated_entries_for_table(self, session, system_truncated=False):  # pylint: disable=invalid-name
         tables_id = self.get_tables_id_of_keyspace(session=session, keyspace_name='truncate_ks')
 
@@ -146,6 +148,7 @@ class UpgradeTest(FillDatabaseData):
                 self.assertTrue(truncated_time,
                                 msg='Expected truncated entry in the system.local table, but it\'s not found')
 
+    @calculate_time
     @truncate_entries
     def upgrade_node(self, node, upgrade_sstables=True):
         # pylint: disable=too-many-branches,too-many-statements
@@ -245,6 +248,7 @@ class UpgradeTest(FillDatabaseData):
         if upgrade_sstables:
             self.upgradesstables_if_command_available(node)
 
+    @calculate_time
     @truncate_entries
     def rollback_node(self, node, upgrade_sstables=True):
         # pylint: disable=too-many-branches,too-many-statements
@@ -328,6 +332,7 @@ class UpgradeTest(FillDatabaseData):
         if upgrade_sstables:
             self.upgradesstables_if_command_available(node)
 
+    @calculate_time
     def upgradesstables_if_command_available(self, node, queue=None):  # pylint: disable=invalid-name
         upgradesstables_available = False
         upgradesstables_supported = node.remoter.run(
@@ -454,6 +459,7 @@ class UpgradeTest(FillDatabaseData):
         self.verify_db_data()
         self.verify_stress_thread(stress_queue)
 
+    @calculate_time
     def fill_and_verify_db_data(self, note, pre_fill=False, rewrite_data=True):
         if pre_fill:
             self.log.info('Populate DB with many types of tables and data')
@@ -489,6 +495,7 @@ class UpgradeTest(FillDatabaseData):
 
         return [x for x in chain.from_iterable(zip_longest(*dc_nodes.values())) if x]
 
+    @calculate_time
     def test_rolling_upgrade(self):  # pylint: disable=too-many-locals,too-many-statements
         """
         Upgrade half of nodes in the cluster, and start special read workload

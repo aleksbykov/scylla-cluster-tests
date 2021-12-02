@@ -24,6 +24,7 @@ import re
 
 from collections import OrderedDict
 from uuid import UUID
+from functools import wraps
 
 from cassandra import InvalidRequest
 from cassandra.util import sortedset, SortedSet  # pylint: disable=no-name-in-module
@@ -37,6 +38,17 @@ from sdcm.utils.cdc.options import CDC_LOGTABLE_SUFFIX
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def calculate_time(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        started = time.perf_counter()
+        result = func(*args, **kwargs)
+        finished = time.perf_counter()
+        LOGGER.info("Function %s executed %s", func.__name__, finished - started)
+        return result
+    return wrapper
 
 
 class FillDatabaseData(ClusterTester):
@@ -3035,9 +3047,10 @@ class FillDatabaseData(ClusterTester):
             return match.groupdict()["table_name"]
         return None
 
-    @staticmethod
-    def cql_create_simple_tables(session, rows):
+    @calculate_time
+    def cql_create_simple_tables(self, session, rows):
         """ Create tables for truncate test """
+        self.log.info("Create Simple tables")
         create_query = "CREATE TABLE IF NOT EXISTS truncate_table%d (my_id int PRIMARY KEY, col1 int, value int) " \
             "with cdc = {'enabled': true, 'ttl': 0}"
         for i in range(rows):
@@ -3045,20 +3058,24 @@ class FillDatabaseData(ClusterTester):
             # Added sleep after each created table
             time.sleep(15)
 
-    @staticmethod
-    def cql_insert_data_to_simple_tables(session, rows):  # pylint: disable=invalid-name
+    @calculate_time
+    def cql_insert_data_to_simple_tables(self, session, rows):  # pylint: disable=invalid-name
+        self.log.info("Insert data to Simple tables")
+
         def insert_query():
             return f'INSERT INTO truncate_table{i} (my_id, col1, value) VALUES ( {k}, {k}, {k})'
         for i in range(rows):  # pylint: disable=unused-variable
             for k in range(100):  # pylint: disable=unused-variable
                 session.execute(insert_query())
 
-    @staticmethod
-    def cql_truncate_simple_tables(session, rows):
+    @calculate_time
+    def cql_truncate_simple_tables(self, session, rows):
+        self.log.info("Truncate Simple tables")
         truncate_query = 'TRUNCATE TABLE truncate_table%d'
         for i in range(rows):
             session.execute(truncate_query % i)
 
+    @calculate_time
     def fill_db_data_for_truncate_test(self, insert_rows):
         # Prepare connection and keyspace
         with self.db_cluster.cql_connection_patient(self.db_cluster.nodes[0]) as session:
@@ -3098,6 +3115,7 @@ class FillDatabaseData(ClusterTester):
 
         return create_table
 
+    @calculate_time
     def cql_create_tables(self, session):
         truncates = []
         self.log.info('Start table creation')
@@ -3193,6 +3211,7 @@ class FillDatabaseData(ClusterTester):
         yield
         self.log.info(message.format(int(time.time() - start_time)))
 
+    @calculate_time
     def truncate_tables(self, session):
         # Run through the list of items and create all tables
         self.log.info('Start table truncation')
@@ -3203,6 +3222,7 @@ class FillDatabaseData(ClusterTester):
                     with self._execute_and_log(f'Truncated table for test "{test_name}" in {{}} seconds'):
                         self.truncate_table(session, truncate)
 
+    @calculate_time
     def cql_insert_data_to_tables(self, session, default_fetch_size):
         self.log.info('Start to populate data into tables')
         # pylint: disable=too-many-nested-blocks
@@ -3236,6 +3256,7 @@ class FillDatabaseData(ClusterTester):
                 #         for cdc_table in item["cdc_tables"]:
                 #             item["cdc_tables"][cdc_table] = self.get_cdc_log_rows(session, cdc_table)
 
+    @calculate_time
     def _run_db_queries(self, item, session):
         for i in range(len(item['queries'])):
             try:
@@ -3258,8 +3279,9 @@ class FillDatabaseData(ClusterTester):
                 LOGGER.exception(item['queries'][i])
                 raise ex
 
-    @staticmethod
-    def _run_invalid_queries(item, session):
+    @calculate_time
+    def _run_invalid_queries(self, item, session):
+        self.log.info("Running invalid queries")
         for i in range(len(item['invalid_queries'])):
             try:
                 session.execute(item['invalid_queries'][i])
@@ -3268,6 +3290,7 @@ class FillDatabaseData(ClusterTester):
             except InvalidRequest as ex:
                 LOGGER.debug("Found error '%s' as expected", ex)
 
+    @calculate_time
     def _read_cdc_tables(self, item, session):
         for cdc_table in item["cdc_tables"]:
             actual_result = self.get_cdc_log_rows(session, cdc_table)
@@ -3280,6 +3303,7 @@ class FillDatabaseData(ClusterTester):
             except AssertionError as err:
                 LOGGER.error("content was differ %s", err)
 
+    @calculate_time
     def run_db_queries(self, session, default_fetch_size):
         self.log.info('Start to running queries')
         # pylint: disable=too-many-branches,too-many-nested-blocks
@@ -3312,9 +3336,11 @@ class FillDatabaseData(ClusterTester):
                 #             item["cdc_tables"][cdc_table] = self.get_cdc_log_rows(session, cdc_table)
                 #             LOGGER.debug(item["cdc_tables"][cdc_table])
 
+    @calculate_time
     def get_cdc_log_rows(self, session, cdc_log_table):
         return list(session.execute(f"select * from {self.base_ks}.{cdc_log_table}"))
 
+    @calculate_time
     def fill_db_data(self):
         """
         Run a set of different cql queries against various types/tables before
@@ -3336,6 +3362,7 @@ class FillDatabaseData(ClusterTester):
             # Insert data to the tables according to the "inserts" and flush to disk in several cases (nodetool flush)
             self.cql_insert_data_to_tables(session, session.default_fetch_size)
 
+    @calculate_time
     def prepare_keyspaces_and_tables(self):
         """
         Prepare keyspaces and tables
@@ -3356,6 +3383,7 @@ class FillDatabaseData(ClusterTester):
             # Create all tables according the above list
             self.cql_create_tables(session)
 
+    @calculate_time
     def verify_db_data(self):
         # Prepare connection
         node = self.db_cluster.nodes[0]
@@ -3364,11 +3392,15 @@ class FillDatabaseData(ClusterTester):
             session.default_consistency_level = ConsistencyLevel.QUORUM
             self.run_db_queries(session, session.default_fetch_size)
 
+    @calculate_time
     def paged_query(self, keyspace='keyspace_complex'):
+
         # Prepare connection
+        @calculate_time
         def create_table():
             session.execute('CREATE TABLE IF NOT EXISTS paged_query_test (k int PRIMARY KEY, v1 int, v2 int)')
 
+        @calculate_time
         def fill_table():
             for i in range(1000):
                 random_int = random.randint(1, 1000000)
