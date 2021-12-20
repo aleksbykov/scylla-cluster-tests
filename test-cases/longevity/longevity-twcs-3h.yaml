@@ -2,8 +2,8 @@ test_duration: 210
 bench_run: true
 
 
-stress_cmd: ["scylla-bench -workload=timeseries -mode=write -replication-factor=3 -partition-count=20000 -clustering-row-count=9999999000000 -clustering-row-size=200 -concurrency=30 -max-rate=60000 -rows-per-request=5000 -duration=170m"]
-stress_read_cmd: ["scylla-bench -workload=timeseries -mode=read -partition-count=20000 -concurrency=48 -replication-factor=3 -write-rate=3 -clustering-row-count=9999999000000 -clustering-row-size=200  -rows-per-request=300 -provide-upper-bound -start-timestamp=SCT_TIME -duration=170m"]
+stress_cmd: ["scylla-bench -workload=timeseries -mode=write -replication-factor=3 -partition-count=20000 -clustering-row-count=9999999000000 -clustering-row-size=200 -concurrency=50 -max-rate=100000 -rows-per-request=5000 -duration=170m"]
+stress_read_cmd: ["scylla-bench -workload=timeseries -mode=read -partition-count=20000 -concurrency=75 -replication-factor=3 -write-rate=6 -clustering-row-count=9999999000000 -clustering-row-size=200  -rows-per-request=300 -provide-upper-bound -start-timestamp=SCT_TIME -duration=170m"]
 
 n_db_nodes: 3
 n_loaders: 1
@@ -21,3 +21,7 @@ user_prefix: 'longevity-twcs-3h-reproduce'
 nemesis_add_node_cnt: 2
 
 append_scylla_args: '--blocked-reactor-notify-ms 10 --abort-on-lsa-bad-alloc 1 --abort-on-seastar-bad-alloc --abort-on-internal-error 1 --abort-on-ebadf 1 --enable-sstable-key-validation 1'
+
+hinted_handoff: 'disabled'
+
+use_mgmt: false
