@@ -303,6 +303,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
     @raise_event_on_failure
     def run(self, interval=None):
+        time.sleep(3 * 3600)
         self.es_publisher.create_es_connection()
         if interval:
             self.interval = interval * 60
