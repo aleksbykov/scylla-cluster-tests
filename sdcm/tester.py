@@ -1625,8 +1625,8 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
             self.update_stress_results(results)
         return results
 
-    def get_stress_results_bench(self, queue):
-        results = queue.get_stress_results_bench()
+    def get_stress_results_bench(self, queue: ScyllaBenchThread) -> List[Dict[str, Union[str, float]]]:
+        results, _ = queue.verify_results()
         if self.create_stats:
             self.update_stress_results(results)
         return results

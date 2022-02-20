@@ -17,6 +17,7 @@ import uuid
 import time
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Tuple, Dict, List, Union
 from enum import Enum
 
 from sdcm.loader import ScyllaBenchStressExporter
@@ -129,7 +130,7 @@ class ScyllaBenchThread:  # pylint: disable=too-many-instance-attributes
         self.sb_workload: ScyllaBenchWorkloads = ScyllaBenchWorkloads(
             re.search(r"-workload=(.+?) ", stress_cmd).group(1))
 
-    def verify_results(self):
+    def verify_results(self) -> Tuple[List[Dict[str, Union[float, str]]], List[str]]:
         sb_summary = []
         results = []
         errors = []
@@ -228,7 +229,7 @@ class ScyllaBenchThread:  # pylint: disable=too-many-instance-attributes
         return self
 
     @classmethod
-    def _parse_bench_summary(cls, lines):
+    def _parse_bench_summary(cls, lines: List[str]) -> Dict[str, Union[float, str]]:
         """
         Parsing bench results, only parse the summary results.
         Collect results of all nodes and return a dictionaries' list,
