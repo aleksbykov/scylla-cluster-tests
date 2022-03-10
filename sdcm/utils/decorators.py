@@ -170,6 +170,7 @@ def latency_calculator_decorator(func):
         test_name = args[0].tester.__repr__().split('testMethod=')[-1].split('>')[0]
         if not args[0].monitoring_set or not args[0].monitoring_set.nodes:
             return res
+        screenshots = args[0].monitoring_set.get_grafana_screenshots(test_start_time=start)
         monitor = args[0].monitoring_set.nodes[0]
         if 'read' in test_name:
             workload = 'read'
@@ -194,6 +195,7 @@ def latency_calculator_decorator(func):
             if 'cycles' not in latency_results[func.__name__]:
                 latency_results[func.__name__]['cycles'] = []
         result = latency.collect_latency(monitor, start, end, workload, args[0].cluster, all_nodes_list)
+        result["screenshots"] = screenshots
         if "steady" in func.__name__.lower():
             if 'Steady State' not in latency_results:
                 latency_results['Steady State'] = result
