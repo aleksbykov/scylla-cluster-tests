@@ -20,9 +20,16 @@ round_robin: true
 
 instance_type_db: 'i3.4xlarge'
 
-nemesis_class_name: 'SisyphusMonkey'
-nemesis_seed: '008'
-nemesis_interval: 5
+nemesis_class_name: 'TopPartitions'
+nemesis_interval: 30
 nemesis_during_prepare: false
 
 user_prefix: 'longevity-cdc-3d-400gb'
+
+authenticator: 'PasswordAuthenticator'
+authenticator_user: cassandra
+authenticator_password: cassandra
+authorizer: 'CassandraAuthorizer'
+
+server_encrypt: true
+client_encrypt: true
