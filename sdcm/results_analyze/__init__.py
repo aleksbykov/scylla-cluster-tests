@@ -224,17 +224,17 @@ class LatencyDuringOperationsPerformanceAnalyzer(BaseResultsAnalyzer):
         filter_path = ['hits.hits._id',
                        'hits.hits._source.results',
                        'hits.hits._source.versions',
-                       'hits.hits._source.test_dtails',
+                       'hits.hits._source.test_details',
                        'hits.hits._source.latency_during_ops']
         query = LatencyWithNemesisQueryFilter(test_doc, is_gce, use_wide_query=True, lastyear=True)()
 
         self.log.debug("ES QUERY: %s", query)
         test_results = self._es.search(  # pylint: disable=unexpected-keyword-arg; pylint doesn't understand Elasticsearch code
-            index="latency-during-ops-mixed",
-            doc_type='test_stats',
+            index=self._es_index,
+            doc_type=self._es_doc_type,
             q=query,
             filter_path=filter_path,
-            size=1000)
+            size=self._limit)
         if not test_results:
             self.log.warning("No results found for query: %s", query)
             return None
@@ -304,12 +304,9 @@ class LatencyDuringOperationsPerformanceAnalyzer(BaseResultsAnalyzer):
         kernel_callstack_events = self.get_kernel_callstack_events()
         kernel_callstack_events_summary = {Severity.DEBUG.name: len(kernel_callstack_events)}
 
-        last_events, events_summary = [], {}
-        reactor_stall_events, reactor_stall_events_summary = [], {}
-        kernel_callstack_events, kernel_callstack_events_summary = [], {}
         subject = f'Performance Regression Compare Results (latency during operations) -' \
                   f' {test_name} - {test_version} - {str(test_start_time)}'
-        best_results_per_nemesis = self._get_best_per_nemesis_for_each_version(doc, is_gce)
+        best_results_per_nemesis = self._get_best_per_nemesis_for_each_version(doc, is_gce) or {}
 
         results = dict(
             events_summary=events_summary,

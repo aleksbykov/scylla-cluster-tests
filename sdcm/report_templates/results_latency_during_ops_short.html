@@ -72,6 +72,7 @@
                                 </tr>
 
                         {% if best_stat_per_version.get(operation) %}
+                            <tr><td colspan="100%" align="center">Previous version results</td></tr>
                             {% for version, best in best_stat_per_version[operation].items() %}
                             <tr>
                                 <td> {{ version }} </td>
