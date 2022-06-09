@@ -3095,10 +3095,10 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         if not self.has_steady_run:
             self.steady_state_latency()
             self.has_steady_run = True
-        InfoEvent(message='StartEvent - start a repair by ScyllaManager').publish()
-        self.disrupt_mgmt_repair_cli()
-        InfoEvent(message='FinishEvent - Manager repair has finished').publish()
-        time.sleep(sleep_time_between_ops)
+        # InfoEvent(message='StartEvent - start a repair by ScyllaManager').publish()
+        # self.disrupt_mgmt_repair_cli()
+        # InfoEvent(message='FinishEvent - Manager repair has finished').publish()
+        # time.sleep(sleep_time_between_ops)
         InfoEvent(message='Starting terminate_and_replace disruption').publish()
         self.disrupt_terminate_and_replace_node()
         InfoEvent(message='Finished terminate_and_replace disruption').publish()
