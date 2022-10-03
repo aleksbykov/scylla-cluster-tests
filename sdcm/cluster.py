@@ -4603,6 +4603,16 @@ class BaseLoaderSet():
         if self.params.get('client_encrypt'):
             node.config_client_encrypt()
 
+        # Install java-8 for workaround hdrhistogram
+        if node.is_rhel_like():
+            node.remoter.sudo('yum install -y java-1.8.0-openjdk-devel', verbose=True, ignore_status=True)
+            node.remoter.sudo("ln -sf /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.*/jre/bin/java* /etc/alternatives/java",
+                              verbose=True, ignore_status=True)
+        else:
+            node.remoter.sudo('apt install -y openjdk-8-jre', verbose=True, ignore_status=True)
+            node.remoter.sudo("ln -sf /usr/lib/jvm/java-1.8.0-openjdk-*/bin/java* /etc/alternatives/java",
+                              verbose=True, ignore_status=True)
+
         if 'scylla-bench' in self.params.list_of_stress_tools:
             # Update existing scylla-bench to latest
             if not node.is_scylla_bench_installed:
@@ -4656,10 +4666,16 @@ class BaseLoaderSet():
         node.download_scylla_repo(scylla_repo_loader)
         if node.is_rhel_like():
             node.remoter.run('sudo yum install -y {}-tools'.format(node.scylla_pkg()))
+            node.remoter.sudo('yum install -y java-1.8.0-openjdk-devel', verbose=True, ignore_status=True)
+            node.remote.sudo("ln -sf /usr/lib/jvm/java-1.8.0-openjdk-amd64/jre/bin/java* /etc/alternatives/java",
+                             verbose=True, ignore_status=True)
         else:
             node.remoter.run('sudo apt-get update')
             node.remoter.run('sudo apt-get install -y '
                              ' {}-tools '.format(node.scylla_pkg()))
+            node.remoter.sudo('apt instally -y openjdk-8-jre', verbose=True, ignore_status=True)
+            node.remoter.sudo("ln -sf /usr/lib/jvm/java-1.8.0-openjdk-amd64/bin/java* /etc/alternatives/java",
+                              verbose=True, ignore_status=True)
 
         if db_node_address is not None:
             node.remoter.run("echo 'export DB_ADDRESS=%s' >> $HOME/.bashrc" % db_node_address)
