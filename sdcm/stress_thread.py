@@ -13,6 +13,7 @@
 
 import os
 import re
+# from threading import Thread, Event
 import time
 import uuid
 import random
@@ -22,11 +23,12 @@ from typing import Any
 from itertools import chain
 
 from sdcm.loader import CassandraStressExporter
-from sdcm.cluster import BaseLoaderSet
+from sdcm.cluster import BaseLoaderSet  # , BaseNode
 from sdcm.prometheus import nemesis_metrics_obj
 from sdcm.sct_events import Severity
 from sdcm.utils.common import FileFollowerThread, generate_random_string, get_profile_content
 from sdcm.sct_events.loaders import CassandraStressEvent, CS_ERROR_EVENTS_PATTERNS, CS_NORMAL_EVENTS_PATTERNS
+from sdcm.utils.remote_logger import SSHLoggerBase
 
 
 LOGGER = logging.getLogger(__name__)
@@ -66,6 +68,17 @@ class CassandraStressEventsPublisher(FileFollowerThread):
                     if pattern.search(line):
                         event.add_info(node=self.node, line=line, line_number=line_number).publish()
                         break  # Stop iterating patterns to avoid creating two events for one line of the log
+
+
+class CSHDRFileLogger(SSHLoggerBase):
+    @property
+    def _logger_cmd(self) -> str:
+        return f"tail -f {self._target_log_file}"
+
+    def _retrieve(self, since):
+        self._remoter.run(self._logger_cmd.format(since=since),
+                          verbose=True, ignore_status=True,
+                          log_file=os.path.join(self.node.logdir, self._target_log_file))
 
 
 class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
@@ -155,6 +168,8 @@ class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
 
     def _run_stress(self, node, loader_idx, cpu_idx, keyspace_idx):  # pylint: disable=too-many-locals
         stress_cmd = self.create_stress_cmd(node, loader_idx, keyspace_idx)
+        with_hdr = False
+        hdr_logger_transfer = None
 
         if self.profile:
             with open(self.profile) as profile_file:
@@ -170,6 +185,16 @@ class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
         os.makedirs(node.logdir, exist_ok=True)
         log_file_name = \
             os.path.join(node.logdir, f'cassandra-stress-l{loader_idx}-c{cpu_idx}-k{keyspace_idx}-{uuid.uuid4()}.log')
+
+        if "%LOG%" in stress_cmd:
+            hdr_file_name = f"cs_hdr_{stress_cmd_opt}_{loader_idx}_c{cpu_idx}_k{keyspace_idx}_{uuid.uuid4()}.hdr"
+            LOGGER.info("HDR log file: %s", hdr_file_name)
+            stress_cmd = re.sub(r"%LOG%",
+                                f"-log hdrfile={hdr_file_name} interval=5s",
+                                stress_cmd)
+            LOGGER.info('Stress command with hdr:\n%s', stress_cmd)
+            hdr_logger_transfer = CSHDRFileLogger(node, target_log_file=hdr_file_name)
+            with_hdr = True
 
         LOGGER.debug('cassandra-stress local log: %s', log_file_name)
 
@@ -194,11 +219,16 @@ class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
                 CassandraStressEvent(node=node, stress_cmd=self.stress_cmd,
                                      log_file_name=log_file_name) as cs_stress_event:
             publisher.event_id = cs_stress_event.event_id
+            if with_hdr:
+                hdr_logger_transfer.start()
             try:
+
                 result = node.remoter.run(cmd=node_cmd, timeout=self.timeout, log_file=log_file_name)
             except Exception as exc:  # pylint: disable=broad-except
                 cs_stress_event.severity = Severity.CRITICAL if self.stop_test_on_failure else Severity.ERROR
                 cs_stress_event.add_error(errors=[format_stress_cmd_error(exc)])
+            if with_hdr:
+                hdr_logger_transfer.stop()
 
         return node, result, cs_stress_event
 
