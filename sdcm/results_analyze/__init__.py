@@ -28,6 +28,7 @@ from sdcm.es import ES
 from sdcm.db_stats import TestStatsMixin
 from sdcm.send_email import Email, BaseEmailReporter
 from sdcm.sct_events import Severity
+from sdcm.utils.common import format_timestamp
 from sdcm.utils.es_queries import query_filter, QueryFilter, PerformanceFilterYCSB, PerformanceFilterScyllaBench, \
     PerformanceFilterCS, CDCQueryFilterCS, LatencyWithNemesisQueryFilter
 from test_lib.utils import MagicList, get_data_by_path
@@ -148,6 +149,7 @@ class BaseResultsAnalyzer:  # pylint: disable=too-many-instance-attributes
         print(os.path.dirname(os.path.abspath(__file__)))
         env = jinja2.Environment(loader=loader, autoescape=True, extensions=[
                                  'jinja2.ext.loopcontrols', 'jinja2.ext.do'])
+        env.filters["format_timestamp"] = format_timestamp
         template = env.get_template(email_template_fp)
         html = template.render(results)
         self.log.info("Results has been rendered to html")
@@ -218,7 +220,7 @@ class LatencyDuringOperationsPerformanceAnalyzer(BaseResultsAnalyzer):
         events_list = [stall for stall in debug_events[Severity.DEBUG.name] if 'type=KERNEL_CALLSTACK' in stall]
         return events_list
 
-    def _get_best_per_nemesis_for_each_version(self, test_doc, is_gce):
+    def _get_best_per_nemesis_for_each_version(self, test_doc, is_gce):  # pylint: disable=too-many-branches
         filter_path = ['hits.hits._id',
                        'hits.hits._source.results',
                        'hits.hits._source.versions',
@@ -236,8 +238,13 @@ class LatencyDuringOperationsPerformanceAnalyzer(BaseResultsAnalyzer):
         if not test_results:
             self.log.warning("No results found for query: %s", query)
             return None
-        results_per_nemesis_by_version = {nemesis: {} for nemesis in test_doc["_source"]["latency_during_ops"].keys()}
-        best_results = {nemesis: {} for nemesis in test_doc["_source"]["latency_during_ops"].keys()}
+        if test_doc["_source"].get("latency_during_ops"):
+            results_per_nemesis_by_version = {nemesis: {}
+                                              for nemesis in test_doc["_source"]["latency_during_ops"].keys()}
+            best_results = {nemesis: {} for nemesis in test_doc["_source"]["latency_during_ops"].keys()}
+        else:
+            results_per_nemesis_by_version = {}
+            best_results = {}
         # expected structure:
         # {'_add_node' : {'5.1.dev': [{latency_during_ops: {....}}, ...],
         #                 '5.0.dev': [{latency_during_ops: {....}}, ...]}}
@@ -245,6 +252,8 @@ class LatencyDuringOperationsPerformanceAnalyzer(BaseResultsAnalyzer):
             if doc["_id"] == test_doc["_id"]:
                 continue
             version = doc["_source"]["versions"]["scylla-server"]["version"]
+            if not doc["_source"].get("latency_during_ops"):
+                continue
             for nemesis in doc["_source"]["latency_during_ops"].keys():
                 if not results_per_nemesis_by_version.get(nemesis):
                     results_per_nemesis_by_version[nemesis] = {}
@@ -325,15 +334,18 @@ class LatencyDuringOperationsPerformanceAnalyzer(BaseResultsAnalyzer):
             grafana_snapshots=self._get_grafana_snapshot(doc),
             grafana_screenshots=self._get_grafana_screenshot(doc),
             job_url=doc['_source']['test_details'].get('job_url', ""),
-            best_stat_per_version=best_results_per_nemesis
+            best_stat_per_version=best_results_per_nemesis,
+            test_histogram=doc["_source"]["test_histogram"]
         )
         attachment_file = [self.save_html_to_file(results,
                                                   file_name='reactor_stall_events_list.html',
                                                   template_file='results_reactor_stall_events_list.html'),
                            self.save_html_to_file(results,
                                                   file_name='full_email_report.html',
-                                                  template_file='results_latency_during_ops.html')
-                           ]
+                                                  template_file='results_latency_during_ops.html'),
+                           self.save_html_to_file(results,
+                                                  file_name='hdr_details_report.html',
+                                                  template_file='results_latency_during_ops_details_hdr_report.html')]
         email_data = {'email_body': results,
                       'attachments': attachment_file,
                       'template': self._email_template_fp}

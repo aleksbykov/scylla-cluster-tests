@@ -22,7 +22,7 @@ import concurrent.futures
 from typing import Any
 from itertools import chain
 
-from sdcm.loader import CassandraStressExporter
+from sdcm.loader import CassandraStressExporter, CassandraStressHDRExporter
 from sdcm.cluster import BaseLoaderSet  # , BaseNode
 from sdcm.prometheus import nemesis_metrics_obj
 from sdcm.sct_events import Severity
@@ -77,7 +77,7 @@ class CSHDRFileLogger(SSHLoggerBase):
 
     def _retrieve(self, since):
         self._remoter.run(self._logger_cmd.format(since=since),
-                          verbose=True, ignore_status=True,
+                          verbose=False, ignore_status=True,
                           log_file=os.path.join(self.node.logdir, self._target_log_file))
 
 
@@ -170,6 +170,7 @@ class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
         stress_cmd = self.create_stress_cmd(node, loader_idx, keyspace_idx)
         with_hdr = False
         hdr_logger_transfer = None
+        local_hdr_file_name = ""
 
         if self.profile:
             with open(self.profile) as profile_file:
@@ -190,11 +191,12 @@ class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
             hdr_file_name = f"cs_hdr_{stress_cmd_opt}_{loader_idx}_c{cpu_idx}_k{keyspace_idx}_{uuid.uuid4()}.hdr"
             LOGGER.info("HDR log file: %s", hdr_file_name)
             stress_cmd = re.sub(r"%LOG%",
-                                f"-log hdrfile={hdr_file_name} interval=5s",
+                                f"-log hdrfile={hdr_file_name} interval=10s",
                                 stress_cmd)
             LOGGER.info('Stress command with hdr:\n%s', stress_cmd)
             hdr_logger_transfer = CSHDRFileLogger(node, target_log_file=hdr_file_name)
             with_hdr = True
+            local_hdr_file_name = os.path.join(node.logdir, hdr_file_name)
 
         LOGGER.debug('cassandra-stress local log: %s', log_file_name)
 
@@ -215,6 +217,11 @@ class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
                                      stress_operation=stress_cmd_opt,
                                      stress_log_filename=log_file_name,
                                      loader_idx=loader_idx, cpu_idx=cpu_idx), \
+                CassandraStressHDRExporter(instance_name=node.cql_ip_address,
+                                           metrics=nemesis_metrics_obj(),
+                                           stress_operation=stress_cmd_opt,
+                                           stress_log_filename=local_hdr_file_name,
+                                           loader_idx=loader_idx, cpu_idx=cpu_idx), \
                 CassandraStressEventsPublisher(node=node, cs_log_filename=log_file_name) as publisher, \
                 CassandraStressEvent(node=node, stress_cmd=self.stress_cmd,
                                      log_file_name=log_file_name) as cs_stress_event:

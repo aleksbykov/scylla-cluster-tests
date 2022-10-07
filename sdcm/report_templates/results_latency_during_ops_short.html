@@ -37,8 +37,100 @@
             <span class="blue">{{ kernel_callstack_events_summary.get('DEBUG', 0) }}</span>
         </h3>
     </div>
+    <div>
+        <h2> Total test HDR Histogram percentiles</h2>
+        <table id="results_table">
+            <th> Workload </th>
+            <th> Start time </th>
+            <th> End time </th>
+            <th> Percentile 50 </th>
+            <th> Percentile 90 </th>
+            <th> Percentile 99 </th>
+            <th> Percentile 99.9 </th>
+            {% for workload, total in test_histogram['total'].items() %}
+                <tr>
+                    <td> {{ workload }} </td>
+                    <td> {{ total['start_time'] | format_timestamp }} </td>
+                    <td> {{ total['end_time'] | format_timestamp }} </td>
+                    <td> {{ total["percentile_50"] }}</td>
+                    {% if total["percentile_90"] > 10  %}
+                        <td style="background-color: red"> {{ total["percentile_90"] }}</td>
+                    {% else %}
+                        <td > {{ total["percentile_90"] }}</td>
+                    {% endif %}
+                    {% if total["percentile_99"] > 15  %}
+                        <td style="background-color: red"> {{ total["percentile_99"] }}</td>
+                    {% else %}
+                        <td > {{ total["percentile_99"] }}</td>
+                    {% endif %}
+                    <td> {{ total["percentile_99_9"] }}</td>
+                </tr>
+            {% endfor %}
+        </table>
+    </div>
         <div>
             {% for operation, results in stats.items() %}
+                <h2> Total {{ operation }} HDR Histogram percentiles</h2>
+                <table id="results_table">
+                    <th> Workload </th>
+                    <th> Start time </th>
+                    <th> End time </th>
+                    <th> Percentile 50 </th>
+                    <th> Percentile 90 </th>
+                    <th> Percentile 99 </th>
+                    <th> Percentile 99.9 </th>
+                    {% if results.get('hdr') %}
+                        {% for workload, data in results['hdr_summary'].items() %}
+                            <tr>
+                                <td> {{ workload }} </td>
+                                <td> {{ data['start_time'] | format_timestamp }} </td>
+                                <td> {{ data['end_time'] | format_timestamp }} </td>
+                                <td> {{ data["percentile_50"] }}</td>
+                                {% if data["percentile_90"] > 10  %}
+                                    <td style="background-color: red"> {{ data["percentile_90"] }}</td>
+                                {% else %}
+                                    <td > {{ data["percentile_90"] }}</td>
+                                {% endif %}
+                                {% if data["percentile_99"] > 15  %}
+                                    <td style="background-color: red"> {{ data["percentile_99"] }}</td>
+                                {% else %}
+                                    <td > {{ data["percentile_99"] }}</td>
+                                {% endif %}
+
+                                <td> {{ data["percentile_99_9"] }}</td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        {% for row in results.get('cycles') %}
+                            {% set cycle_index = loop.index %}
+                            {% if row.get('hdr_summary') %}
+                                <tr>
+                                    <td colspan="100%"> Cycle #{{ cycle_index }} </td>
+                                </tr>
+                                {% for workload, data in row['hdr_summary'].items() %}
+                                    <tr>
+                                        <td> {{ workload }} </td>
+                                        <td> {{ data['start_time'] | format_timestamp }} </td>
+                                        <td> {{ data['end_time'] | format_timestamp }} </td>
+                                        <td> {{ data["percentile_50"] }}</td>
+                                        {% if data["percentile_90"] > 10  %}
+                                            <td style="background-color: red"> {{ data["percentile_90"] }}</td>
+                                        {% else %}
+                                            <td > {{ data["percentile_90"] }}</td>
+                                        {% endif %}
+                                        {% if data["percentile_99"] > 15  %}
+                                            <td style="background-color: red"> {{ data["percentile_99"] }}</td>
+                                        {% else %}
+                                            <td > {{ data["percentile_99"] }}</td>
+                                        {% endif %}
+                                        <td> {{ data["percentile_99_9"] }}</td>
+                                    </tr>
+                                {% endfor %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                </table>
+
                 {% if operation != 'Steady State' %}
                     <h2>{{ operation }}</h2>
                     <table id="results_table">
@@ -60,16 +152,31 @@
                                 {% else %}
                                        <tr>
                                 {% endif %}
-                                    <td> current build </td>
-                                    <td>{{ lat_type }}</td>
-                                    {% for cycle in results['cycles'] %}
-                                        <td>{{ cycle[lat_type] }}</td>
-                                    {% endfor %}
-                                    <td>{{ results['Cycles Average'][lat_type] }}</td>
-                                    <td>{{ stats['Steady State'][lat_type] }}</td>
-                                    <td>{{ results['Relative to Steady'][lat_type] }}</td>
-                                    <td>{{ test_version }}
-                                </tr>
+                            {% else %}
+                                <tr>
+                            {% endif %}
+                            <td> current build </td>
+                            <td>{{ lat_type }}</td>
+                            {% for cycle in results['cycles'] %}
+                                <td>{{ cycle[lat_type] }}</td>
+                                {% if lat_type ~ "_stdev" in cycle %}
+                                    <td>{{ cycle[lat_type ~ "_stdev"] }}</td>
+                                {% else %}
+                                    <td>-</td>
+                                {% endif %}
+                                {% if lat_type ~ "_points_above_threshold" in cycle %}
+                                    <td>{{ cycle[lat_type ~ "_points_above_threshold"] }}</td>
+                                {% else %}
+                                    <td>-</td>
+                                {% endif %}
+                        {% endfor %}
+                        <td>{{ results['Cycles Average'][lat_type] }}</td>
+                        <td>{{ stats['Steady State'][lat_type] }}</td>
+                        <td>{{ results['Relative to Steady'][lat_type] }}</td>
+                        <td>{{ test_version }} </td>
+                        </tr>
+
+
                         {% if best_stat_per_version and best_stat_per_version.get(operation) %}
                             <tr><td colspan="100%" align="center">Previous version results</td></tr>
                             {% for version, best in best_stat_per_version[operation].items() %}
@@ -99,5 +206,4 @@
                 {% endif %}
             {% endfor %}
         </div>
-
 {% endblock %}

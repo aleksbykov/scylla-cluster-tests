@@ -20,6 +20,7 @@ import os
 
 from functools import wraps, partial, cached_property
 from typing import Optional, Callable
+# from sdcm.utils.csrangehistogram import CSRangeHistogramBuilder, CSRangeHistogramSummary
 
 
 LOGGER = logging.getLogger(__name__)
@@ -202,6 +203,13 @@ def latency_calculator_decorator(original_function: Optional[Callable] = None, *
 
             result = latency.collect_latency(monitor, start, end, workload, args[0].cluster, all_nodes_list)
             result["screenshots"] = screenshots
+            # result["hdr"] = hdr_latency.get_hdr_stats_for_interval(workload, start, end)
+            result["hdr"] = args[0].tester.get_cs_range_histogram_by_interval(stress_operation=workload,
+                                                                              start_time=start,
+                                                                              end_time=end)
+            result["hdr_summary"] = args[0].tester.get_cs_range_histogram(stress_operation=workload,
+                                                                          start_time=start,
+                                                                          end_time=end)
 
             if "steady" in func.__name__.lower():
                 if 'Steady State' not in latency_results:
