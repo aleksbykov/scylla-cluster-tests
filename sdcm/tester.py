@@ -252,6 +252,8 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
         self.status = "RUNNING"
         self.start_time = time.time()
         self.teardown_started = False
+        self.prometheus_db_multitenant = []
+        self.monitors_multitenant = None
         self._init_params()
         reuse_cluster_id = self.params.get('reuse_cluster')
         if reuse_cluster_id:
@@ -634,15 +636,29 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
             # sync test_start_time with ES
             self.start_time = self.get_test_start_time()
 
-        if self.monitors:
-            self.monitors.wait_for_init()
+        self.log.info("Initialized monitor: %s with nodes: %s", self.monitors, self.monitors.nodes)
+        if self.monitors and not self.monitors_multitenant:
+            self.monitors_multitenant = [self.monitors]
+        self.log.info("multi-tenant monitors %s", self.monitors_multitenant)
+
+        for monitors in self.monitors_multitenant:
+            monitors.wait_for_init()
 
         self.argus_collect_packages()
 
         # cancel reuse cluster - for new nodes added during the test
         self.test_config.reuse_cluster(False)
-        if self.monitors and self.monitors.nodes:
-            self.prometheus_db = PrometheusDBStats(host=self.monitors.nodes[0].public_ip_address)
+
+        for monitors in self.monitors_multitenant:
+            self.log.info("Monitor %s with nodes %s from multitenant-monitors: %s",
+                          monitors, monitors.nodes, self.monitors_multitenant)
+            if monitors and monitors.nodes:
+                self.prometheus_db_multitenant.append(
+                    PrometheusDBStats(host=monitors.nodes[0].external_address))
+        self.log.info("PrometheusDB-clients %s", self.prometheus_db_multitenant)
+        self.prometheus_db = (self.prometheus_db_multitenant or [None])[0]
+        self.log.info("Prometheus client: %s", self.prometheus_db)
+
         self.start_time = time.time()
         self.timeout_thread = self._init_test_timeout_thread()
 
