@@ -764,8 +764,13 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
             # sync test_start_time with ES
             self.start_time = self.get_test_start_time()
 
+        self.log.info("Initialized monitor: %s with nodes: %s", self.monitors, self.monitors.nodes)
         if self.monitors and not self.monitors_multitenant:
             self.monitors_multitenant = [self.monitors]
+        self.log.info("multi-tenant monitors %s", self.monitors_multitenant)
+
+        for monitors in self.monitors_multitenant:
+            monitors.wait_for_init()
 
         if self.monitors_multitenant:
             monitors_init_in_parallel = ParallelObject(
@@ -783,10 +788,14 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
         self.test_config.reuse_cluster(False)
 
         for monitors in self.monitors_multitenant:
+            self.log.info("Monitor %s with nodes %s from multitenant-monitors: %s",
+                          monitors, monitors.nodes, self.monitors_multitenant)
             if monitors and monitors.nodes:
                 self.prometheus_db_multitenant.append(
                     PrometheusDBStats(host=monitors.nodes[0].external_address))
+        self.log.info("PrometheusDB-clients %s", self.prometheus_db_multitenant)
         self.prometheus_db = (self.prometheus_db_multitenant or [None])[0]
+        self.log.info("Prometheus client: %s", self.prometheus_db)
 
         self.start_time = time.time()
         self.timeout_thread = self._init_test_timeout_thread()
