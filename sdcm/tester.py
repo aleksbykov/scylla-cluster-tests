@@ -3065,12 +3065,16 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
         return False
 
     def get_cs_range_histogram(self, stress_operation: str, start_time: float, end_time: float) -> dict[str, Any]:
+        self.log.info("Build HDR histogram with start time: %s, end time: %s; for operation: %s",
+                      start_time, end_time, stress_operation)
         range_histogram = CSRangeHistogramBuilder.build_histogram_from_dir(base_path=self.loaders.logdir,
                                                                            start_time=start_time,
                                                                            end_time=end_time)
         return CSRangeHistogramSummary(range_histogram).get_summary_for_operation(stress_operation)[0]
 
     def get_cs_range_histogram_by_interval(self, stress_operation, start_time, end_time, time_interval=600) -> list[dict[str, Any]]:
+        self.log.info("Build HDR histogram with start time: %s, end time: %s, time interval: %s for operation: %s",
+                      start_time, end_time, time_interval, stress_operation)
         range_histograms = CSRangeHistogramBuilder.build_histograms_range_with_interval(path=self.loaders.logdir,
                                                                                         start_time=start_time,
                                                                                         end_time=end_time,
