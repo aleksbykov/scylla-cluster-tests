@@ -80,6 +80,13 @@ class CSHDRFileLogger(SSHLoggerBase):
                           verbose=False, ignore_status=True,
                           log_file=os.path.join(self.node.logdir, self._target_log_file))
 
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop()
+
 
 class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
     def __init__(self, loader_set, stress_cmd, timeout, stress_num=1, keyspace_num=1, keyspace_name='',  # pylint: disable=too-many-arguments
@@ -156,7 +163,9 @@ class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
             return stress_cmd
         return stress_cmd.replace(current_error_option, 'errors ' + ' '.join(new_error_suboptions))
 
-    def _get_available_suboptions(self, node, option):
+    def _get_available_suboptions(self, node, option, _cache={}):  # pylint: disable=dangerous-default-value
+        if cached_value := _cache.get(node.name):
+            return cached_value
         try:
             result = node.remoter.run(
                 cmd=f'cassandra-stress help {option} | grep "^Usage:"',
@@ -164,12 +173,42 @@ class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
                 ignore_status=True).stdout
         except Exception:  # pylint: disable=broad-except
             return []
-        return re.findall(r' *\[([\w-]+?)[=?]*] *', result)
+        findings = re.findall(r' *\[([\w-]+?)[=?]*] *', result)
+        _cache[node.name] = findings
+        return findings
+
+    @staticmethod
+    def _add_hdr_log_option(stress_cmd: str, hdr_log_name: str) -> str:
+        if "-log" in stress_cmd:
+            if match := re.search(r"\s-log ([^-]*)-?", stress_cmd):
+                cs_log_option = match.group(1)
+                if "hdr" not in cs_log_option:
+                    stress_cmd.replace("-log", f"-log hdr={hdr_log_name}")
+                else:
+                    if replacing_hdr_file := re.search(r"hdr=(.*?)\s", cs_log_option):
+                        stress_cmd.replace(f"hdr={replacing_hdr_file.group(1)}", f"hdr={hdr_log_name}")
+        else:
+            stress_cmd += f" -log hdr={hdr_log_name} interal=10s"
+
+        return stress_cmd
+
+    @staticmethod
+    def _add_hdr_log_option(stress_cmd: str, hdr_log_name: str) -> str:
+        if "-log" in stress_cmd:
+            if match := re.search(r"\s-log ([^-]*)-?", stress_cmd):
+                cs_log_option = match.group(1)
+                if "hdr" not in cs_log_option:
+                    stress_cmd.replace("-log", f"-log hdr={hdr_log_name}")
+                else:
+                    if replacing_hdr_file := re.search(r"hdr=(.*?)\s", cs_log_option):
+                        stress_cmd.replace(f"hdr={replacing_hdr_file.group(1)}", f"hdr={hdr_log_name}")
+        else:
+            stress_cmd += f" -log hdr={hdr_log_name} interal=10s"
+
+        return stress_cmd
 
     def _run_stress(self, node, loader_idx, cpu_idx, keyspace_idx):  # pylint: disable=too-many-locals
         stress_cmd = self.create_stress_cmd(node, loader_idx, keyspace_idx)
-        with_hdr = False
-        hdr_logger_transfer = None
         local_hdr_file_name = ""
 
         if self.profile:
@@ -187,16 +226,11 @@ class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
         log_file_name = \
             os.path.join(node.logdir, f'cassandra-stress-l{loader_idx}-c{cpu_idx}-k{keyspace_idx}-{uuid.uuid4()}.log')
 
-        if "%LOG%" in stress_cmd:
-            hdr_file_name = f"cs_hdr_{stress_cmd_opt}_{loader_idx}_c{cpu_idx}_k{keyspace_idx}_{uuid.uuid4()}.hdr"
-            LOGGER.info("HDR log file: %s", hdr_file_name)
-            stress_cmd = re.sub(r"%LOG%",
-                                f"-log hdrfile={hdr_file_name} interval=10s",
-                                stress_cmd)
-            LOGGER.info('Stress command with hdr:\n%s', stress_cmd)
-            hdr_logger_transfer = CSHDRFileLogger(node, target_log_file=hdr_file_name)
-            with_hdr = True
-            local_hdr_file_name = os.path.join(node.logdir, hdr_file_name)
+        hdr_file_name = f"cs_hdr_{stress_cmd_opt}_{loader_idx}_c{cpu_idx}_k{keyspace_idx}_{uuid.uuid4()}.hdr"
+        LOGGER.info("HDR log file: %s", hdr_file_name)
+        stress_cmd = self._add_hdr_log_option(stress_cmd, hdr_file_name)
+        LOGGER.info('Stress command with hdr:\n%s', stress_cmd)
+        local_hdr_file_name = os.path.join(node.logdir, hdr_file_name)
 
         LOGGER.debug('cassandra-stress local log: %s', log_file_name)
 
@@ -217,25 +251,22 @@ class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
                                      stress_operation=stress_cmd_opt,
                                      stress_log_filename=log_file_name,
                                      loader_idx=loader_idx, cpu_idx=cpu_idx), \
+                CassandraStressEventsPublisher(node=node, cs_log_filename=log_file_name) as publisher, \
+                CassandraStressEvent(node=node, stress_cmd=self.stress_cmd,
+                                     log_file_name=log_file_name) as cs_stress_event, \
+                CSHDRFileLogger(node, target_log_file=hdr_file_name), \
                 CassandraStressHDRExporter(instance_name=node.cql_ip_address,
                                            metrics=nemesis_metrics_obj(),
                                            stress_operation=stress_cmd_opt,
                                            stress_log_filename=local_hdr_file_name,
-                                           loader_idx=loader_idx, cpu_idx=cpu_idx), \
-                CassandraStressEventsPublisher(node=node, cs_log_filename=log_file_name) as publisher, \
-                CassandraStressEvent(node=node, stress_cmd=self.stress_cmd,
-                                     log_file_name=log_file_name) as cs_stress_event:
+                                           loader_idx=loader_idx, cpu_idx=cpu_idx):
             publisher.event_id = cs_stress_event.event_id
-            if with_hdr:
-                hdr_logger_transfer.start()
             try:
 
                 result = node.remoter.run(cmd=node_cmd, timeout=self.timeout, log_file=log_file_name)
             except Exception as exc:  # pylint: disable=broad-except
                 cs_stress_event.severity = Severity.CRITICAL if self.stop_test_on_failure else Severity.ERROR
                 cs_stress_event.add_error(errors=[format_stress_cmd_error(exc)])
-            if with_hdr:
-                hdr_logger_transfer.stop()
 
         return node, result, cs_stress_event
 
