@@ -109,6 +109,8 @@ class CSRangeHistogramBuilder:
                                                                range_end_time_sec=end_time,
                                                                absolute=absolute_time)
             if not next_hist:
+                if hdr_reader.start_time_sec > start_time:
+                    end_time = int(start_time)
                 break
             tag = next_hist.get_tag()
             if not tag:
@@ -150,7 +152,7 @@ class CSRangeHistogramBuilder:
             build_range_histogram = partial(CSRangeHistogramBuilder.build_histogram_from_file,
                                             hdr_file=path,
                                             absolute_time=absolute_time)
-        elif os.path.isdir(path):
+        elif os.path.exists(path) and os.path.isdir(path):
             build_range_histogram = partial(CSRangeHistogramBuilder.build_histogram_from_dir,
                                             base_path=path,
                                             absolute_time=absolute_time)
@@ -160,6 +162,8 @@ class CSRangeHistogramBuilder:
         for start_interval in range(start_ts, end_ts, window_step):
             end_interval = end_ts if start_interval + window_step > end_ts else start_interval + window_step
             range_histograms = build_range_histogram(start_time=start_interval, end_time=end_interval)
+            if not range_histograms.histograms and int(range_histograms.start_time) == int(range_histograms.end_time):
+                continue
             if not range_histograms.histograms:
                 break
             summary.append(range_histograms)
