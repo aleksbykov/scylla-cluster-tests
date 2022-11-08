@@ -2554,7 +2554,7 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
                              f"current size is: '{used}'"
 
     def check_latency_during_ops(self):
-        start_time = self.start_time
+        start_time = self.start_time if not self.create_stats else self._stats["test_details"]["start_time"]
         end_time = time.time()
         results_analyzer = LatencyDuringOperationsPerformanceAnalyzer(es_index=self._test_index,
                                                                       es_doc_type=self._es_doc_type,
