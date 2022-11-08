@@ -203,7 +203,7 @@ class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
                     if replacing_hdr_file := re.search(r"hdrfile=(.*?)\s", cs_log_option):
                         stress_cmd.replace(f"hdrfile={replacing_hdr_file.group(1)}", f"hdrfile={hdr_log_name}")
         else:
-            stress_cmd += f" -log hdr={hdr_log_name} interal=10s"
+            stress_cmd += f" -log hdrfile={hdr_log_name} interval=10s"
 
         return stress_cmd
 
