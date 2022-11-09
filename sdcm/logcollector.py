@@ -823,7 +823,7 @@ class LoaderLogCollector(LogCollector):
                 search_locally=True),
         FileLog(name='*cassandra-harry*.log',
                 search_locally=True),
-        FileLog(name="*cs_hdr_*.hdr",
+        FileLog(name="*cs-hdr-*.hdr",
                 search_locally=True)
     ]
 

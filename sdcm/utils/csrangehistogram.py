@@ -64,7 +64,7 @@ class CSRangeHistogramBuilder:
         c-s hdr logs
     """
 
-    CS_HDR_FILE_WC = "*/cs_hdr_*.hdr"
+    CS_HDR_FILE_WC = "*/cs-hdr-*.hdr"
 
     @staticmethod
     def build_histogram_from_dir(pattern: str = "", base_path="",
@@ -214,6 +214,9 @@ class CSRangeHistogramBuilder:
         """
             Merge several time range histogram to one containg summary result.
         """
+        if not range_histograms:
+            return CSRangeHistogram(start_time=0, end_time=0, histograms={})
+
         final_hst = range_histograms.pop(0)
         for hst in range_histograms:
             for tag in hst.histograms.keys():
