@@ -259,7 +259,7 @@ class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
                 CassandraStressEvent(node=node, stress_cmd=self.stress_cmd,
                                      log_file_name=log_file_name) as cs_stress_event, \
                 CSHDRFileLogger(node, target_log_file=remote_hdr_file_name), \
-                CassandraStressHDRExporter(instance_name=node.cql_ip_address,
+                CassandraStressHDRExporter(instance_name=node.ip_address,
                                            metrics=nemesis_metrics_obj(),
                                            stress_operation=stress_cmd_opt,
                                            stress_log_filename=local_hdr_file_name,
