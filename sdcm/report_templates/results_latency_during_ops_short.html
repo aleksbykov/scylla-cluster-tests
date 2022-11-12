@@ -147,13 +147,10 @@
                         {% set lat_type_list = ['c-s P99'] %}
 
                         {% for lat_type in lat_type_list|sort %}
-                                {% if 'color' in results and lat_type in results['color'] and results['color'][lat_type] == 'red' %}
-                                    <tr style ="background-color: red">
-                                {% else %}
-                                       <tr>
-                                {% endif %}
+                            {% if 'color' in results and lat_type in results['color'] and results['color'][lat_type] == 'red' %}
+                                <tr style ="background-color: red">
                             {% else %}
-                                <tr>
+                                   <tr>
                             {% endif %}
                             <td> current build </td>
                             <td>{{ lat_type }}</td>
