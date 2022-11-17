@@ -4739,3 +4739,23 @@ class StartStopValidationCompaction(Nemesis):
 
     def disrupt(self):
         self.disrupt_start_stop_validation_compaction()
+
+
+class StreamingErrorMonkey(Nemesis):
+    """
+    Selected number of nemesis that is focused on scylla-operator functionality
+    """
+    disruptive = True
+    run_with_gemini: bool = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.disrupt_methods_list = [
+            'disrupt_decommission_streaming_err',
+            'disrupt_rebuild_streaming_err',
+            'disrupt_repair_streaming_err',
+            'disprupt_'
+        ]
+
+    def disrupt(self):
+        self.call_random_disrupt_method(disrupt_methods=self.disrupt_methods_list, predefined_sequence=True)
