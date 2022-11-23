@@ -196,6 +196,20 @@ class CassandraStressThread(DockerBasedStressThread):  # pylint: disable=too-man
 
     def _run_cs_stress(self, loader, loader_idx, cpu_idx, keyspace_idx):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         cleanup_context = contextlib.nullcontext()
+        os.makedirs(loader.logdir, exist_ok=True)
+
+        # This tag will be output in the header of c-stress result,
+        # we parse it to know the loader & cpu info in _parse_cs_summary().
+        stress_cmd_opt = self.stress_cmd.split("cassandra-stress", 1)[1].split(None, 1)[0]
+
+        log_id = self._build_log_file_id(loader_idx, cpu_idx, keyspace_idx)
+        log_file_name = \
+            os.path.join(loader.logdir, f'cassandra-stress-{stress_cmd_opt}-{log_id}.log')
+        LOGGER.debug('cassandra-stress local log: %s', log_file_name)
+        remote_hdr_file_name = f"cs-hdr-{stress_cmd_opt}-{log_id}.hdr"
+        LOGGER.debug("cassandra-stress remote HDR log file: %s", remote_hdr_file_name)
+        local_hdr_file_name = os.path.join(loader.logdir, remote_hdr_file_name)
+        LOGGER.debug("cassandra-stress HDR local file %s", local_hdr_file_name)
 
         if "k8s" in self.params.get("cluster_backend"):
             cmd_runner = loader.remoter
@@ -207,6 +221,7 @@ class CassandraStressThread(DockerBasedStressThread):  # pylint: disable=too-man
             cmd_runner = loader.remoter
             cmd_runner_name = loader.ip_address
         else:
+            loader.remoter.run(f"touch $HOME/{remote_hdr_file_name}", ignore_status=True, verbose=False)
             cassandra_stress = self.params.get(self.DOCKER_IMAGE_PARAM_NAME)
             cmd_runner_name = loader.ip_address
             if not cassandra_stress:
@@ -220,7 +235,8 @@ class CassandraStressThread(DockerBasedStressThread):  # pylint: disable=too-man
                                                         command_line="-c 'tail -f /dev/null'",
                                                         extra_docker_opts=f'{cpu_options} '
                                                                           f'--label shell_marker={self.shell_marker}'
-                                                                          f' --entrypoint /bin/bash')
+                                                                          f' --entrypoint /bin/bash'
+                                                                          f' -v $HOME/{remote_hdr_file_name}:/{remote_hdr_file_name}')
 
         stress_cmd = self.create_stress_cmd(cmd_runner, keyspace_idx)
         local_hdr_file_name = ""
@@ -242,26 +258,9 @@ class CassandraStressThread(DockerBasedStressThread):  # pylint: disable=too-man
             cmd_runner.send_files(str(connection_bundle_file),
                                   self.target_connection_bundle_file, delete_dst=True, verbose=True)
 
-        # Get next word after `cassandra-stress' in stress_cmd.
-        # Do it this way because stress_cmd can contain env variables before `cassandra-stress'.
-        stress_cmd_opt = stress_cmd.split("cassandra-stress", 1)[1].split(None, 1)[0]
-
+        stress_cmd = self._add_hdr_log_option(stress_cmd, remote_hdr_file_name)
         LOGGER.info('Stress command:\n%s', stress_cmd)
 
-        os.makedirs(loader.logdir, exist_ok=True)
-        log_id = self._build_log_file_id(loader_idx, cpu_idx, keyspace_idx)
-        log_file_name = \
-            os.path.join(loader.logdir, f'cassandra-stress-{stress_cmd_opt}-{log_id}.log')
-        LOGGER.debug('cassandra-stress local log: %s', log_file_name)
-        remote_hdr_file_name = f"cs-hdr-{stress_cmd_opt}-{log_id}.hdr"
-        LOGGER.info("HDR log file: %s", remote_hdr_file_name)
-        stress_cmd = self._add_hdr_log_option(stress_cmd, remote_hdr_file_name)
-        LOGGER.info('Stress command with hdr:\n%s', stress_cmd)
-        local_hdr_file_name = os.path.join(loader.logdir, remote_hdr_file_name)
-        
-
-        # This tag will be output in the header of c-stress result,
-        # we parse it to know the loader & cpu info in _parse_cs_summary().
         tag = f'TAG: loader_idx:{loader_idx}-cpu_idx:{cpu_idx}-keyspace_idx:{keyspace_idx}'
 
         if self.stress_num > 1:
