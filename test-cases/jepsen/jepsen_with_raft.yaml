@@ -15,11 +15,12 @@ nemesis_class_name: 'NoOpMonkey'
 scylla_linux_distro: 'debian-buster'
 use_preinstalled_scylla: false
 user_prefix: 'jepsen'
-jepsen_scylla_repo: 'https://github.com/scylladb/jepsen.git'
+use_legacy_cluster_init: true
+jepsen_scylla_repo: 'https://github.com/aleksbykov/jepsen.git'
 jepsen_test_count: 5
 jepsen_test_run_policy: any
 bare_loaders: true
 
 append_scylla_yaml: |
   experimental_features:
-    - raft
+    - consistent-topology-changes
