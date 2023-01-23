@@ -63,6 +63,31 @@ class TestDatabaseLogEvent(unittest.TestCase):
         self.assertEqual(event2.line, f"{TOLERABLE_REACTOR_STALL} ms")
         self.assertEqual(event2.line_number, 2)
 
+    def test_reactor_stalled_counter(self):
+        DatabaseLogEvent.REACTOR_STALLED.start_count()
+        print(DatabaseLogEvent.events_counter, "\n")
+        event1 = DatabaseLogEvent.REACTOR_STALLED()
+        # self.assertTrue(event1._is_count)
+        # self.assertFalse(DatabaseLogEvent.ABORTING_ON_SHARD._is_count)
+        event1.publish()
+        print(DatabaseLogEvent.events_counter, "\n")
+        self.assertEqual(event1.get_counter(), 1)
+        for _ in range(5):
+            DatabaseLogEvent.REACTOR_STALLED().publish()
+        print(DatabaseLogEvent.events_counter, "\n")
+        self.assertEqual(DatabaseLogEvent.REACTOR_STALLED.get_counter(), 6)
+        DatabaseLogEvent.REACTOR_STALLED.stop_count()
+        # self.assertFalse(event1._is_count)
+        self.assertTrue(event1.__class__.__name__ not in event1.events_counter)
+        print(DatabaseLogEvent.events_counter, "\n")
+
+    def test_count_all_database_events(self):
+        DatabaseLogEvent.start_count()
+        _ = DatabaseLogEvent.REACTOR_STALLED().publish()
+        _ = DatabaseLogEvent.BACKTRACE().publish()
+        print(DatabaseLogEvent.events_counter)
+        self.assertEqual(DatabaseLogEvent.get_counter(), 2)
+
     def test_kernel_callstack_severity(self):
         event1 = DatabaseLogEvent.KERNEL_CALLSTACK()
         self.assertEqual(event1.severity, Severity.DEBUG)
