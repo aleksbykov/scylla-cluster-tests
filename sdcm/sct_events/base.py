@@ -98,6 +98,8 @@ class SctEvent:
     _ready_to_publish: bool = False  # set it to True in __init__() and to False in publish() to prevent double-publish
     publish_to_grafana: bool = True
     save_to_files: bool = True
+    events_counter: dict[str, int] = {}
+    _is_count = False
 
     def __init_subclass__(cls, abstract: bool = False):
         # pylint: disable=unsupported-membership-test; pylint doesn't know about Dict
@@ -121,6 +123,27 @@ class SctEvent:
         self.event_id = str(uuid.uuid4())
         self.log_level = LOG_LEVEL_MAPPING.get(severity, logging.ERROR)
         self.subcontext = []
+
+    @classmethod
+    def start_count(cls):
+        cls._is_count = True
+        cls.events_counter[cls.__name__] = 0
+
+    @classmethod
+    def stop_count(cls):
+        cls._is_count = False
+        del cls.events_counter[cls.__name__]
+
+    @classmethod
+    def get_counter(cls):
+        return cls.events_counter.get(cls.__name__)
+
+    def increment_event_counter(self):
+        if self._is_count:
+            if self.__class__.__name__ in self.events_counter:
+                self.events_counter[self.__class__.__name__] += 1
+            if self.__class__.__name__.split(".", maxsplit=1)[0] in self.events_counter:
+                self.events_counter[self.__class__.__name__.split(".", maxsplit=1)[0]] += 1
 
     @classmethod
     def is_abstract(cls) -> bool:
@@ -241,10 +264,13 @@ class SctEvent:
         # pylint: disable=import-outside-toplevel; to avoid cyclic imports
         from sdcm.sct_events.events_device import get_events_main_device
 
+        self.increment_event_counter()
+
         if not self._ready_to_publish:
             if warn_not_ready:
                 LOGGER.warning("[SCT internal warning] %s is not ready to be published", self)
             return
+
         get_events_main_device(_registry=self._events_processes_registry).publish_event(self)
         self._ready_to_publish = False
 

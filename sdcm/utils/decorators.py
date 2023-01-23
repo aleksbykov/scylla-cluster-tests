@@ -161,6 +161,7 @@ def latency_calculator_decorator(original_function: Optional[Callable] = None, *
     """
     # calling this import here, because of circular import
     from sdcm.utils import latency  # pylint: disable=import-outside-toplevel
+    from sdcm.sct_events.database import DatabaseLogEvent  # pylint: disable=import-outside-toplevel
 
     def wrapper(func):
 
@@ -168,7 +169,10 @@ def latency_calculator_decorator(original_function: Optional[Callable] = None, *
         def wrapped(*args, **kwargs):  # pylint: disable=too-many-branches, too-many-locals
             start = time.time()
             start_node_list = args[0].cluster.nodes[:]
+            args[0].start_event_count(DatabaseLogEvent.REACTOR_STALLED)
             res = func(*args, **kwargs)
+            reactor_stalls_num = args[0].get_event_counter(DatabaseLogEvent.REACTOR_STALLED)
+            args[0].stop_event_count(DatabaseLogEvent.REACTOR_STALLED)
             end_node_list = args[0].cluster.nodes[:]
             all_nodes_list = list(set(start_node_list + end_node_list))
             end = time.time()
@@ -208,7 +212,7 @@ def latency_calculator_decorator(original_function: Optional[Callable] = None, *
             result["hdr_summary"] = args[0].tester.get_cs_range_histogram(stress_operation=workload,
                                                                           start_time=start,
                                                                           end_time=end)
-
+            result["reactors_stall"] = reactor_stalls_num
             if "steady" in func.__name__.lower():
                 if 'Steady State' not in latency_results:
                     latency_results['Steady State'] = result

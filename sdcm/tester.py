@@ -3570,3 +3570,15 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
                                                                                         end_time=end_time,
                                                                                         interval=time_interval)
         return CSRangeHistogramSummary(range_histograms).get_summary_for_operation(stress_operation)
+
+    @staticmethod
+    def start_count_event(event: "SctEvent"):
+        event.start_count()
+
+    @staticmethod
+    def stop_count_event(event: "SctEvent"):
+        event.stop_count()
+
+    @staticmethod
+    def get_event_counter(event: "SctEvent"):
+        return {event.__name__: event.get_counter()}

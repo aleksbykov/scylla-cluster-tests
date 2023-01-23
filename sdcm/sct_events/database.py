@@ -71,11 +71,25 @@ class ReactorStalledMixin(Generic[T_log_event]):
     def add_info(self: T_log_event, node, line: str, line_number: int) -> T_log_event:
         try:
             # Dynamically handle reactor stalls severity.
-            if int(MILLI_RE.findall(line)[0]) >= self.tolerable_reactor_stall:
+            if stall_ms := int(MILLI_RE.findall(line)[0]) >= self.tolerable_reactor_stall:
                 self.severity = Severity.ERROR
+                self.stall_ms = stall_ms
         except (ValueError, IndexError, ):
             LOGGER.warning("failed to read REACTOR_STALLED line=[%s] ", line)
         return super().add_info(node=node, line=line, line_number=line_number)
+
+    @classmethod
+    def start_count(cls):
+        cls._is_count = True
+        cls.events_counter[cls.__name__] = {}
+
+    def increment_event_counter(self):
+        if not self._is_count:
+            return
+        if self.__class__.__name__ in self.events_counter:
+            self.events_counter[self.__class__.__name__] += 1
+        if self.__class__.__name__.split(".", maxsplit=1)[0] in self.events_counter:
+            self.events_counter[self.__class__.__name__.split(".", maxsplit=1)[0]] += 1
 
 
 DatabaseLogEvent.add_subevent_type("WARNING", severity=Severity.WARNING,
