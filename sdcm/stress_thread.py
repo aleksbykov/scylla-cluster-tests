@@ -254,9 +254,12 @@ class CassandraStressThread(DockerBasedStressThread):  # pylint: disable=too-man
             ssl_conf_dir = Path(get_data_dir_path('ssl_conf', 'client'))
             for ssl_file in ssl_conf_dir.iterdir():
                 if ssl_file.is_file():
+                    cmd_runner.sudo("mkdir -p /etc/scylla/ssl_conf/client", ignore_status=True)
+                    cmd_runner.sudo("chmod -R 777 /etc/scylla/ssl_conf/client", ignore_status=True)
                     cmd_runner.send_files(str(ssl_file),
                                           str(Path('/etc/scylla/ssl_conf/client') / ssl_file.name),
                                           verbose=True)
+                    cmd_runner.sudo(f"chmod -R 777 /etc/scylla/ssl_conf/client/{ssl_file.name}", ignore_status=True)
 
         if connection_bundle_file := self.connection_bundle_file:
             cmd_runner.send_files(str(connection_bundle_file),
