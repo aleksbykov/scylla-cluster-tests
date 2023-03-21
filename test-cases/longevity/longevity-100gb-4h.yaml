@@ -13,7 +13,7 @@ seeds_num: 1
 
 instance_type_db: 'i3.4xlarge'
 
-nemesis_class_name: 'DecommissionStreamingErrMonkey'
+nemesis_class_name: 'RemoveNodesMonkey'
 nemesis_seed: '032'
 nemesis_interval: 5
 nemesis_filter_seeds: false
