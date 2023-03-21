@@ -5483,3 +5483,11 @@ class SlaNemeses(Nemesis):
 
     def disrupt(self):
         self.call_random_disrupt_method(disrupt_methods=self.disrupt_methods_list)
+
+
+class RemoveNodesMonkey(Nemesis):
+
+    def disrupt(self):
+        self.call_random_disrupt_method(
+            disrupt_methods=['disrupt_decommission_streaming_err', 'disrupt_terminate_and_replace_node',
+                             'disrupt_nodetool_decommission'])
