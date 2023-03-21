@@ -3085,6 +3085,12 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             # dead_nodes_list, so the health validator terminate the job
             if exit_status != 0:
                 self.log.error(f"nodetool removenode command exited with status {exit_status}")
+                # check and clean difference between group0 and token ring,
+                garbage_host_ids = self.cluster.diff_token_ring_group0_members(verification_node)
+                self.log.debug("Difference between token ring and group0 is %s", garbage_host_ids)
+                if garbage_host_ids:
+                    self.cluster.clean_group0_garbage(verification_node)
+
                 self.log.debug(
                     f"Remove failed node {node_to_remove} from dead node list {self.cluster.dead_nodes_list}")
                 node = next((n for n in self.cluster.dead_nodes_list if n.ip_address == node_to_remove.ip_address), None)

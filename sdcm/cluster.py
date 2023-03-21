@@ -4609,21 +4609,7 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         if missing_host_ids:
             # decommission was aborted after all data streams and node removed from
             # token ring but left in group0. we can safely removenode and terminate it
-            self.log.debug("Remove node with host id %s from group0", missing_host_ids)
-            for missing_host_id in missing_host_ids:
-                result = verification_node.run_nodetool("removenode {}".format(missing_host_id),
-                                                        ignore_status=True, verbose=True)
-                if not result.ok:
-                    self.log.error("Removenode with host_id %s failed with %s",
-                                   missing_host_id, result.stdout + result.stderr)
-            missing_host_ids = self.diff_token_ring_group0_members(verification_node)
-            self.log.debug("Difference between token ring and group0 is %s", missing_host_ids)
-            if missing_host_ids:
-                token_ring_members = verification_node.get_token_ring_members()
-                group0_members = verification_node.get_group0_members()
-                error_msg = f"Token ring {token_ring_members} and group0 {group0_members} are differs on: {missing_host_ids}"
-                self.log.error(error_msg)
-                raise Exception(error_msg)
+            self.clean_group0_garbage(verification_node, raise_exception=True)
 
         LOGGER.info('Decommission %s PASS', node)
         self.terminate_node(node)  # pylint: disable=no-member
@@ -4633,6 +4619,24 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         with SoftTimeoutEvent(soft_timeout=soft_timeout, operation="decommission"):
             node.run_nodetool("decommission", timeout=timeout)
         self.verify_decommission(node)
+
+    def clean_group0_garbage(self, node: BaseNode, raise_exception: bool = False):
+        InfoEvent("Clean host ids from group0").publish()
+        host_ids = self.diff_token_ring_group0_members(node)
+        for host_id in host_ids:
+            result = node.run_nodetool("removenode {}".format(host_id),
+                                       ignore_status=True, verbose=True)
+            if not result.ok:
+                self.log.error("Removenode with host_id %s failed with %s",
+                               host_id, result.stdout + result.stderr)
+
+        if missing_host_ids := self.diff_token_ring_group0_members(node):
+            token_ring_members = node.get_token_ring_members()
+            group0_members = node.get_group0_members()
+            error_msg = f"Token ring {token_ring_members} and group0 {group0_members} are differs on: {missing_host_ids}"
+            self.log.error(error_msg)
+            if raise_exception:
+                raise Exception(error_msg)
 
     @property
     def scylla_manager_node(self) -> BaseNode:
