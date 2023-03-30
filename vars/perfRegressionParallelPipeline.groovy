@@ -275,6 +275,19 @@ def call(Map pipelineParams) {
                                                 }
                                             }
                                         }
+                                        stage("Decode reactor stalled") {
+                                            catchError(stageResult: 'FAILURE') {
+                                                script {
+                                                    wrap([$class: 'BuildUser']) {
+                                                        dir('scylla-cluster-tests') {
+                                                            timeout(time: 5, unit: 'MINUTES') {
+                                                                runDecodeReactorStalled()
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                         stage("Collect logs for ${sub_test}") {
                                             catchError(stageResult: 'FAILURE') {
                                                 wrap([$class: 'BuildUser']) {

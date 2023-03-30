@@ -35,6 +35,7 @@ from sdcm.paths import SCYLLA_YAML_PATH, SCYLLA_PROPERTIES_PATH
 from sdcm.provision import provisioner_factory
 from sdcm.provision.provisioner import ProvisionerError
 from sdcm.remote import RemoteCmdRunnerBase, LocalCmdRunner
+from sdcm.reactor_stall_decoder import DECODED_STALLS_DIR_NAME
 from sdcm.db_stats import PrometheusDBStats
 from sdcm.sct_events.events_device import EVENTS_LOG_DIR, RAW_EVENTS_LOG
 from sdcm.utils.common import (
@@ -1293,6 +1294,7 @@ class Collector:  # pylint: disable=too-many-instance-attributes,
         self.kubernetes_set = []
         self.sct_set = []
         self.pt_report_set = []
+        self.reactor_stall_decoder_set = []
         self.cluster_log_collectors = {
             ScyllaLogCollector: self.db_cluster,
             BaseSCTLogCollector: self.sct_set,
@@ -1310,6 +1312,7 @@ class Collector:  # pylint: disable=too-many-instance-attributes,
             SSTablesCollector: self.db_cluster,
             JepsenLogCollector: self.loader_set,
             ParallelTimelinesReportCollector: self.pt_report_set,
+            ReactorStallCollector: self.reactor_stall_decoder_set
         }
 
     @property
@@ -1582,3 +1585,15 @@ def upload_archive_to_s3(archive_path: str, storing_path: str) -> Optional[str]:
         LOGGER.error("File `%s' will not be uploaded", archive_path)
         return None
     return S3Storage().upload_file(file_path=archive_path, dest_dir=storing_path)
+
+
+class ReactorStallCollector(BaseSCTLogCollector):
+    log_entities = [
+        DirLog(name=f'{DECODED_STALLS_DIR_NAME}/*', search_locally=True),
+    ]
+    cluster_log_type = 'operations_reactor_stalls'
+    cluster_dir_prefix = 'operations_reactor_stalls'
+
+    @property
+    def is_collect_to_a_single_archive(self) -> bool:
+        return True

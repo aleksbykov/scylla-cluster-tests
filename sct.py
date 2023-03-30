@@ -43,6 +43,7 @@ from sdcm.provision import AzureProvisioner
 from sdcm.provision.provisioner import VmInstance
 from sdcm.remote import LOCALRUNNER
 from sdcm.results_analyze import PerformanceResultsAnalyzer, BaseResultsAnalyzer
+from sdcm.reactor_stall_decoder import ReactorStallDecoder
 from sdcm.sct_config import SCTConfiguration
 from sdcm.sct_provision.common.layout import SCTProvisionLayout, create_sct_configuration
 from sdcm.sct_provision.instances_provider import provision_sct_resources
@@ -1673,6 +1674,45 @@ cli.add_command(sct_ssh.tunnel)
 cli.add_command(sct_ssh.copy_cmd)
 cli.add_command(sct_ssh.attach_test_sg_cmd)
 cli.add_command(sct_ssh.ssh_cmd)
+
+
+@cli.command("decode-reactor-stalls", help="Pick up all reactor stalls events from event log and decode in a batch")
+@click.option("--test-id", envvar="SCT_TEST_ID", help="Test ID to search in sct-results")
+@click.option("--logdir", envvar='HOME', type=click.Path(exists=True),
+              help="Directory with sct-results folder")
+def decode_reactor_stalls(logdir: str, test_id: str | None) -> None:
+    add_file_logger()
+
+    event_log_file = "raw_events.log"
+    scylla_exec_bin = "libexec_scylla_bin.debug"
+
+    LOGGER.debug("Searching for the required test run directory in %s...", logdir)
+    testrun_dir = get_testrun_dir(os.path.join(logdir, "sct-results"), test_id)
+    if not testrun_dir:
+        click.secho(message=f"Couldn't find directory for the required test run in '{logdir}'! Aborting...", fg="red")
+        sys.exit(1)
+    LOGGER.info("Found the test run directory '%s'", testrun_dir)
+
+    LOGGER.debug("Searching for the %s in %s...", event_log_file, testrun_dir)
+    raw_events_log_path = next(Path(testrun_dir).glob(f"**/{event_log_file}"), None)
+
+    LOGGER.debug("Searching for the %s in %s...", scylla_exec_bin, testrun_dir)
+    scylla_executable = next(Path(testrun_dir).glob(f"**/{scylla_exec_bin}"), "")
+
+    if raw_events_log_path is None:
+        click.secho(message=f"Couldn't find '{event_log_file}' in '{testrun_dir}'! Aborting...", color=True, fg="red")
+        sys.exit(1)
+    LOGGER.info("Found the file '%s'", raw_events_log_path)
+
+    if not scylla_executable:
+        click.secho(
+            message="Scylla executable with symbols was not found. Decoding result will not contain all information", fg="yellow")
+
+    LOGGER.info("Pickup all Reactor stalls per node")
+    decoder = ReactorStallDecoder(LOCALRUNNER, testrun_dir, raw_events_log_path, scylla_executable)
+    decoder.run_decoding()
+    LOGGER.info("Decoding done. Result could be found in %s", decoder.store_dir)
+
 
 if __name__ == '__main__':
     cli.main(prog_name="hydra")

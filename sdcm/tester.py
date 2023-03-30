@@ -852,6 +852,7 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
         for db_cluster in self.db_clusters_multitenant:
             if db_cluster:
                 db_cluster.validate_seeds_on_all_nodes()
+        self.save_scylla_debug_to_sct_runner()
 
     def set_system_auth_rf(self, db_cluster=None):
         if not db_cluster:
@@ -3603,3 +3604,32 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
                                                                                         end_time=end_time,
                                                                                         interval=time_interval)
         return CSRangeHistogramSummary(range_histograms, tag_type).get_summary_for_operation(stress_operation)
+
+    def save_scylla_debug_to_sct_runner(self):
+        scylla_debug_sct_runner_file = "libexec_scylla_bin.debug"
+        if not self.db_cluster or not self.db_cluster.nodes:
+            self.log.debug("No alive db cluster nodes")
+            return
+
+        db_node: BaseNode = self.db_cluster.nodes[0]
+        scylla_debug_file = db_node.get_scylla_debug_file()
+        if not scylla_debug_file:
+            return
+
+        scylla_debug_full_path = os.path.join(self.logdir, scylla_debug_sct_runner_file)
+        if os.path.exists(scylla_debug_full_path):
+            self.log.debug("Scylla debug bin already exists on sct-runner")
+            return
+
+        self.log.debug("Download scylla_debug bin file")
+        try:
+            state = db_node.remoter.receive_files(scylla_debug_file, scylla_debug_full_path)
+        except Exception as exc:  # pylint: disable=broad-except
+            self.log.warning("Download scylla db file failed with error: %s", exc)
+            state = False
+
+        if not state:
+            self.log.warning("Scylla debug bin file was not received")
+            return
+
+        self.log.debug("Scylla debug bin file was received %s", scylla_debug_full_path)

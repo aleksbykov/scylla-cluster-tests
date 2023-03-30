@@ -291,7 +291,6 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
             self.configure_remote_logging()
         self.start_task_threads()
         self._init_port_mapping()
-
         self.set_keep_alive()
         if self.node_type == "db" and not self.is_kubernetes() \
                 and self.parent_cluster.params.get("print_kernel_callstack"):
@@ -1457,6 +1456,16 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
 
             if self.termination_event.is_set() and self.test_config.DECODING_QUEUE.empty():
                 break
+
+    def get_scylla_debug_file(self) -> str:
+        scylla_debug_file = ""
+        if not self._db_log_reader_thread:
+            return scylla_debug_file
+        try:
+            scylla_debug_file = self._db_log_reader_thread.get_scylla_debuginfo_file()
+        except Exception:  # pylint: disable=broad-except
+            self.log.warning("Scylla debug file was not found")
+        return scylla_debug_file
 
     def copy_scylla_debug_info(self, node_name: str, debug_file: str):
         """Copy scylla debug file from db-node to monitor-node
