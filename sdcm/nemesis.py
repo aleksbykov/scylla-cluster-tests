@@ -3324,7 +3324,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         ignore_ycsb_connection_refused,
         ignore_view_error_gate_closed_exception
     ])
-    def reboot_node(self, target_node, hard=True, verify_ssh=True):
+    def reboot_node(self, target_node: BaseNode, hard=True, verify_ssh=True):
         target_node.reboot(hard=hard, verify_ssh=verify_ssh)
         if self.tester.params.get('print_kernel_callstack'):
             save_kallsyms_map(node=target_node)
@@ -3489,6 +3489,49 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self.target_node.wait_db_up(timeout=300)
         with adaptive_timeout(Operations.REBUILD, self.target_node, timeout=HOUR_IN_SEC * 48):
             self.target_node.run_nodetool("rebuild")
+
+    def start_and_interrupt_bootstrap_streaming(self):
+        self.log.info("Start adding new node")
+
+        timeout = 1800 if self._is_it_on_kubernetes() else 400
+        self.log.info("Adding new node to cluster...")
+        InfoEvent(message='StartEvent - Adding new node to cluster').publish()
+        new_node = self.cluster.add_nodes(
+            count=1, dc_idx=self.target_node.dc_idx, enable_auto_bootstrap=True, rack=self.target_node.rack)[0]
+        self.set_current_running_nemesis(node=new_node)  # prevent to run nemesis on new node when running in parallel
+
+        def init_and_start_new_node(node: BaseNode):
+            try:
+                with adaptive_timeout(Operations.NEW_NODE, node=self.cluster.nodes[0], timeout=timeout):
+                    self.cluster.wait_for_init(node_list=[new_node], timeout=timeout, check_node_health=False)
+            except (NodeSetupFailed, NodeSetupTimeout):
+                self.log.warning("TestConfig of the '%s' failed, removing it from list of nodes" % new_node)
+                self.cluster.nodes.remove(new_node)
+                self.log.warning("Node will not be terminated. Please terminate manually!!!")
+
+        trigger = partial(
+            init_and_start_new_node,
+            node=new_node,
+        )
+
+        log_follower = new_node.follow_system_log(patterns=["BOOTSTRAP"])
+
+        watcher = partial(
+            self._call_disrupt_func_after_expression_logged,
+            log_follower=log_follower,
+            disrupt_func=self.reboot_node,
+            disrupt_func_kwargs={"target_node": new_node, "hard": True, "verify_ssh": False},
+            timeout=timeout,
+            delay=1
+        )
+        ParallelObject(objects=[trigger, watcher], timeout=timeout + 60).call_objects()
+        self.log.info("New node was started, boostrapping was interrupted")
+
+        # check node state and group0
+        # clean group0
+        # add new node
+        # work several minutes
+        # remove node
 
     def disrupt_decommission_streaming_err(self):
         """
