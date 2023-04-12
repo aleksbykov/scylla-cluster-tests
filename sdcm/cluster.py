@@ -4647,6 +4647,10 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
     def clean_group0_garbage(self, node: BaseNode, raise_exception: bool = False):
         InfoEvent("Clean host ids from group0").publish()
         host_ids = self.diff_token_ring_group0_members(node)
+        if not host_ids:
+            self.log.debug("Node could return to token ring but not yet bootstrap")
+            # Add host id which cann't vote after decommission aborted because it is already terminated")
+            host_ids = [member['host_id'] for member in node.get_group0_members() if str(member['voter']) == 'False']
         while host_ids:
             removing_host_id = host_ids.pop(0)
             ingore_dead_nodes_opt = f"--ignore-dead-nodes {','.join(host_ids)}" if host_ids else ""
