@@ -54,6 +54,8 @@ from sdcm.cluster import (
     NodeSetupFailed,
     NodeSetupTimeout,
     NodeStayInClusterAfterDecommission,
+    NodeCleanedAfterDecommissionAborted,
+    Group0MembersNotConsistenWithTokenRingMembers,
 )
 from sdcm.cluster_k8s import (
     KubernetesOps,
@@ -3377,6 +3379,12 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             except NodeStayInClusterAfterDecommission:
                 self.log.debug('The decommission of target node is successfully interrupted')
                 return None
+            except NodeCleanedAfterDecommissionAborted:
+                self.log.debug("Decommission aborted, Group0 was cleaned successfully. New node will be added")
+            except Group0MembersNotConsistenWithTokenRingMembers as exc:
+                self.log.error("Cluster state could be not predictable due to ghost members in raft group0: %s", exc)
+                raise
+
             except Exception as exc:  # pylint: disable=broad-except
                 self.log.error('Unexpected exception raised in checking decommission status: %s', exc)
 

@@ -183,6 +183,14 @@ class NodeStayInClusterAfterDecommission(Exception):
     """ raise after decommission finished but node stay in cluster"""
 
 
+class NodeCleanedAfterDecommissionAborted(Exception):
+    """ raise after decommission aborted and node cleaned from group0(Raft)"""
+
+
+class Group0MembersNotConsistenWithTokenRingMembers(Exception):
+    """ raise if set of group0 members differs from Tokein Ring members after removing Ghost members"""
+
+
 def prepend_user_prefix(user_prefix: str, base_name: str):
     return '%s-%s' % (user_prefix, base_name)
 
@@ -4569,7 +4577,7 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         for node in self.nodes:
             node.run_nodetool('repair')
 
-    def verify_decommission(self, node):
+    def verify_decommission(self, node: BaseNode):
         def get_node_ip_list(verification_node):
             try:
                 ip_node_list = []
@@ -4596,6 +4604,7 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
             patterns=['DECOMMISSIONING: done'], start_from_beginning=True))
 
         if target_node_ip in node_ip_list and not missing_host_ids and not decommission_done:
+            # Decommission was interrupted during streaming data.
             cluster_status = self.get_nodetool_status(verification_node)
             error_msg = ('Node that was decommissioned %s still in the cluster. '
                          'Cluster status info: %s' % (node,
@@ -4607,9 +4616,17 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
 
         self.log.debug("Difference between token ring and group0 is %s", missing_host_ids)
         if missing_host_ids:
-            # decommission was aborted after all data streams and node removed from
+            # decommission was aborted after all data was streamed and node removed from
             # token ring but left in group0. we can safely removenode and terminate it
+            # terminate node to be sure that it want return back to cluster,
+            # because node was just rebooted and could cause unpredictable cluster state.
+            LOGGER.debug("Terminate node %s", node.name)
+            self.terminate_node(node)  # pylint: disable=no-member
+            self.test_config.tester_obj().monitors.reconfigure_scylla_monitoring()
+            self.log.debug("Node %s was terminated", node.name)
             self.clean_group0_garbage(verification_node, raise_exception=True)
+            LOGGER.error("Decommission for node %s was aborted", node)
+            raise NodeCleanedAfterDecommissionAborted(f"Decommission for node {node} was aborted")
 
         LOGGER.info('Decommission %s PASS', node)
         self.terminate_node(node)  # pylint: disable=no-member
@@ -4623,12 +4640,19 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
     def clean_group0_garbage(self, node: BaseNode, raise_exception: bool = False):
         InfoEvent("Clean host ids from group0").publish()
         host_ids = self.diff_token_ring_group0_members(node)
-        for host_id in host_ids:
-            result = node.run_nodetool("removenode {}".format(host_id),
-                                       ignore_status=True, verbose=True)
+        while host_ids:
+            removing_host_id = host_ids.pop(0)
+            ingore_dead_nodes_opt = f"--ignore-dead-nodes {','.join(host_ids)}" if host_ids else ""
+
+            result = node.run_nodetool(f"removenode {removing_host_id} {ingore_dead_nodes_opt}",
+                                       ignore_status=True,
+                                       verbose=True,
+                                       retry=3)
             if not result.ok:
                 self.log.error("Removenode with host_id %s failed with %s",
-                               host_id, result.stdout + result.stderr)
+                               removing_host_id, result.stdout + result.stderr)
+            if not host_ids:
+                break
 
         if missing_host_ids := self.diff_token_ring_group0_members(node):
             token_ring_members = node.get_token_ring_members()
@@ -4636,7 +4660,7 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
             error_msg = f"Token ring {token_ring_members} and group0 {group0_members} are differs on: {missing_host_ids}"
             self.log.error(error_msg)
             if raise_exception:
-                raise Exception(error_msg)
+                raise Group0MembersNotConsistenWithTokenRingMembers(error_msg)
 
     @property
     def scylla_manager_node(self) -> BaseNode:
