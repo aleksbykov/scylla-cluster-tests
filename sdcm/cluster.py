@@ -3048,6 +3048,44 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
             return
         self.remoter.run(f"sudo kill -s SIGHUP {pid}")
 
+    def get_raft_status(self) -> str:
+        """ get raft state
+
+        If execute query, raft state will be return if raft is enabled,
+        otherwise result will be empty
+        Example
+
+            key                  | value
+            ----------------------+--------------------------
+            group0_upgrade_state | use_post_raft_procedures
+
+            (1 rows)
+
+
+        """
+        result = self.run_cqlsh("SELECT * FROM system.scylla_local WHERE key = 'group0_upgrade_state'",
+                                split=True, num_retry_on_failure=3)
+
+        if not result or len(result) <= 3:
+            return ""
+
+        raft_state = result[3].strip().split("|")
+        if not raft_state or len(raft_state) != 2:
+            return ""
+        return raft_state[1].strip()
+
+    def is_raft_ready(self) -> bool:
+        """check if raft running
+
+        According to https://docs.scylladb.com/branch-5.2/architecture/raft.html
+        """
+        state = self.get_raft_status()
+        return state == "use_post_raft_procedures"
+
+    def is_raft_enabled(self) -> bool:
+        with self.remote_scylla_yaml() as scylla_yaml:
+            return scylla_yaml.consistent_cluster_management
+
     def get_token_ring_members(self) -> list[dict[str, str]]:
         token_ring_members = []
         self.log.debug("Get token ring members")
@@ -3070,6 +3108,17 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
     def get_group0_members(self) -> list[dict[str, str]]:
         self.log.debug("Get group0 members")
         group0_members = []
+
+        if not self.is_raft_enabled():
+            self.log.info("Raft feature is not enabled")
+            return group0_members
+
+        if not self.is_raft_ready():
+            err_msg = f"Node {self.name} that raft is not ready {self.get_raft_status()}"
+            self.log.error(err_msg)
+            InfoEvent(message=err_msg, severity=Severity.ERROR).publish()
+            return group0_members
+
         result = self.run_cqlsh("select value from system.scylla_local where key = 'raft_group0_id'",
                                 split=True, num_retry_on_failure=3)
         # run_cqlsh return splitted ouput if data was found:
@@ -3086,6 +3135,11 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
         if not result or len(result) <= 3:
             return []
         raft_group0_id = result[3].strip()
+        if not raft_group0_id:
+            err_msg = f"Node {self.name} that raft_group0_id empty. {result}"
+            self.log.error(err_msg)
+            InfoEvent(message=err_msg, severity=Severity.ERROR).publish()
+            return group0_members
 
         result = self.run_cqlsh(
             f"select server_id, can_vote from system.raft_state where group_id = {raft_group0_id} and disposition = 'CURRENT'",
@@ -4645,6 +4699,10 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         self.verify_decommission(node)
 
     def clean_group0_garbage(self, node: BaseNode, raise_exception: bool = False):
+        if not self.is_raft_enabled_on_all_nodes():
+            self.log.info("Raft is not enabled")
+            return
+
         InfoEvent("Clean host ids from group0").publish()
         host_ids = self.diff_token_ring_group0_members(node)
         if not host_ids:
@@ -4737,6 +4795,9 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         return results
 
     def diff_token_ring_group0_members(self, node: BaseNode) -> list[str]:
+        if not self.is_raft_enabled_on_all_nodes() or not self.is_raft_ready_on_all_nodes():
+            self.log.info("Raft is not enabled or ready")
+            return []
         self.log.debug("Compare token ring and group0 members")
         group0_members = node.get_group0_members()
         group0_members_ids = {member["host_id"] for member in group0_members}
@@ -4745,6 +4806,15 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         self.log.debug("Token rings members ids: %s", token_ring_member_ids)
         self.log.debug("Group0 members ids: %s", group0_members_ids)
         return list(group0_members_ids - token_ring_member_ids)
+
+    def is_raft_ready_on_all_nodes(self) -> bool:
+        return all(node.is_raft_ready() for node in self.nodes)
+
+    def is_raft_enabled_on_all_nodes(self) -> bool:
+        status = all(node.is_raft_enabled for node in self.nodes)
+        if not status:
+            InfoEvent("Raft is not enabled on all nodes", severity=Severity.ERROR)
+        return status
 
 
 class BaseLoaderSet():
