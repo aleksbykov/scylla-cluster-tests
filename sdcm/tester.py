@@ -853,6 +853,7 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
         for db_cluster in self.db_clusters_multitenant:
             if db_cluster:
                 db_cluster.validate_seeds_on_all_nodes()
+                db_cluster.validate_raft_status_on_all_nodes()
 
     def set_system_auth_rf(self, db_cluster=None):
         if not db_cluster:

@@ -2598,8 +2598,12 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
         nodes_status = self.get_nodes_status()
         peers_details = self.get_peers_info() or {}
         gossip_info = self.get_gossip_info() or {}
-        group0_members = self.get_group0_members()
-        tokenring_members = self.get_token_ring_members()
+        if self.parent_cluster.raft_enabled:
+            group0_members = self.get_group0_members()
+            tokenring_members = self.get_token_ring_members()
+        else:
+            self.log.debug("Raft is disabled")
+            group0_members = tokenring_members = []
 
         return itertools.chain(
             check_nodes_status(
@@ -3081,6 +3085,7 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
 
     def is_raft_enabled(self) -> bool:
         with self.remote_scylla_yaml() as scylla_yaml:
+            self.log.debug("consistent_cluster_management : %s", scylla_yaml.consistent_cluster_management)
             return scylla_yaml.consistent_cluster_management
 
     def get_token_ring_members(self) -> list[dict[str, str]]:
@@ -3105,16 +3110,6 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
     def get_group0_members(self) -> list[dict[str, str]]:
         self.log.debug("Get group0 members")
         group0_members = []
-
-        if not self.is_raft_enabled():
-            self.log.info("Raft feature is not enabled")
-            return group0_members
-
-        if not self.is_raft_ready():
-            err_msg = f"Node {self.name} that raft is not ready {self.get_raft_status()}"
-            self.log.error(err_msg)
-            InfoEvent(message=err_msg, severity=Severity.ERROR).publish()
-            return group0_members
 
         result = self.run_cqlsh("select value from system.scylla_local where key = 'raft_group0_id'",
                                 split=True, num_retry_on_failure=3)
@@ -3884,6 +3879,8 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         self.test_config = TestConfig()
         self._node_cycle = None
         self.params = kwargs.get('params', {})
+        self.raft_ready = False
+        self.raft_enabled = False
         super().__init__(*args, **kwargs)
 
     def get_node_ips_param(self, public_ip=True):
@@ -4731,7 +4728,7 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         self.verify_decommission(node)
 
     def clean_group0_garbage(self, node: BaseNode, raise_exception: bool = False):
-        if not self.is_raft_enabled_on_all_nodes():
+        if not self.raft_enabled:
             self.log.info("Raft is not enabled")
             return
 
@@ -4827,7 +4824,7 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         return results
 
     def diff_token_ring_group0_members(self, node: BaseNode) -> list[str]:
-        if not self.is_raft_enabled_on_all_nodes() or not self.is_raft_ready_on_all_nodes():
+        if not self.raft_enabled:
             self.log.info("Raft is not enabled or ready")
             return []
         self.log.debug("Compare token ring and group0 members")
@@ -4839,14 +4836,46 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         self.log.debug("Group0 members ids: %s", group0_members_ids)
         return list(group0_members_ids - token_ring_member_ids)
 
-    def is_raft_ready_on_all_nodes(self) -> bool:
-        return all(node.is_raft_ready() for node in self.nodes)
+    def check_raft_ready_on_all_nodes(self, nodes: list[BaseNode] | None = None) -> bool:
+        self.log.debug("Check raft feature state on node")
+        if not nodes:
+            nodes = self.nodes
+        nodes_raft_status = []
+        for node in nodes:
+            raft_ready = node.is_raft_ready()
+            if raft_ready:
+                nodes_raft_status.append(raft_ready)
+                continue
+            InfoEvent(f"Node {node.name} has raft state: {node.get_raft_status()}", severity=Severity.ERROR).publish()
 
-    def is_raft_enabled_on_all_nodes(self) -> bool:
-        status = all(node.is_raft_enabled for node in self.nodes)
-        if not status:
-            InfoEvent("Raft is not enabled on all nodes", severity=Severity.ERROR)
-        return status
+        if not all(nodes_raft_status):
+            InfoEvent(f"Raft on cluster {self.name} is not ready")
+            raise Exception(f"Raft on cluster {self.name} is not ready")
+        self.raft_ready = True
+        self.log.debug("Raft is ready!")
+        return self.raft_ready
+
+    def check_raft_enabled_on_all_nodes(self, nodes: list[BaseNode] | None = None) -> bool:
+        if not nodes:
+            nodes = self.nodes
+        raft_feature_state = [node.is_raft_enabled() for node in nodes]
+        self.log.debug("Raft feature state: %", raft_feature_state)
+        raft_enabled = all(raft_feature_state)
+        raft_disabled = all(map(lambda x: not x, raft_feature_state))
+        if not raft_enabled and not raft_disabled:
+            InfoEvent("Raft is not enabled on all nodes", severity=Severity.ERROR).publish()
+            raise Exception("Raft is not enabled on all nodes")
+
+        self.raft_enabled = raft_enabled
+        self.log.debug("Raft on cluster %s is enabled: %s", self.name, self.raft_enabled)
+        return self.raft_enabled
+
+    def validate_raft_status_on_all_nodes(self):
+        self.log.debug("Check raft on cluster")
+        self.check_raft_enabled_on_all_nodes()
+        if self.raft_enabled:
+            self.check_raft_enabled_on_all_nodes()
+        self.log.debug("Raft status: Enabled: %s, Ready %s", self.raft_enabled, self.raft_ready)
 
 
 class BaseLoaderSet():

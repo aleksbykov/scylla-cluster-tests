@@ -268,7 +268,7 @@ def check_schema_agreement_in_gossip_and_peers(node, retries: int = CHECK_NODE_H
 def check_group0_tokenring_consistency(group0_members: list[dict[str, str]],
                                        tokenring_members: list[dict[str, str]],
                                        current_node) -> HealthEventsGenerator:
-    if not group0_members:
+    if not group0_members and not tokenring_members:
         LOGGER.info("Raft feature is disabled")
         return
     LOGGER.debug("Check group0 and tokenring consistency...")

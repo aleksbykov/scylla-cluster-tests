@@ -3434,13 +3434,14 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             retry=0,
         )
 
-        terminate_patterns = ["DECOMMISSIONING: unbootstrap starts",
-                              "DECOMMISSIONING: unbootstrap done",
-                              "becoming a group 0 non-voter",
-                              "became a group 0 non-voter",
-                              "leaving token ring",
-                              "left token ring",
-                              "Finished token ring movement"]
+        terminate_patterns = ["DECOMMISSIONING: unbootstrap starts"]
+        if self.cluster.raft_enabled:
+            terminate_patterns += ["DECOMMISSIONING: unbootstrap done",
+                                   "becoming a group 0 non-voter",
+                                   "became a group 0 non-voter",
+                                   "leaving token ring",
+                                   "left token ring",
+                                   "Finished token ring movement"]
         self.use_nemesis_seed()
         terminate_pattern = random.choice(terminate_patterns)
         self.log.debug("Reboot node after log message: '%s'", terminate_pattern)
