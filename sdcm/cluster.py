@@ -4874,7 +4874,7 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         self.log.debug("Check raft on cluster")
         self.check_raft_enabled_on_all_nodes()
         if self.raft_enabled:
-            self.check_raft_enabled_on_all_nodes()
+            self.check_raft_ready_on_all_nodes()
         self.log.debug("Raft status: Enabled: %s, Ready %s", self.raft_enabled, self.raft_ready)
 
 

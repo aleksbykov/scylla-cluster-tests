@@ -3387,15 +3387,15 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             EventsSeverityChangerFilter(new_severity=Severity.WARNING,
                                         event_class=DatabaseLogEvent.DATABASE_ERROR,
                                         regex=".*storage_service - decommission.*Operation failed",
-                                        extra_time_to_expiration=30), \
+                                        extra_time_to_expiration=timeout), \
             EventsSeverityChangerFilter(new_severity=Severity.WARNING,
                                         event_class=DatabaseLogEvent.DATABASE_ERROR,
-                                        regex=".*storage_service - This node was decommissioned and will not rejoin the ring.*",
-                                        extra_time_to_expiration=30), \
+                                        regex=".*This node was decommissioned and will not rejoin the ring",
+                                        extra_time_to_expiration=timeout), \
             EventsSeverityChangerFilter(new_severity=Severity.WARNING,
                                         event_class=DatabaseLogEvent.RUNTIME_ERROR,
-                                        regex=".*init - Startup failed: std::runtime_error.*is removed from the cluster",
-                                        extra_time_to_expiration=30):
+                                        regex=".*Startup failed: std::runtime_error.*is removed from the cluster",
+                                        extra_time_to_expiration=timeout):
             while time.time() - start_time < timeout:
                 if list(log_follower):
                     time.sleep(delay)
