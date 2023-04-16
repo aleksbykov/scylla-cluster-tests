@@ -3158,6 +3158,11 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
         self.log.debug("Group0 members: %s", group0_members)
         return group0_members
 
+    def get_group0_non_voters(self) -> list[str]:
+        self.log.debug("Node could return to token ring but it is not as voter")
+        # Add host id which cann't vote after decommission was aborted because it is fast rebooted / terminated")
+        return [member['host_id'] for member in self.get_group0_members() if not member['voter']]
+
 
 class FlakyRetryPolicy(RetryPolicy):
 
@@ -4690,6 +4695,10 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
 
         missing_host_ids = self.diff_token_ring_group0_members(verification_node)
 
+        self.log.debug("If node by any reason returned to tokenring, but stay non-voter, remove it")
+        if not missing_host_ids and self.raft_enabled:
+            missing_host_ids = verification_node.get_group0_non_voters()
+
         decommission_done = list(node.follow_system_log(
             patterns=['DECOMMISSIONING: done'], start_from_beginning=True))
 
@@ -4736,8 +4745,7 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         host_ids = self.diff_token_ring_group0_members(node)
         if not host_ids:
             self.log.debug("Node could return to token ring but not yet bootstrap")
-            # Add host id which cann't vote after decommission was aborted because it is already terminated")
-            host_ids = [member['host_id'] for member in node.get_group0_members() if not member['voter']]
+            host_ids = node.get_group0_non_voters()
         while host_ids:
             removing_host_id = host_ids.pop(0)
             ingore_dead_nodes_opt = f"--ignore-dead-nodes {','.join(host_ids)}" if host_ids else ""
