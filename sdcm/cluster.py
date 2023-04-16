@@ -4859,7 +4859,7 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         if not nodes:
             nodes = self.nodes
         raft_feature_state = [node.is_raft_enabled() for node in nodes]
-        self.log.debug("Raft feature state: %", raft_feature_state)
+        self.log.debug("Raft feature state: %s", raft_feature_state)
         raft_enabled = all(raft_feature_state)
         raft_disabled = all(map(lambda x: not x, raft_feature_state))
         if not raft_enabled and not raft_disabled:
