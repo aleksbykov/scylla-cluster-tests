@@ -3383,7 +3383,19 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                            node=self.target_node), \
             DbEventsFilter(db_event=DatabaseLogEvent.RUNTIME_ERROR,
                            line="got error in row level repair",
-                           node=self.target_node):
+                           node=self.target_node), \
+            EventsSeverityChangerFilter(new_severity=Severity.WARNING,
+                                        event_class=DatabaseLogEvent.DATABASE_ERROR,
+                                        regex=".*storage_service - decommission.*Operation failed",
+                                        extra_time_to_expiration=30), \
+            EventsSeverityChangerFilter(new_severity=Severity.WARNING,
+                                        event_class=DatabaseLogEvent.DATABASE_ERROR,
+                                        regex=".*storage_service - This node was decommissioned and will not rejoin the ring.*",
+                                        extra_time_to_expiration=30), \
+            EventsSeverityChangerFilter(new_severity=Severity.WARNING,
+                                        event_class=DatabaseLogEvent.RUNTIME_ERROR,
+                                        regex=".*init - Startup failed: std::runtime_error.*is removed from the cluster",
+                                        extra_time_to_expiration=30):
             while time.time() - start_time < timeout:
                 if list(log_follower):
                     time.sleep(delay)
