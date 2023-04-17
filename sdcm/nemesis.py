@@ -16,6 +16,7 @@
 """
 Classes that introduce disruption in clusters.
 """
+import contextlib
 import copy
 import datetime
 import inspect
@@ -3383,19 +3384,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                            node=self.target_node), \
             DbEventsFilter(db_event=DatabaseLogEvent.RUNTIME_ERROR,
                            line="got error in row level repair",
-                           node=self.target_node), \
-            EventsSeverityChangerFilter(new_severity=Severity.WARNING,
-                                        event_class=DatabaseLogEvent.DATABASE_ERROR,
-                                        regex=".*storage_service - decommission.*Operation failed",
-                                        extra_time_to_expiration=timeout), \
-            EventsSeverityChangerFilter(new_severity=Severity.WARNING,
-                                        event_class=DatabaseLogEvent.DATABASE_ERROR,
-                                        regex=".*This node was decommissioned and will not rejoin the ring",
-                                        extra_time_to_expiration=timeout), \
-            EventsSeverityChangerFilter(new_severity=Severity.WARNING,
-                                        event_class=DatabaseLogEvent.RUNTIME_ERROR,
-                                        regex=".*Startup failed: std::runtime_error.*is removed from the cluster",
-                                        extra_time_to_expiration=timeout):
+                           node=self.target_node):
             while time.time() - start_time < timeout:
                 if list(log_follower):
                     time.sleep(delay)
@@ -3470,11 +3459,33 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         timeout = 1200
         if self.cluster.params.get('cluster_backend') == 'azure':
             timeout += 1200  # Azure reboot can take up to 20min to initiate
-        ParallelObject(objects=[trigger, watcher], timeout=timeout).call_objects()
-        if new_node := decommission_post_action():
-            new_node.run_nodetool("rebuild")
+
+        if self.cluster.raft_enabled:
+            scylla_start_failed_expected_contexts = (
+                EventsSeverityChangerFilter(new_severity=Severity.WARNING,
+                                            event_class=DatabaseLogEvent.DATABASE_ERROR,
+                                            regex=".*storage_service - decommission.*Operation failed",
+                                            extra_time_to_expiration=timeout),
+                EventsSeverityChangerFilter(new_severity=Severity.WARNING,
+                                            event_class=DatabaseLogEvent.DATABASE_ERROR,
+                                            regex=".*This node was decommissioned and will not rejoin the ring",
+                                            extra_time_to_expiration=timeout),
+                EventsSeverityChangerFilter(new_severity=Severity.WARNING,
+                                            event_class=DatabaseLogEvent.RUNTIME_ERROR,
+                                            regex=".*Startup failed: std::runtime_error.*is removed from the cluster",
+                                            extra_time_to_expiration=timeout))
         else:
-            self.target_node.run_nodetool(sub_cmd="rebuild")
+            scylla_start_failed_expected_contexts = (contextlib.nullcontext(),)
+
+        with contextlib.ExitStack() as stack:
+            for start_failed_expeted_context in scylla_start_failed_expected_contexts:
+                stack.enter_context(start_failed_expeted_context)
+
+            ParallelObject(objects=[trigger, watcher], timeout=timeout).call_objects()
+            if new_node := decommission_post_action():
+                new_node.run_nodetool("rebuild")
+            else:
+                self.target_node.run_nodetool(sub_cmd="rebuild")
 
     def start_and_interrupt_repair_streaming(self):
         """
