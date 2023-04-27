@@ -5643,11 +5643,11 @@ class CreateIndexNemesis(Nemesis):
         self.disrupt_create_index()
 
 
-class AddRemoveMvNemesis(Nemesis):
+# class AddRemoveMvNemesis(Nemesis):
 
-    disruptive = True
-    schema_changes = True
-    free_tier_set = True
+#     disruptive = True
+#     schema_changes = True
+#     free_tier_set = True
 
-    def disrupt(self):
-        self.disrupt_add_remove_mv()
+#     def disrupt(self):
+#         self.disrupt_add_remove_mv()
