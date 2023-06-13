@@ -68,8 +68,8 @@ class GeminiStressThread(DockerBasedStressThread):  # pylint: disable=too-many-i
         self.oracle_cluster = oracle_cluster
         self._gemini_result_file = None
         self.gemini_commands = []
-        self.gemini_request_timeout = 180
-        self.gemini_connect_timeout = 120
+        self.gemini_request_timeout = 600
+        self.gemini_connect_timeout = 180
 
     @property
     def gemini_result_file(self):
