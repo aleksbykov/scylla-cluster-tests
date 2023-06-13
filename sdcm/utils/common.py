@@ -1017,7 +1017,7 @@ def list_load_balancers_aws(tags_dict=None, regions=None, group_as_region=False,
             LOGGER.info("%s: done [%s/%s]", region, len(list(load_balancers.keys())), len(aws_regions))
 
     ParallelObject(aws_regions, timeout=100, num_workers=len(aws_regions)
-                   ).run(get_load_balancers, ignore_exceptions=False)
+                   ).run(get_load_balancers, ignore_exceptions=True)
 
     if not group_as_region:
         load_balancers = list(itertools.chain(*list(load_balancers.values())))  # flatten the list of lists
@@ -1093,7 +1093,7 @@ def list_cloudformation_stacks_aws(tags_dict=None, regions=None, group_as_region
         if verbose:
             LOGGER.info("%s: done [%s/%s]", region, len(list(cloudformation_stacks.keys())), len(aws_regions))
 
-    ParallelObject(aws_regions, timeout=100, num_workers=len(aws_regions)).run(get_stacks, ignore_exceptions=False)
+    ParallelObject(aws_regions, timeout=100, num_workers=len(aws_regions)).run(get_stacks, ignore_exceptions=True)
 
     if not group_as_region:
         cloudformation_stacks = list(itertools.chain(*list(cloudformation_stacks.values()))
