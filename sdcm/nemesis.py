@@ -5700,21 +5700,21 @@ class SlaNemeses(Nemesis):
         self.call_random_disrupt_method(disrupt_methods=self.disrupt_methods_list)
 
 
-class CreateIndexNemesis(Nemesis):
+# class CreateIndexNemesis(Nemesis):
 
-    disruptive = False
-    schema_changes = True
-    free_tier_set = True
+#     disruptive = False
+#     schema_changes = True
+#     free_tier_set = True
 
-    def disrupt(self):
-        self.disrupt_create_index()
+#     def disrupt(self):
+#         self.disrupt_create_index()
 
 
-class AddRemoveMvNemesis(Nemesis):
+# class AddRemoveMvNemesis(Nemesis):
 
-    disruptive = True
-    schema_changes = True
-    free_tier_set = True
+#     disruptive = True
+#     schema_changes = True
+#     free_tier_set = True
 
-    def disrupt(self):
-        self.disrupt_add_remove_mv()
+#     def disrupt(self):
+#         self.disrupt_add_remove_mv()
