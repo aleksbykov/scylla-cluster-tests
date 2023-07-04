@@ -50,6 +50,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 from concurrent.futures.thread import _python_exit
 import hashlib
 from pathlib import Path
+from inspect import stack
 
 import requests
 
@@ -1485,11 +1486,13 @@ class ScyllaCQLSession:
             return execute_orig(*args, **kwargs)
 
         def execute_async_verbose(*args, **kwargs):
+
             if args:
                 query = args[0]
             else:
                 query = kwargs.get("query")
-            LOGGER.debug("Executing CQL '%s' ...", query)
+            if stack()[1].function != "execute_verbose":
+                LOGGER.debug("Executing CQL '%s' ...", query)
             return execute_async_orig(*args, **kwargs)
 
         if self.verbose:

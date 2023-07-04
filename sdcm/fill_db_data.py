@@ -3249,7 +3249,10 @@ class FillDatabaseData(ClusterTester):
                     res = session.execute(item['queries'][i].replace('#STR', ''))
                     self.assertEqual(str([list(row) for row in res]), item['results'][i])
                 else:
-                    res = session.execute(item['queries'][i])
+                    res = session.execute(item['queries'][i], trace=True)
+                    LOGGER.debug("Show tracing info:")
+                    LOGGER.debug(" | >>> | ".join(str(e) for e in res.get_query_trace().events))
+                    LOGGER.debug("Stop tracing info")
                     self.assertEqual([list(row) for row in res], item['results'][i])
             except Exception as ex:
                 LOGGER.exception(item['queries'][i])
