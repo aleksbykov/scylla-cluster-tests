@@ -112,7 +112,11 @@ class PerfSimpleQueryAnalyzer(BaseResultsAnalyzer):
             for key, value in stats.items():
                 table_line[key] = value
                 if value > 0 and key != "mad tps":
-                    diff = test_stats['stats'][key] / value
+                    if key.endswith("op"):
+                        # low  X_op is better
+                        diff = value / test_stats['stats'][key]
+                    else:
+                        diff = test_stats['stats'][key] / value
                     table_line["is_" + key + "_within_limits"] = False
                     if diff > 1 - regression_limit:
                         table_line["is_" + key + "_within_limits"] = True
