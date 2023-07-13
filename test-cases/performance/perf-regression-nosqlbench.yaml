@@ -1,0 +1,6 @@
+prepare_write_cmd: ""
+stress_cmd_r: "nosqlbench cql-timeseries2 default rampup-cycles=40M main-cycles=240M read_ratio=1 async=300 --progress console:5s rf=3 partsize=5000 driver=cql-scylla -v threads=auto"
+stress_cmd_m: "nosqlbench cql-timeseries2 default rampup-cycles=40M main-cycles=240M write_ratio=8 read_ratio=2 async=300 --progress console:5s rf=3 partsize=5000 driver=cql-scylla -v"
+stress_multiplier_w: 1
+stress_multiplier_r: 1
+stress_multiplier_m: 1
