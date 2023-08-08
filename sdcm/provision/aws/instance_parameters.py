@@ -50,7 +50,7 @@ class AWSDiskMapping(BaseModel):
 
 class AWSPlacementInfo(BaseModel):
     AvailabilityZone: str
-    GroupName: str = None
+    GroupName: str = "sct-perf-pg-testing"
     Tenancy: Literal['default', 'dedicated', 'host'] = 'default'
 
 

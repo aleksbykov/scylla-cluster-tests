@@ -80,7 +80,8 @@ class AWSCluster(cluster.BaseCluster):  # pylint: disable=too-many-instance-attr
                  ec2_user_data='', ec2_block_device_mappings=None,
                  cluster_prefix='cluster',
                  node_prefix='node', n_nodes=10, params=None, node_type=None,
-                 extra_network_interface=False, add_nodes=True):
+                 extra_network_interface=False, add_nodes=True,
+                 group_placement_partition_id=1):
         # pylint: disable=too-many-locals
         region_names = params.region_names
         if len(credentials) > 1 or len(region_names) > 1:
@@ -99,6 +100,7 @@ class AWSCluster(cluster.BaseCluster):  # pylint: disable=too-many-instance-attr
         self._ec2_user_data = ec2_user_data
         self.region_names = region_names
         self.params = params
+        self.group_placement_partition_id = group_placement_partition_id
 
         super().__init__(cluster_uuid=cluster_uuid,
                          cluster_prefix=cluster_prefix,
@@ -141,7 +143,9 @@ class AWSCluster(cluster.BaseCluster):  # pylint: disable=too-many-instance-attr
         ec2 = ec2_client.EC2ClientWrapper(region_name=self.region_names[dc_idx])
         subnet_info = ec2.get_subnet_info(interfaces[0]["SubnetId"])
         region_name_with_az = subnet_info['AvailabilityZone']
-        LOGGER.debug('Sending an On-Demand request with params: %s', params)
+        params["Placement"] = {"GroupName": "sct-perf-pg-testing-partition",
+                               "PartitionNumber": self.group_placement_partition_id}
+        LOGGER.info('Sending an On-Demand request with params: %s', params)
         LOGGER.debug('Using EC2 service with DC-index: %s, (associated with region: %s)',
                      dc_idx, self.region_names[dc_idx])
         LOGGER.debug("Using Availability Zone of: %s", region_name_with_az)
@@ -928,6 +932,7 @@ class LoaderSetAWS(cluster.BaseLoaderSet, AWSCluster):
                      (cluster_prefix, n_nodes))
         cluster.BaseLoaderSet.__init__(self,
                                        params=params)
+        self.group_placement_partition_id = 7
 
         AWSCluster.__init__(self,
                             ec2_ami_id=ec2_ami_id,
@@ -943,7 +948,8 @@ class LoaderSetAWS(cluster.BaseLoaderSet, AWSCluster):
                             node_prefix=node_prefix,
                             n_nodes=n_nodes,
                             params=params,
-                            node_type=node_type)
+                            node_type=node_type,
+                            group_placement_partition_id=self.group_placement_partition_id)
 
 
 class MonitorSetAWS(cluster.BaseMonitorSet, AWSCluster):
@@ -961,6 +967,7 @@ class MonitorSetAWS(cluster.BaseMonitorSet, AWSCluster):
         cluster.BaseMonitorSet.__init__(
             self, targets=targets, params=params, monitor_id=monitor_id,
         )
+        self.group_placement_partition_id = 7
 
         AWSCluster.__init__(self,
                             ec2_ami_id=ec2_ami_id,
@@ -976,4 +983,5 @@ class MonitorSetAWS(cluster.BaseMonitorSet, AWSCluster):
                             n_nodes=n_nodes,
                             params=params,
                             node_type=node_type,
-                            add_nodes=add_nodes)
+                            add_nodes=add_nodes,
+                            group_placement_partition_id=self.group_placement_partition_id)
