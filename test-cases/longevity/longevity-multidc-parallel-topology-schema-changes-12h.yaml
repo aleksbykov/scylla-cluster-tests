@@ -24,6 +24,7 @@ nemesis_during_prepare: false
 
 seeds_num: 3
 round_robin: true
+hinted_handoff: 'disabled'
 
 server_encrypt: true
 internode_encryption: 'dc'
