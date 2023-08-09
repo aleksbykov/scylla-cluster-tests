@@ -3,7 +3,7 @@ n_db_nodes: 3
 n_test_oracle_db_nodes: 1
 n_loaders: 1
 n_monitor_nodes: 1
-instance_type_db: 'i4i.large'
+instance_type_db: 'i4i.2xlarge'
 
 user_prefix: 'gemini-with-nemesis-3h-normal'
 
@@ -27,4 +27,4 @@ gemini_cmd: "gemini -d --duration 3h --warmup 30m \
 gemini_schema_url: 'https://s3.amazonaws.com/scylla-gemini/Binaries/schema.json' # currently is not used
 
 db_type: mixed_scylla
-instance_type_db_oracle: 'i4i.8xlarge'
+instance_type_db_oracle: 'i3.16xlarge'
