@@ -1,5 +1,6 @@
 - AbortRepairMonkey
 - AddDropColumnMonkey
+- AddRemoveDCMonkey
 - AddRemoveDcNemesis
 - AddRemoveMvNemesis
 - AddRemoveRackNemesis
@@ -28,6 +29,8 @@
 - EnospcMonkey
 - GrowShrinkClusterNemesis
 - HardRebootNodeMonkey
+- IsolateNodeWithIptableRuleNemesis
+- IsolateNodeWithProcessSignalNemesis
 - LoadAndStreamMonkey
 - MajorCompactionMonkey
 - MemoryStressMonkey

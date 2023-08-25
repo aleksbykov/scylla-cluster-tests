@@ -135,6 +135,7 @@ from sdcm.exceptions import (
     NemesisSubTestFailure,
     AuditLogTestFailure,
     BootstrapStreamErrorFailure,
+    BannedCQLOperation
 )
 from test_lib.compaction import CompactionStrategy, get_compaction_strategy, get_compaction_random_additional_params, \
     get_gc_mode, GcMode
@@ -4904,6 +4905,103 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         assert not gate_closed_appearing, \
             "After re-enabling binary and gossip, 'gate closed' messages continue to appear"
 
+    def disrupt_refusing_connection_from_banned_node(self, use_iptables=False):
+        """Banned node could not connect with rest nodes in cluster
+
+        If node was removed from cluster for any reason, even if removed node
+        become alive and try to communicate with rest node in cluster, all connections
+        from it should be refused by other nodes in cluster
+        1. on target node block any scylladb process
+        1.1 Pause process
+        1.2 Block with iptables port 9100/10000
+        2. Wait and remove target node from cluster
+        3. start scylla on target node
+        4. Create exclusive connection to target node
+        5. Execute cql command on target node and validate that no operation
+        from target node passed to cluster
+        """
+        if not self.target_node.raft.consistent_topology_changes_enabled:
+            raise UnsupportedNemesis("Experimental feature 'consistent-topology-changes' is not enabled")
+
+        def prepare_test_keyspace(node):
+            with self.cluster.cql_connection_patient(node) as session:
+                session.execute(
+                    "CREATE KEYSPACE IF NOT EXISTS banned_keyspace \
+                        WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 3};")
+                session.execute("CREATE TABLE IF NOT EXISTS banned_keyspace.table1 (id BIGINT PRIMARY KEY, name text);")
+
+        def read_barrier(node):
+            with self.cluster.cql_connection_patient(node) as session:
+                session.execute("DROP TABLE IF EXISTS noexist_ks.noexist_cf;")
+
+        @contextlib.contextmanager
+        def use_network_firwall(target_node: BaseNode):
+            ports = [7199, 7000, 9042, 19042, 10000, 7199]
+            target_node.install_package("iptables")
+            target_node.log.debug("Block connections %s", target_node.name)
+            for port in ports:
+                target_node.remoter.sudo(f"iptables -A INPUT -p tcp --dport {port} -j DROP")
+            yield
+            target_node.log.debug("Remove all iptable rules %s", target_node.name)
+            for port in ports:
+                target_node.remoter.sudo(f"iptables -D INPUT -p tcp --dport {port} -j DROP")
+
+        @contextlib.contextmanager
+        def use_send_signal_process(target_node: BaseNode):
+            target_node.log.debug("Send signal SIGSTOP to scylla process on node %s", target_node.name)
+            target_node.remoter.sudo("pkill --signal SIGSTOP -e scylla", timeout=60)
+            yield
+            target_node.log.debug("Send signal SIGCONT to scylla process on node %s", target_node.name)
+            target_node.remoter.sudo(cmd="pkill --signal SIGCONT -e scylla", timeout=60)
+
+        simulate_node_unavailability = use_network_firwall if use_iptables else use_send_signal_process
+
+        working_node = random.choice([node for node in self.cluster.nodes if node != self.target_node])
+        target_host_id = self.target_node.host_id
+
+        def check_node_removed_from_cluster(node: BaseNode, verification_node: Optional[BaseNode] = None):
+            cluster_status: Optional[dict] = self.cluster.get_nodetool_status(verification_node=verification_node)
+            if not cluster_status:
+                return False
+            result = []
+            for dc in cluster_status:
+                result.append(node.ip_address not in list(cluster_status[dc].keys()))
+            return all(result)
+
+        prepare_test_keyspace(self.target_node)
+        with simulate_node_unavailability(self.target_node):
+            wait_for(lambda: self.target_node not in self.cluster.get_nodes_up_and_normal(
+                working_node), timeout=180, throw_exc=False)
+            self.log.debug("Remove node %s : hostid: %s with stopped scylla", self.target_node.name, target_host_id)
+            working_node.run_nodetool(f"removenode {target_host_id}", retry=3)
+            self.log.debug("Wait while all node update paused node status. Based on gossip duration = 2min")
+            wait_for(check_node_removed_from_cluster, timeout=300, throw_exc=False,
+                     node=self.target_node, verification_node=working_node)
+            read_barrier(working_node)
+
+        try:
+            with self.cluster.cql_connection_exclusive(node=self.target_node) as session:
+                stmt = SimpleStatement("INSERT INTO banned_keyspace.table1 (id, name) VALUES (1, 'name1');",
+                                       consistency_level=ConsistencyLevel.ALL)
+                session.execute(stmt)
+                raise BannedCQLOperation("wrong operations were executed")
+        finally:
+            LOGGER.debug("Terminating node %s", self.target_node.name)
+            self.cluster.terminate_node(self.target_node)
+            LOGGER.debug("Restore number of cluster nodes")
+            new_node = self._add_and_init_new_cluster_node()
+            LOGGER.debug("New node %s was added", new_node.name)
+            try:
+                with self.cluster.cql_connection_patient(new_node) as session:
+                    LOGGER.debug("Check create keyspace is empty")
+                    result = list(session.execute("SELECT * from banned_keyspace.table1"))
+                    LOGGER.debug("Query result %s", result)
+                    assert not result, f"New rows were added from banned node, {result}"
+            finally:
+                with self.cluster.cql_connection_patient(working_node) as session:
+                    LOGGER.debug("Drop create keyspace")
+                    session.execute("DROP KEYSPACE IF EXISTS banned_keyspace")
+
 
 def disrupt_method_wrapper(method, is_exclusive=False):  # pylint: disable=too-many-statements
     """
@@ -6387,3 +6485,21 @@ class DisableBinaryGossipExecuteMajorCompaction(Nemesis):
 
     def disrupt(self):
         self.disrupt_disable_binary_gossip_execute_major_compaction()
+
+
+class IsolateNodeWithProcessSignalNemesis(Nemesis):
+    disruptive = True
+    topology_changes = True
+    kubernetes = False
+
+    def disrupt(self):
+        self.disrupt_refusing_connection_from_banned_node(use_iptables=False)
+
+
+class IsolateNodeWithIptableRuleNemesis(Nemesis):
+    disruptive = True
+    topology_changes = True
+    kubernetes = False
+
+    def disrupt(self):
+        self.disrupt_refusing_connection_from_banned_node(use_iptables=True)

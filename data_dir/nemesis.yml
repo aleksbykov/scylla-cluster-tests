@@ -16,6 +16,7 @@
   - run_with_gemini = False
   - limited = True
   - topology_changes = True
+- disrupt_add_remove_dc: []
 - disrupt_add_remove_mv:
   - disruptive = True
   - schema_changes = True
@@ -205,6 +206,14 @@
   - topology_changes = True
 - disrupt_rebuild_streaming_err:
   - disruptive = True
+- disrupt_refusing_connection_from_banned_node:
+  - disruptive = True
+  - topology_changes = True
+  - kubernetes = False
+- disrupt_refusing_connection_from_banned_node:
+  - disruptive = True
+  - topology_changes = True
+  - kubernetes = False
 - disrupt_remove_node_then_add_node:
   - disruptive = True
   - kubernetes = False
@@ -316,6 +325,7 @@
   - disruptive = False
   - schema_changes = True
   - free_tier_set = True
+  - disabled = True
 - disrupt_toggle_table_ics:
   - kubernetes = True
   - schema_changes = True

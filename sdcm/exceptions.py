@@ -59,3 +59,7 @@ class BootstrapStreamErrorFailure(Exception):  # pylint: disable=too-few-public-
 
 class KillNemesis(BaseException):
     """Exception that would be raised, when a nemesis thread is killed at teardown of the test"""
+
+
+class BannedCQLOperation(Exception):
+    """Raise when Insert operation executed on banned node"""
