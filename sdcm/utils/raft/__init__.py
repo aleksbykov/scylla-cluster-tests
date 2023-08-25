@@ -75,6 +75,10 @@ class RaftFeatureOperations(Protocol):
     def is_enabled(self) -> bool:
         ...
 
+    @property
+    def consistent_topology_changes_enabled(self) -> bool:
+        ...
+
     def get_status(self) -> str:
         ...
 
@@ -121,6 +125,14 @@ class Raft(RaftFeatureOperations):
     @property
     def is_enabled(self) -> bool:
         return True
+
+    @property
+    def consistent_topology_changes_enabled(self) -> bool:
+        with self._node.remote_scylla_yaml() as scylla_yaml:
+            if self._node.is_kubernetes():
+                return "consistent-topology-changes" in scylla_yaml.get("experimental_features", [])
+            else:
+                return "consistent-topology-changes" in scylla_yaml.experimental_features
 
     def get_status(self) -> str:
         """ get raft status """
@@ -282,6 +294,10 @@ class NoRaft(RaftFeatureOperations):
 
     @property
     def is_enabled(self) -> bool:
+        return False
+
+    @property
+    def consistent_topology_changes_enabled(self):
         return False
 
     def get_status(self) -> str:
