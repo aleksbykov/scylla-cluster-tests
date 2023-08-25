@@ -79,3 +79,7 @@ class ExitByEventError(Exception):
 
 class SstablesNotFound(Exception):
     pass
+
+
+class BannedCQLOperation(Exception):
+    """Raise when Insert operation executed on banned node"""
