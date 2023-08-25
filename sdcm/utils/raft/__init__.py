@@ -77,6 +77,10 @@ class RaftFeatureOperations(Protocol):
     def is_enabled(self) -> bool:
         ...
 
+    @property
+    def consistent_topology_changes_enabled(self) -> bool:
+        ...
+
     def get_status(self) -> str:
         ...
 
@@ -123,6 +127,22 @@ class RaftFeature(RaftFeatureOperations):
     @property
     def is_enabled(self) -> bool:
         return True
+
+    @property
+    def consistent_topology_changes_enabled(self) -> bool:
+        """Consistent-topology-changes always enabled by default
+        starting from version 5.5.dev+
+
+        If parameter force-gossip-topology-changes = true,
+        then consistent-topology-changes is disabled and old
+        mode with gossiper is used for topology operations"""
+        with self._node.remote_scylla_yaml() as scylla_yaml:
+            LOGGER.info("Node %s has force-gossip-topology-changes: %s",
+                        self._node.name, scylla_yaml.force_gossip_topology_changes)
+            if self._node.is_kubernetes():
+                return not scylla_yaml.get("force-gossip-topology-changes", False)
+            else:
+                return not scylla_yaml.force_gossip_topology_changes
 
     def get_status(self) -> str:
         """ get raft status """
@@ -285,6 +305,10 @@ class NoRaft(RaftFeatureOperations):
 
     @property
     def is_enabled(self) -> bool:
+        return False
+
+    @property
+    def consistent_topology_changes_enabled(self):
         return False
 
     def get_status(self) -> str:
