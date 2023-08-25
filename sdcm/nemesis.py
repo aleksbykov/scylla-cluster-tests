@@ -39,6 +39,7 @@ from threading import Lock
 from types import MethodType  # pylint: disable=no-name-in-module
 
 from cassandra import ConsistencyLevel, InvalidRequest, Unavailable
+from cassandra import ConsistencyLevel, InvalidRequest, Unavailable
 from cassandra.query import SimpleStatement  # pylint: disable=no-name-in-module
 from cassandra.cluster import NoHostAvailable, OperationTimedOut  # pylint: disable=no-name-in-module
 from invoke import UnexpectedExit
@@ -165,6 +166,7 @@ from test_lib.compaction import CompactionStrategy, get_compaction_strategy, get
     get_gc_mode, GcMode, calculate_allowed_twcs_ttl, get_table_compaction_info
 from test_lib.cql_types import CQLTypeBuilder
 from test_lib.sla import ServiceLevel, MAX_ALLOWED_SERVICE_LEVELS
+from sdcm.utils.tablets.common import TabletsConfiguration
 from sdcm.utils.topology_ops import FailedDecommissionOperationMonitoring
 
 

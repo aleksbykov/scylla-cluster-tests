@@ -12,6 +12,7 @@ LOGGER = logging.getLogger(__name__)
 def block_scylla_ports(target_node: "BaseNode", ports: list[int] | None = None):
     ports = ports or [7001, 7000, 9042, 9142, 19042, 19142]
     target_node.install_package("iptables")
+
     target_node.start_service("iptables")
     target_node.log.debug("Block connections %s", target_node.name)
     for port in ports:
