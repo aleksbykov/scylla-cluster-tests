@@ -6575,3 +6575,21 @@ class IsolateNodeWithIptableRuleNemesis(Nemesis):
 
     def disrupt(self):
         self.disrupt_refusing_connection_from_banned_node(use_iptables=True)
+
+
+class IsolateNodeWithProcessSignalNemesis(Nemesis):
+    disruptive = True
+    topology_changes = True
+    kubernetes = False
+
+    def disrupt(self):
+        self.disrupt_refusing_connection_from_banned_node(use_iptables=False)
+
+
+class IsolateNodeWithIptableRuleNemesis(Nemesis):
+    disruptive = True
+    topology_changes = True
+    kubernetes = False
+
+    def disrupt(self):
+        self.disrupt_refusing_connection_from_banned_node(use_iptables=True)
