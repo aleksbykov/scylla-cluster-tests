@@ -50,6 +50,10 @@ class ScyllaUserDataBuilder(ScyllaUserDataBuilderBase):
         return self.params.get("raid_level") or RaidLevelType.RAID0
 
     @property
+    def online_discard(self) -> int:
+        return 1 if self.params.get("online_discard") else 0
+
+    @property
     def post_configuration_script(self) -> str:
         post_boot_script = AWSConfigurationScriptBuilder(
             aws_additional_interface=self.params.get('extra_network_interface') or False,

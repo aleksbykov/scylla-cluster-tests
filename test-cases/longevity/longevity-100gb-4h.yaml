@@ -6,14 +6,19 @@ stress_cmd: ["cassandra-stress write cl=QUORUM duration=240m -schema 'replicatio
              "cassandra-stress read  cl=QUORUM duration=240m -schema 'replication(factor=3) compaction(strategy=SizeTieredCompactionStrategy)' -mode cql3 native -rate threads=40 -pop seq=1..20971520 -col 'n=FIXED(10) size=FIXED(512)' -log interval=5"
              ]
 
-n_db_nodes: 6
+n_db_nodes: 4
 n_loaders: 2
 n_monitor_nodes: 1
-seeds_num: 3
+seeds_num: 2
 
 instance_type_db: 'i3.4xlarge'
+gce_instance_type_db: 'n1-highmem-16'
+gce_instance_type_loader: 'e2-standard-4'
 
-nemesis_class_name: 'SisyphusMonkey'
+ssh_transport: 'libssh2'
+gce_n_local_ssd_disk_db: 2
+
+nemesis_class_name: 'GrowShrinkClusterNemesis'
 nemesis_seed: '032'
 nemesis_interval: 5
 nemesis_filter_seeds: false
@@ -26,3 +31,9 @@ client_encrypt: true
 
 pre_create_schema: True
 sstable_size: 100
+
+use_preinstalled_scylla: false
+run_db_node_benchmarks: false
+online_discard: false
+scylla_linux_distro: 'centos'
+gce_image_db: 'https://www.googleapis.com/compute/v1/projects/centos-cloud/global/images/family/centos-stream-8'

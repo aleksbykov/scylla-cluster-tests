@@ -1096,6 +1096,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         #       as 'NotReady' and will fail the pod waiter function.
         self.log.info("Adding new node to cluster...")
         InfoEvent(message='StartEvent - Adding new node to cluster').publish()
+        self.cluster.params["online_discard"] = not self.cluster.params["online_discard"]
         new_node = self.cluster.add_nodes(
             count=1, dc_idx=self.target_node.dc_idx, enable_auto_bootstrap=True, rack=rack)[0]
         self.monitoring_set.reconfigure_scylla_monitoring()

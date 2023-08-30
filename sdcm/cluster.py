@@ -2141,6 +2141,9 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
         if self.parent_cluster.params.get('unified_package'):
             extra_setup_args += ' --no-verify-package '
 
+        extra_setup_args += ' --online-discard=1 ' if self.parent_cluster.params.get(
+            'online_discard') else ' --online-discard=0 '
+        self.log.info("Extra options %s", extra_setup_args)
         if self.parent_cluster.params.get('workaround_kernel_bug_for_iotune'):
             self.log.warning(dedent("""
                 Kernel version is {}. Due to known kernel bug in this version using predefined iotune.

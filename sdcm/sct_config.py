@@ -1334,6 +1334,11 @@ class SCTConfiguration(dict):
 
         dict(name="enable_argus", env="SCT_ENABLE_ARGUS", type=boolean,
              help="Control reporting to argus"),
+
+        dict(name="online_discard", env="SCT_ONLINE_DISCARD",
+             type=boolean,
+             help="""Parameter for scylla_raid_setup"""),
+
     ]
 
     required_params = ['cluster_backend', 'test_duration', 'n_db_nodes', 'n_loaders', 'use_preinstalled_scylla',
