@@ -1,0 +1,11 @@
+# Run docker
+`docker run -v ./:/data stallanalyzer:v0.4 -e /data/scylla/libexec/scylla /data/node3_rs.log > node3_rs_decoded.log`
+
+-v ./:/data to mount directory with downloaded and extracted relocatable scylla package to docker container into /data
+
+-e path in docker container to scylla bin 
+
+/data/node3_rs.log path to file with reactor stall
+
+> node3_rs_decoded.log  file with decoded 
+
