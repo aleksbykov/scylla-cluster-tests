@@ -211,28 +211,40 @@ class Raft(RaftFeatureOperations):
         return (
             EventsSeverityChangerFilter(new_severity=Severity.WARNING,
                                         event_class=DatabaseLogEvent.DATABASE_ERROR,
-                                        regex=".*storage_service - decommission.*Operation failed",
+                                        regex=r".*storage_service - decommission.*Operation failed",
                                         extra_time_to_expiration=timeout),
             EventsSeverityChangerFilter(new_severity=Severity.WARNING,
                                         event_class=DatabaseLogEvent.DATABASE_ERROR,
-                                        regex=".*node_ops - decommission.*seastar::sleep_aborted",
+                                        regex=r".*node_ops - decommission.*seastar::sleep_aborted",
                                         extra_time_to_expiration=timeout),
             EventsSeverityChangerFilter(new_severity=Severity.WARNING,
                                         event_class=DatabaseLogEvent.DATABASE_ERROR,
-                                        regex=".*This node was decommissioned and will not rejoin the ring",
+                                        regex=r".*This node was decommissioned and will not rejoin the ring",
                                         extra_time_to_expiration=timeout),
             EventsSeverityChangerFilter(new_severity=Severity.WARNING,
                                         event_class=DatabaseLogEvent.RUNTIME_ERROR,
-                                        regex=".*Startup failed: std::runtime_error.*is removed from the cluster",
-                                        extra_time_to_expiration=timeout),
-            EventsSeverityChangerFilter(new_severity=Severity.WARNING,
-                                        event_class=DatabaseLogEvent.DATABASE_ERROR,
-                                        regex=".*gossip - is_safe_for_restart.*status=LEFT",
+                                        regex=r".*This node was decommissioned and will not rejoin the ring",
                                         extra_time_to_expiration=timeout),
             EventsSeverityChangerFilter(new_severity=Severity.WARNING,
                                         event_class=DatabaseLogEvent.RUNTIME_ERROR,
-                                        regex=".*init - Startup failed: std::runtime_error.*already exists, cancelling join",
+                                        regex=r".*Startup failed: std::runtime_error.*is removed from the cluster",
+                                        extra_time_to_expiration=timeout),
+            EventsSeverityChangerFilter(new_severity=Severity.WARNING,
+                                        event_class=DatabaseLogEvent.DATABASE_ERROR,
+                                        regex=r".*gossip - is_safe_for_restart.*status=LEFT",
+                                        extra_time_to_expiration=timeout),
+            EventsSeverityChangerFilter(new_severity=Severity.WARNING,
+                                        event_class=DatabaseLogEvent.RUNTIME_ERROR,
+                                        regex=r".*init - Startup failed: std::runtime_error.*already exists, cancelling join",
+                                        extra_time_to_expiration=timeout),
+            EventsSeverityChangerFilter(new_severity=Severity.WARNING,
+                                        event_class=DatabaseLogEvent.RUNTIME_ERROR,
+                                        regex=r".*init - Startup failed: std::runtime_error.*repair_reason=bootstrap.*aborted_by_user=true",
                                         extra_time_to_expiration=timeout)
+
+
+
+
         )
 
     def is_cluster_topology_consistent(self) -> bool:
