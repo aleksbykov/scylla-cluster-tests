@@ -37,7 +37,8 @@ from collections import defaultdict, Counter, namedtuple
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from types import MethodType  # pylint: disable=no-name-in-module
-from multiprocessing import Process
+from multiprocessing import Process, Pipe
+from threading import Event
 
 from cassandra import ConsistencyLevel, InvalidRequest
 from cassandra.query import SimpleStatement  # pylint: disable=no-name-in-module
@@ -95,7 +96,7 @@ from sdcm.utils.common import (get_db_tables, generate_random_string,
                                update_certificates, reach_enospc_on_node, clean_enospc_on_node,
                                parse_nodetool_listsnapshots,
                                update_authenticator, ParallelObject,
-                               ParallelObjectResult, sleep_for_percent_of_duration)
+                               ParallelObjectResult, sleep_for_percent_of_duration, raise_exception_in_thread)
 from sdcm.utils.compaction_ops import CompactionOps, StartStopCompactionArgs
 from sdcm.utils.context_managers import nodetool_context
 from sdcm.utils.decorators import retrying, latency_calculator_decorator
@@ -4794,58 +4795,125 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self.monitoring_set.reconfigure_scylla_monitoring()
         self.set_current_running_nemesis(node=new_node)  # prevent to run nemesis on new node when running in parallel
 
-        def start_bootstrap(new_node: BaseNode, timeout=3600):
-            bootstrap_process = Process(target=self.cluster.node_setup,
-                                        name=f"Bootstraping_{new_node.name}",
-                                        kwargs={"node": new_node, "verbose": True, "timeout": int(timeout)},
-                                        daemon=True)
-            try:
-                self.log.info("Start node %s setup and bootstrapp", new_node.name)
-                bootstrap_log_follower = new_node.follow_system_log(patterns=['init - Startup failed',
-                                                                              'init - Startup interrupted',
-                                                                              'initialization completed'])
-                bootstrap_process.start()
-                log_messages = wait_for(func=lambda: list(bootstrap_log_follower),
-                                        text='Waiting for bootstap aborting or finishing', step=5, timeout=timeout)
-
-                if log_messages and ('init - Startup failed' in log_messages[0] or 'init - Startup interrupted' in log_messages[0]):
-                    self.log.debug("Bootstrap node %s was aborted", new_node.name)
-                    raise NodeSetupFailed(node=new_node, error_msg=log_messages[0])
-
-                if new_node.db_up() and new_node.jmx_up():
-                    self.log.info("Node %s bootstrapped succesfull", new_node.name)
-            except Exception as exc:  # pylint: disable=broad-except
-                self.log.warning("Node bootstrap was aborted with error: %s", exc)
-            finally:
-                self.log.debug("Stop node bootstrap process")
-                bootstrap_process.join(60)
-                bootstrap_process.terminate()
-                self.log.debug("Node bootstrap process stopped")
-
-        trigger = partial(
-            start_bootstrap, new_node=new_node)
-
+        stop_event = Event()
         terminate_pattern = self.target_node.raft.get_random_log_message(operation=TopologyOperations.BOOTSTRAP,
                                                                          seed=self.tester.params.get("nemesis_seed"))
 
-        self.log.info("Stop bootsrap process after log message: '%s'", terminate_pattern.log_message)
+        class BootstrapProcess(Process):
 
-        log_follower = new_node.follow_system_log(patterns=[terminate_pattern.log_message])
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self._pconn, self._cconn = Pipe()
+                self._exception = None
 
-        watcher = partial(
-            self._call_disrupt_func_after_expression_logged,
-            log_follower=log_follower,
-            disrupt_func=new_node.stop_scylla,
-            disrupt_func_kwargs={},
-            delay=0
-        )
+            def run(self):
+                try:
+                    super().run()
+                    self._cconn.send(None)
+                except Exception as exc:
+                    traceback_info = traceback.format_exc()
+                    self._cconn.send((exc, traceback_info))
+                    raise
+
+            @property
+            def exception(self):
+                if self._pconn.poll():
+                    self._exception = self._pconn.recv()
+                return self._exception
+
+        def start_bootstrap(new_node: BaseNode, timeout=3600, stop_event: Optional[Event] = None):
+
+            bootstrap_process = BootstrapProcess(target=self.cluster.node_setup,
+                                                 name=f"Bootstraping_{new_node.name}",
+                                                 kwargs={"node": new_node, "verbose": True, "timeout": int(timeout)},
+                                                 daemon=True)
+            bootstrap_process.start()
+
+            # try:
+            #     self.log.info("Starting bootstrap process")
+            #     self.cluster.node_setup(new_node, verbose=True, timeout=timeout)
+            # except Exception as exc:
+            #     self.log.info("Setup failed with exc %s", exc)
+            # else:
+            #     self.log.info("Node was Bootstrapped")
+            # finally:
+            #     if stop_event and not stop_event.is_set():
+            #         stop_event.set()
+
+            try:
+                while bootstrap_process.is_alive():
+                    bootstrap_process.join(30)
+                    if bootstrap_process.exception:
+                        LOGGER.info("Exception in parallel process : %s", bootstrap_process.exception)
+                        raise bootstrap_process.exception
+
+                    scylla_starting = new_node.follow_system_log(patterns=[".*init - Scylla version.*starting ..."])
+                    wait_for(func=lambda: list(scylla_starting),
+                             step=5,
+                             text=f'Waiting for scylla is starting on new node {new_node.name}',
+                             timeout=600,
+                             stop_event=stop_event)
+
+                    self.log.info("Start node %s setup and bootstrapp", new_node.name)
+                    bootstrap_log_follower = new_node.follow_system_log(patterns=['init - Startup failed',
+                                                                                  'init - Startup interrupted',
+                                                                                  'initialization completed'])
+                    log_messages = wait_for(func=lambda: list(bootstrap_log_follower),
+                                            text='Waiting for bootstap aborting or finishing',
+                                            step=5, stop_event=stop_event, timeout=timeout)
+
+                    if log_messages and ('init - Startup failed' in log_messages[0] or 'init - Startup interrupted' in log_messages[0]):
+                        self.log.debug("Bootstrap node %s was aborted", new_node.name)
+                        raise NodeSetupFailed(node=new_node, error_msg=log_messages[0])
+
+                    if new_node.db_up() and new_node.jmx_up():
+                        self.log.info("Node %s bootstrapped succesfull", new_node.name)
+                    break
+            except Exception as exc:  # pylint: disable=broad-except
+                self.log.warning("Node bootstrap was aborted with error: %s", exc)
+                self.log.warning("Exception in parallel process %s", bootstrap_process.exception)
+            finally:
+                self.log.debug("Stop node bootstrap process %s", new_node.name)
+                bootstrap_process.join(60)
+                bootstrap_process.terminate()
+                self.log.debug("Node bootstrap process stopped %s", new_node.name)
+
+        def abort_bootstrap(new_node: BaseNode, log_message: str, timeout: int = 600, stop_event: Event | None = None):
+            self.log.info("Start waiting log message thread")
+
+            self.log.info("Stop bootsrap process after log message: '%s'", log_message)
+
+            log_follower = new_node.follow_system_log(patterns=[log_message])
+            self._call_disrupt_func_after_expression_logged(log_follower=log_follower,
+                                                            disrupt_func=new_node.stop_scylla,
+                                                            disrupt_func_kwargs={},
+                                                            timeout=timeout,
+                                                            delay=0)
+            if stop_event:
+                stop_event.set()
+
+        trigger = partial(
+            start_bootstrap, new_node=new_node, stop_event=stop_event)
+
+        # terminate_pattern = self.target_node.raft.get_random_log_message(operation=TopologyOperations.BOOTSTRAP,
+        #                                                                  seed=self.tester.params.get("nemesis_seed"))
+
+        # self.log.info("Stop bootsrap process after log message: '%s'", terminate_pattern.log_message)
+
+        # log_follower = new_node.follow_system_log(patterns=[terminate_pattern.log_message])
+
+        watcher = partial(abort_bootstrap, new_node=new_node,
+                          log_message=terminate_pattern.log_message,
+                          timeout=terminate_pattern.timeout + 600,
+                          stop_event=stop_event)
 
         with EventsSeverityChangerFilter(new_severity=Severity.WARNING,
                                          event_class=DatabaseLogEvent,
                                          regex=".*init - Startup failed.*",
-                                         extra_time_to_expiration=30), \
-                adaptive_timeout(operation=Operations.NEW_NODE, node=self.target_node, timeout=3600) as bootstrap_timeout:
-            ParallelObject(objects=[trigger, watcher], timeout=bootstrap_timeout).call_objects(ignore_exceptions=True)
+                                         extra_time_to_expiration=30):
+            ParallelObject(objects=[trigger, watcher],
+                           timeout=terminate_pattern.timeout + 1200).call_objects(ignore_exceptions=False)
+            stop_event.set()
 
         host_id_searcher = new_node.follow_system_log(patterns=['Setting local host id to'])
 
@@ -4891,7 +4959,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 raise BootstrapStreamErrorFailure(err_message) from exc
 
         if new_node.db_up() and not self.target_node.raft.is_cluster_topology_consistent():
-            LOGGER.error("New host was not properly bootstrapped. Terminate it")
+            LOGGER.error(msg="New host was not properly bootstrapped. Terminate it")
             clean_unbootstrapped_node()
             self.log.info("Failed bootstrapped node removed. Cluster is in initial state")
             return
