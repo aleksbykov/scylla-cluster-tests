@@ -13,7 +13,7 @@ seeds_num: 3
 
 instance_type_db: 'i4i.4xlarge'
 
-nemesis_class_name: 'SisyphusMonkey'
+nemesis_class_name: 'IsolateNodeWithProcessSignalNemesis'
 nemesis_seed: '032'
 nemesis_interval: 5
 nemesis_filter_seeds: false
@@ -24,7 +24,10 @@ space_node_threshold: 64424
 server_encrypt: true
 client_encrypt: true
 
-pre_create_schema: True
+pre_create_schema: False
 sstable_size: 100
 
 hinted_handoff: 'enabled'
+append_scylla_yaml: |
+  experimental_features:
+    - consistent-topology-changes
