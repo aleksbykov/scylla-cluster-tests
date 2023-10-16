@@ -4495,7 +4495,11 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         node.wait_jmx_up(verbose=verbose, timeout=200)
 
     def node_setup(self, node: BaseNode, verbose: bool = False, timeout: int = 3600):  # pylint: disable=too-many-branches,too-many-statements
+        self.log.info("Node %s waiting ssh", node.name)
         node.wait_ssh_up(verbose=verbose, timeout=timeout)
+        self.log.info("Node %s ssh is up", node.name)
+
+        self.log.info("Checking system on node %s", node.name)
         if node.distro.is_centos8 or node.distro.is_rhel8 or node.distro.is_oel8 or node.distro.is_rocky8 or node.distro.is_rocky9:
             node.remoter.sudo('systemctl stop iptables', ignore_status=True)
             node.remoter.sudo('systemctl disable iptables', ignore_status=True)
@@ -4512,11 +4516,12 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
                 result = node.remoter.run("cat /proc/sys/crypto/fips_enabled", ignore_status=True)
                 assert int(result.stdout) == 1, "Even though Ubuntu pro is enabled, FIPS is not enabled"
                 # https://ubuntu.com/tutorials/using-the-ua-client-to-enable-fips#4-enabling-fips-crypto-modules
-
+        self.log.info("Finished check system on node %s", node.name)
         node.update_repo_cache()
         node.install_package('lsof net-tools', wait_for_package_manager=False)
         install_scylla = True
 
+        self.log.info("Check and start scylla on node %s", node.name)
         if self.params.get("use_preinstalled_scylla") and node.is_scylla_installed(raise_if_not_installed=True):
             install_scylla = False
 
@@ -4541,14 +4546,16 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
 
             if self.test_config.MULTI_REGION or self.params.get('simulated_racks') > 1:
                 SnitchConfig(node=node, datacenters=self.datacenter).apply()  # pylint: disable=no-member
+            self.log.info("Start node config setup on node %s", node.name)
             node.config_setup(append_scylla_args=self.get_scylla_args())
 
             self._scylla_post_install(node, install_scylla, nic_devname)
-
+            self.log.info("Finished node config setup on node %s", node.name)
             # prepare and start saslauthd service
             if self.params.get('prepare_saslauthd'):
                 prepare_and_start_saslauthd_service(node)
 
+            self.log.info("Restart and clean scylla on node %s", node.name)
             if self.node_setup_requires_scylla_restart:
                 node.stop_scylla_server(verify_down=False)
                 node.clean_scylla_data()
@@ -4572,12 +4579,13 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
                 self.install_scylla_manager(node)
         else:
             self._reuse_cluster_setup(node)
-
+        self.log.info("waiting scylla start on node %s", node.name)
         node.wait_db_up(verbose=verbose, timeout=timeout)
         nodes_status = node.get_nodes_status()
         check_nodes_status(nodes_status=nodes_status, current_node=node)
 
         self.clean_replacement_node_options(node)
+        self.log.info("Scylla is started setup on node %s", node.name)
 
     def install_scylla_manager(self, node):
         pkgs_url = self.params.get("scylla_mgmt_pkg")

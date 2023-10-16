@@ -4823,9 +4823,14 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         def start_bootstrap(new_node: BaseNode, timeout=3600, stop_event: Optional[Event] = None):
 
-            bootstrap_process = BootstrapProcess(target=self.cluster.node_setup,
-                                                 name=f"Bootstraping_{new_node.name}",
-                                                 kwargs={"node": new_node, "verbose": True, "timeout": int(timeout)},
+            # bootstrap_process = BootstrapProcess(target=self.cluster.node_setup,
+            #                                      name=f"Bootstraping_{new_node.name}",
+            #                                      kwargs={"node": new_node, "verbose": True, "timeout": int(timeout)},
+            #                                      daemon=True)
+            bootstrap_process = BootstrapProcess(target=self.cluster.wait_for_init,
+                                                 name=f"Bootstrapping node {new_node.name}",
+                                                 kwargs={"node_list": [new_node], "verbose": True,
+                                                         "check_node_health": False, "timeout": timeout},
                                                  daemon=True)
             bootstrap_process.start()
 
@@ -4882,13 +4887,16 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             self.log.info("Start waiting log message thread")
 
             self.log.info("Stop bootsrap process after log message: '%s'", log_message)
+            try:
+                log_follower = new_node.follow_system_log(patterns=[log_message])
+                self._call_disrupt_func_after_expression_logged(log_follower=log_follower,
+                                                                disrupt_func=new_node.stop_scylla,
+                                                                disrupt_func_kwargs={},
+                                                                timeout=timeout,
+                                                                delay=0)
+            except Exception as exc:
+                self.log.info("Failed with %s", exc)
 
-            log_follower = new_node.follow_system_log(patterns=[log_message])
-            self._call_disrupt_func_after_expression_logged(log_follower=log_follower,
-                                                            disrupt_func=new_node.stop_scylla,
-                                                            disrupt_func_kwargs={},
-                                                            timeout=timeout,
-                                                            delay=0)
             if stop_event:
                 stop_event.set()
 
