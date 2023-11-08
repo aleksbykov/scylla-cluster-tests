@@ -32,3 +32,4 @@ user_prefix: 'longevity-5gb-1h-GrowShrinkClusterNemesis'
 
 server_encrypt: true
 client_encrypt: true
+cs_debug: true
