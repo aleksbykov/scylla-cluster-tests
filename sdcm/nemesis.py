@@ -5027,6 +5027,11 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             # and bootstrap new one
             LOGGER.debug("Terminating node %s", self.target_node.name)
             self.cluster.terminate_node(self.target_node)
+            # check node was remove previously, if not remove it from cluster
+            removed_node_status = self.cluster.get_node_status_dictionary(
+                ip_address=self.target_node.ip_address, verification_node=working_node)
+            if removed_node_status is not None:
+                working_node.run_nodetool(f"removenode {target_host_id}", retry=3)
             LOGGER.debug("Restore number of cluster nodes")
             new_node = self._add_and_init_new_cluster_node()
             LOGGER.debug("New node %s was added", new_node.name)
@@ -6577,19 +6582,10 @@ class IsolateNodeWithIptableRuleNemesis(Nemesis):
         self.disrupt_refusing_connection_from_banned_node(use_iptables=True)
 
 
-class IsolateNodeWithProcessSignalNemesis(Nemesis):
+class IsolateNodeNemesis(Nemesis):
     disruptive = True
     topology_changes = True
-    kubernetes = False
 
     def disrupt(self):
-        self.disrupt_refusing_connection_from_banned_node(use_iptables=False)
-
-
-class IsolateNodeWithIptableRuleNemesis(Nemesis):
-    disruptive = True
-    topology_changes = True
-    kubernetes = False
-
-    def disrupt(self):
-        self.disrupt_refusing_connection_from_banned_node(use_iptables=True)
+        random.seed(100)
+        self.disrupt_refusing_connection_from_banned_node(use_iptables=random.choice([True, False]))
