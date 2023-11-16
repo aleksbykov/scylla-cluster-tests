@@ -16,10 +16,12 @@ def use_network_firwall(target_node: "BaseNode"):
     target_node.log.debug("Block connections %s", target_node.name)
     for port in ports:
         target_node.remoter.sudo(f"iptables -A INPUT -p tcp --dport {port} -j DROP")
+        target_node.remoter.sudo(f"iptables -A OUTPUT -p tcp --dport {port} -j DROP")
     yield
     target_node.log.debug("Remove all iptable rules %s", target_node.name)
     for port in ports:
         target_node.remoter.sudo(f"iptables -D INPUT -p tcp --dport {port} -j DROP")
+        target_node.remoter.sudo(f"iptables -D OUTPUT -p tcp --dport {port} -j DROP")
 
 
 @contextlib.contextmanager
