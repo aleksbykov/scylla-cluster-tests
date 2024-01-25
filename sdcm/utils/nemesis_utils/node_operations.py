@@ -11,7 +11,7 @@ LOGGER = logging.getLogger(__name__)
 
 @contextlib.contextmanager
 def use_network_firwall(target_node: "BaseNode"):
-    ports = [7199, 7000, 9042, 19042, 10000, 7199]
+    ports = [7001, 7000, 9042, 9142, 19042, 19142]
     target_node.install_package("iptables")
     target_node.log.debug("Block connections %s", target_node.name)
     for port in ports:

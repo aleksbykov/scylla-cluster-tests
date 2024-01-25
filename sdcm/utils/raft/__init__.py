@@ -129,6 +129,7 @@ class Raft(RaftFeatureOperations):
     @property
     def consistent_topology_changes_enabled(self) -> bool:
         with self._node.remote_scylla_yaml() as scylla_yaml:
+            LOGGER.info("Node %s has experimental features: %s", self._node.name, scylla_yaml.experimental_features)
             if self._node.is_kubernetes():
                 return "consistent-topology-changes" in scylla_yaml.get("experimental_features", [])
             else:
@@ -331,14 +332,17 @@ class NoRaft(RaftFeatureOperations):
         return len(token_ring_ids) == num_of_nodes
 
 
-def get_raft_mode(node) -> Raft | NoRaft:
-    with node.remote_scylla_yaml() as scylla_yaml:
-        if node.is_kubernetes():
-            consistent_cluster_management = scylla_yaml.get('consistent_cluster_management')
-        else:
-            consistent_cluster_management = scylla_yaml.consistent_cluster_management
-        node.log.debug("consistent_cluster_management : %s", consistent_cluster_management)
-        return Raft(node) if consistent_cluster_management else NoRaft(node)
+# def get_raft_mode(node) -> Raft | NoRaft:
+#     with node.remote_scylla_yaml() as scylla_yaml:
+#         if node.is_kubernetes():
+#             consistent_cluster_management = scylla_yaml.get('consistent_cluster_management')
+#         else:
+#             consistent_cluster_management = scylla_yaml.consistent_cluster_management
+#         node.log.debug("consistent_cluster_management : %s", consistent_cluster_management)
+#         return Raft(node) if consistent_cluster_management else NoRaft(node)
+
+def get_raft_mode(node) -> Raft:
+    return Raft(node)
 
 
 __all__ = ["get_raft_mode",

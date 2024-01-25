@@ -38,7 +38,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from types import MethodType  # pylint: disable=no-name-in-module
 
-from cassandra import ConsistencyLevel, InvalidRequest, consistency_value_to_name
+from cassandra import ConsistencyLevel, InvalidRequest
 from cassandra.query import SimpleStatement  # pylint: disable=no-name-in-module
 from invoke import UnexpectedExit
 from elasticsearch.exceptions import ConnectionTimeout as ElasticSearchConnectionTimeout
@@ -145,6 +145,7 @@ from sdcm.exceptions import (
     AuditLogTestFailure,
     BootstrapStreamErrorFailure,
     QuotaConfigurationFailure,
+    BannedQueryExecutedSuccessful,
 )
 from test_lib.compaction import CompactionStrategy, get_compaction_strategy, get_compaction_random_additional_params, \
     get_gc_mode, GcMode
@@ -4969,7 +4970,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         from target node passed to cluster
         """
         if not self.target_node.raft.consistent_topology_changes_enabled:
-            raise UnsupportedNemesis("")
+            raise UnsupportedNemesis("Raft feature: consistent-topology-changes is not enabled")
 
         def prepare_test_keyspace(node):
             """ Create new table for verification missing data
@@ -4992,7 +4993,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         try:
             with simulate_node_unavailability(self.target_node):
                 # target node stopped by Contextmanger. Wait while its status will be updated
-                wait_for(node_operations.check_node_seen_as_down_in_cluster, timeout=180, throw_exc=True,
+                wait_for(node_operations.check_node_seen_as_down_in_cluster, timeout=600, throw_exc=True,
                          down_node=self.target_node)
                 self.log.debug("Remove node %s : hostid: %s with stopped scylla from cluster",
                                self.target_node.name, target_host_id)
@@ -5006,31 +5007,31 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             # Context manager at exit  start scylla on target node.
             # But node already removed from cluster. So any operations from it
             # should be banned. If query executed succesfull, raise an error
-            consistency_levels = (ConsistencyLevel.ONE, ConsistencyLevel.ALL)
-            query_results = {}
             assert self.target_node.is_port_used(
                 port=9042, service_name="scylla-service"), f"Port 9042 is closed on node {self.target_node.name}"
 
             with self.cluster.cql_connection_exclusive(node=self.target_node) as session:
-                for consistency_level in consistency_levels:
-                    level_name = consistency_value_to_name(consistency_level)
-                    query_results[level_name] = True
-                    try:
-                        stmt = SimpleStatement("INSERT INTO banned_keyspace.table1 (id, name) VALUES (1, 'name1');",
-                                               consistency_level=consistency_level)
-                        session.execute(stmt)
-                    except Exception as exc:  # pylint: disable=broad-except
-                        self.log.debug("Query failed with error: %s", exc)
-                        query_results[level_name] = False
+                try:
+                    stmt = SimpleStatement("INSERT INTO banned_keyspace.table1 (id, name) VALUES (1, 'name1');",
+                                           consistency_level=ConsistencyLevel.ALL)
+                    session.execute(stmt)
+                    raise BannedQueryExecutedSuccessful(
+                        "Query from banned node was executed succesful with Consistency.ALL")
+                except BannedQueryExecutedSuccessful:
+                    self.log.error("Banned query passed to cluster from banned node")
+                    raise
+                except Exception as exc:  # pylint: disable=broad-except
+                    self.log.debug("Query failed with error: %s as expected", exc)
 
-            assert not any(list(query_results.values())), \
-                f"Query from banned node was executed succesful for CL: {query_results}"
         except Exception as exc:  # pylint: disable=broad-except
             self.log.error("Method failed with error %s", exc)
             raise
         finally:
             # because target node removed from cluster, terminate it
             # and bootstrap new one
+            # LOGGER.error("Stop test!!!!!!")
+            # InfoEvent("Stop the test", Severity.CRITICAL)
+            # raise Exception("Stop the test!!!!!!!!!!!!!!")
             LOGGER.debug("Terminating node %s", self.target_node.name)
             self.cluster.terminate_node(self.target_node)
             # check node was remove previously, if not remove it from cluster
@@ -5061,6 +5062,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 with self.cluster.cql_connection_patient(working_node) as session:
                     LOGGER.debug("Drop create keyspace")
                     session.execute("DROP KEYSPACE IF EXISTS banned_keyspace")
+            self.unset_current_running_nemesis(new_node)
 
 
 def disrupt_method_wrapper(method, is_exclusive=False):  # pylint: disable=too-many-statements
