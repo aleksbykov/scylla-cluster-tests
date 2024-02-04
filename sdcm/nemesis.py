@@ -920,6 +920,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         ks_cf_for_destroy = ks_cf_for_destroy.replace('.', '/')
         files = self.target_node.remoter.sudo("find /var/lib/scylla/data/%s-* -maxdepth 1 -type f"
                                               % ks_cf_for_destroy, verbose=False)
+
+        self.log.debug("Next files found for destroy: %s", files.stdout)
         if files.stderr:
             raise NoFilesFoundToDestroy(
                 'Failed to get data files for destroy in {}. Error: {}'.format(ks_cf_for_destroy,
@@ -946,6 +948,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             file_for_destroy = one_file.replace(file_name, file_name_template + '-*')
             self.log.debug('Selected files for destroy: {}'.format(file_for_destroy))
             if file_for_destroy:
+                self.log.debug("Files to destroy: %s", file_for_destroy)
                 break
 
         if not file_for_destroy:
@@ -2870,7 +2873,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             # verify node is removed by nodetool status
             removed_node_status = self.cluster.get_node_status_dictionary(
                 ip_address=node_to_remove.ip_address, verification_node=verification_node)
-            assert removed_node_status is None,\
+            assert removed_node_status is None, \
                 "Node was not removed properly (Node status:{})".format(removed_node_status)
 
             # add new node
