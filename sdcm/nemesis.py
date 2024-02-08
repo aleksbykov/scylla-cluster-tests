@@ -6596,3 +6596,12 @@ class IsolateNodeWithIptableRuleNemesis(Nemesis):
 
     def disrupt(self):
         self.disrupt_refusing_connection_from_banned_node(use_iptables=True)
+
+
+class IsolateNodeNemesis(Nemesis):
+    disruptive = True
+    topology_changes = True
+
+    def disrupt(self):
+        random.seed(100)
+        self.disrupt_refusing_connection_from_banned_node(use_iptables=random.choice([True, False]))

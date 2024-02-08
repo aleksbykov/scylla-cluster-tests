@@ -332,14 +332,17 @@ class NoRaft(RaftFeatureOperations):
         return len(token_ring_ids) == num_of_nodes
 
 
-def get_raft_mode(node) -> Raft | NoRaft:
-    with node.remote_scylla_yaml() as scylla_yaml:
-        if node.is_kubernetes():
-            consistent_cluster_management = scylla_yaml.get('consistent_cluster_management')
-        else:
-            consistent_cluster_management = scylla_yaml.consistent_cluster_management
-        node.log.debug("consistent_cluster_management : %s", consistent_cluster_management)
-        return Raft(node) if consistent_cluster_management else NoRaft(node)
+# def get_raft_mode(node) -> Raft | NoRaft:
+#     with node.remote_scylla_yaml() as scylla_yaml:
+#         if node.is_kubernetes():
+#             consistent_cluster_management = scylla_yaml.get('consistent_cluster_management')
+#         else:
+#             consistent_cluster_management = scylla_yaml.consistent_cluster_management
+#         node.log.debug("consistent_cluster_management : %s", consistent_cluster_management)
+#         return Raft(node) if consistent_cluster_management else NoRaft(node)
+
+def get_raft_mode(node):
+    return Raft(node)
 
 
 __all__ = ["get_raft_mode",
