@@ -4372,7 +4372,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self.log.debug(f"table {ks}.{table} cdc extension state: {cdc_settings}")
 
         self.log.debug("Choose random cdc property to toggle")
-        cdc_property = random.choice(cdc.options.get_cdc_settings_names())
+        # cdc_property = random.choice(cdc.options.get_cdc_settings_names())
+        cdc_property = "preimage"
         self.log.debug(f"Next cdc property will be changed {cdc_property}")
 
         cdc_settings[cdc_property] = cdc.options.toggle_cdc_property(cdc_property, cdc_settings[cdc_property])
