@@ -266,3 +266,5 @@ run_scylla_doctor: false
 nemesis_double_load_during_grow_shrink_duration: 0
 
 enterprise_disable_kms: false
+
+enable_force_gossip_topology_changes_on_upgrade: false

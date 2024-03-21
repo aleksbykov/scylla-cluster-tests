@@ -1,0 +1,2 @@
+append_scylla_yaml:
+  force_gossip_topology_changes: true

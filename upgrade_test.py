@@ -21,7 +21,7 @@ import random
 import time
 import re
 from functools import wraps, cache
-from typing import List
+from typing import List, Any
 import contextlib
 
 import cassandra
@@ -52,7 +52,7 @@ from sdcm.sct_events.filters import EventsSeverityChangerFilter
 from sdcm.sct_events.group_common_events import ignore_upgrade_schema_errors, ignore_ycsb_connection_refused, \
     ignore_abort_requested_errors, decorate_with_context
 from sdcm.utils import loader_utils
-from sdcm.utils.features import CONSISTENT_TOPOLOGY_CHANGES_FEATURE
+from sdcm.utils.features import TABLETS_FEATURE, CONSISTENT_TOPOLOGY_CHANGES_FEATURE, get_enabled_features
 from sdcm.wait import wait_for
 from sdcm.paths import SCYLLA_YAML_PATH
 from sdcm.rest.raft_upgrade_procedure import RaftUpgradeProcedure
@@ -1524,3 +1524,7 @@ class UpgradeCustomTest(UpgradeTest):
             assert all(tables_upgraded), "Failed to upgrade the sstable format {}".format(tables_upgraded)
 
         InfoEvent(message='all nodes were upgraded, and last workaround is verified.').publish()
+
+    def get_old_config_value(self, config_name: str) -> Any:
+        with self.db_cluster.nodes[0].remote_scylla_yaml() as scylla_yaml:
+            return getattr(scylla_yaml, config_name, None)
