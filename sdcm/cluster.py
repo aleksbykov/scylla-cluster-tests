@@ -4229,17 +4229,23 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         if not nodes:
             nodes = self.nodes
         status = self.get_nodetool_status(verification_node=verification_node)
+        self.log.debug("===================> Current satatus: \n %s", status)
         up_statuses = []
         for node in nodes:
+            self.log.debug("===================> Current node: %s[%s]", node.name, node.ip_address)
             found_node_status = False
-            for dc_status in status.values():
+            for dc_name, dc_status in status.items():
+                self.log.debug("===================> Current DC: %s", dc_name)
                 ip_status = dc_status.get(node.ip_address)
+                self.log.debug("===================> Current ip status: %s", ip_status)
                 if ip_status:
                     found_node_status = True
+                    self.log.debug("===================> Node %s state %s", node.name, ip_status["state"] == "UN")
                     up_statuses.append(ip_status["state"] == "UN")
                     break
             if not found_node_status:
                 up_statuses.append(False)
+        self.log.debug("===================> Full up statuses: %s", up_statuses)
         if not all(up_statuses):
             raise ClusterNodesNotReady("Not all nodes joined the cluster")
 
