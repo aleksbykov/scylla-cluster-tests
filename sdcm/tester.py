@@ -805,10 +805,10 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
 
     def prepare_kms_host(self) -> None:
         if (self.params.is_enterprise and ComparableScyllaVersion(self.params.scylla_version) >= '2023.1.3'
-            and self.params.get('cluster_backend') == 'aws'
-            and not self.params.get('scylla_encryption_options')
-            and self.params.get("db_type") != "mixed_scylla"  # oracle probably doesn't support KMS
-            ):
+                and self.params.get('cluster_backend') == 'aws'
+                and not self.params.get('scylla_encryption_options')
+                and self.params.get("db_type") != "mixed_scylla"  # oracle probably doesn't support KMS
+                ):
             self.params['scylla_encryption_options'] = "{ 'cipher_algorithm' : 'AES/ECB/PKCS5Padding', 'secret_key_strength' : 128, 'key_provider': 'KmsKeyProviderFactory', 'kms_host': 'auto'}"  # pylint: disable=line-too-long
         if not (scylla_encryption_options := self.params.get("scylla_encryption_options") or ''):
             return None
@@ -1003,12 +1003,11 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
         if self.params.get('alternator_port'):
             self.log.info("Going to create alternator tables")
             if self.params.get('alternator_enforce_authorization'):
+                role_name = self.params.get('alternator_access_key_id')
+                password = self.params.get('alternator_secret_access_key')
                 with self.db_cluster.cql_connection_patient(self.db_cluster.nodes[0]) as session:
-                    session.execute(SimpleStatement("""
-                        INSERT INTO system_auth.roles (role, salted_hash) VALUES (%s, %s)
-                    """, consistency_level=ConsistencyLevel.ALL),
-                                    (self.params.get('alternator_access_key_id'),
-                                     self.params.get('alternator_secret_access_key')))
+                    session.execute(SimpleStatement(
+                        f"CREATE ROLE {role_name} WITH PASSWORD = '{password}'", consistency_level=ConsistencyLevel.ALL))
 
             schema = self.params.get("dynamodb_primarykey_type")
             self.alternator.create_table(node=node, schema=schema)
