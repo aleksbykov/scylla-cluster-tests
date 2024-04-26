@@ -11,7 +11,7 @@ batch_size: 100
 
 n_loaders: 5
 n_monitor_nodes: 1
-n_db_nodes: 1
+n_db_nodes: 3
 add_node_cnt: 5
 
 jmx_heap_memory: 1024 # this is a fix/workaround for https://github.com/scylladb/scylla/issues/7609
