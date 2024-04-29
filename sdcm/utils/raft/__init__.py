@@ -3,13 +3,14 @@ import logging
 import random
 
 from enum import Enum
-from typing import Protocol, NamedTuple, Mapping, Iterable
+from abc import ABC, abstractmethod
+from typing import NamedTuple, Mapping, Iterable
 
 from sdcm.sct_events.database import DatabaseLogEvent
 from sdcm.sct_events.filters import EventsSeverityChangerFilter
 from sdcm.sct_events import Severity
 from sdcm.utils.features import is_consistent_topology_changes_feature_enabled, is_consistent_cluster_management_feature_enabled
-
+from sdcm.wait import wait_for
 
 LOGGER = logging.getLogger(__name__)
 RAFT_DEFAULT_SCYLLA_VERSION = "5.5.0-dev"
@@ -68,30 +69,38 @@ ABORT_BOOTSTRAP_LOG_PATTERNS: Iterable[MessagePosition] = [
 ]
 
 
-class RaftFeatureOperations(Protocol):
+class RaftFeatureOperations(ABC):
     _node: "BaseNode"
     TOPOLOGY_OPERATION_LOG_PATTERNS: dict[TopologyOperations, Iterable[MessagePosition]]
+    message_iter: Iterable | None = None
 
     @property
+    @abstractmethod
     def is_enabled(self) -> bool:
         ...
 
     @property
+    @abstractmethod
     def is_consistent_topology_changes_enabled(self) -> bool:
         ...
 
+    @abstractmethod
     def get_status(self) -> str:
         ...
 
+    @abstractmethod
     def is_ready(self) -> bool:
         ...
 
+    @abstractmethod
     def get_group0_members(self) -> list[str]:
         ...
 
+    @abstractmethod
     def get_group0_non_voters(self) -> list[dict[str, str]]:
         ...
 
+    @abstractmethod
     def clean_group0_garbage(self, raise_exception: bool = False) -> None:
         ...
 
@@ -104,6 +113,7 @@ class RaftFeatureOperations(Protocol):
 
     def get_random_log_message(self, operation: TopologyOperations, seed: int | None = None):
         random.seed(seed)
+
         log_patterns = self.TOPOLOGY_OPERATION_LOG_PATTERNS.get(operation)
         log_pattern = random.choice(log_patterns)
         return self.get_message_waiting_timeout(log_pattern)
@@ -189,6 +199,10 @@ class RaftFeature(RaftFeatureOperations):
         return diff
 
     def clean_group0_garbage(self, raise_exception: bool = False) -> None:
+        def is_node_down(removing_host_id: str) -> bool:
+            node_status = self._node.parent_cluster.get_node_state(host_id=removing_host_id)
+            return not node_status.get("up", False)
+
         LOGGER.debug("Clean group0 non-voter's members")
         host_ids = self.get_diff_group0_token_ring_members()
         if not host_ids:
@@ -196,9 +210,11 @@ class RaftFeature(RaftFeatureOperations):
             host_ids = self.get_group0_non_voters()
         while host_ids:
             removing_host_id = host_ids.pop(0)
-            ingore_dead_nodes_opt = f"--ignore-dead-nodes {','.join(host_ids)}" if host_ids else ""
+            wait_for(func=is_node_down, step=5, timeout=60, throw_exc=False,
+                     text=f"Waiting node with {removing_host_id} marked down", removing_host_id=removing_host_id)
+            ignore_dead_nodes_opt = f"--ignore-dead-nodes {','.join(host_ids)}" if host_ids else ""
 
-            result = self._node.run_nodetool(f"removenode {removing_host_id} {ingore_dead_nodes_opt}",
+            result = self._node.run_nodetool(f"removenode {removing_host_id} {ignore_dead_nodes_opt}",
                                              ignore_status=True,
                                              verbose=True,
                                              retry=3)
@@ -207,11 +223,12 @@ class RaftFeature(RaftFeatureOperations):
                              removing_host_id, result.stdout + result.stderr)
             if not host_ids:
                 break
-
-        if missing_host_ids := self.get_diff_group0_token_ring_members():
+        missing_host_ids = self.get_diff_group0_token_ring_members() or self.get_group0_non_voters()
+        if missing_host_ids:
             token_ring_members = self._node.get_token_ring_members()
             group0_members = self.get_group0_members()
-            error_msg = f"Token ring {token_ring_members} and group0 {group0_members} are differs on: {missing_host_ids}"
+            error_msg = (f"Token ring {token_ring_members} and group0 {group0_members} are differs on: {missing_host_ids}"
+                         f" or/and has non-voter member {missing_host_ids}")
             LOGGER.error(error_msg)
             if raise_exception:
                 raise Group0MembersNotConsistentWithTokenRingMembersException(error_msg)
@@ -238,19 +255,11 @@ class RaftFeature(RaftFeatureOperations):
                                         extra_time_to_expiration=timeout),
             EventsSeverityChangerFilter(new_severity=Severity.WARNING,
                                         event_class=DatabaseLogEvent.RUNTIME_ERROR,
-                                        regex=r".*Startup failed: std::runtime_error.*is removed from the cluster",
+                                        regex=r".*Startup failed: std::runtime_error \(the topology coordinator rejected request to join the cluster",
                                         extra_time_to_expiration=timeout),
             EventsSeverityChangerFilter(new_severity=Severity.WARNING,
                                         event_class=DatabaseLogEvent.DATABASE_ERROR,
                                         regex=r".*gossip - is_safe_for_restart.*status=LEFT",
-                                        extra_time_to_expiration=timeout),
-            EventsSeverityChangerFilter(new_severity=Severity.WARNING,
-                                        event_class=DatabaseLogEvent.RUNTIME_ERROR,
-                                        regex=r".*init - Startup failed: std::runtime_error.*already exists, cancelling join",
-                                        extra_time_to_expiration=timeout),
-            EventsSeverityChangerFilter(new_severity=Severity.WARNING,
-                                        event_class=DatabaseLogEvent.RUNTIME_ERROR,
-                                        regex=r".*init - Startup failed: std::runtime_error.*repair_reason=bootstrap.*aborted_by_user=true",
                                         extra_time_to_expiration=timeout),
             EventsSeverityChangerFilter(new_severity=Severity.WARNING,
                                         event_class=DatabaseLogEvent,
@@ -258,6 +267,18 @@ class RaftFeature(RaftFeatureOperations):
             EventsSeverityChangerFilter(new_severity=Severity.WARNING,
                                         event_class=DatabaseLogEvent.DATABASE_ERROR,
                                         regex=r".*node_ops - bootstrap.*Operation failed.*seastar::abort_requested_exception",
+                                        extra_time_to_expiration=timeout),
+            EventsSeverityChangerFilter(new_severity=Severity.WARNING,
+                                        event_class=DatabaseLogEvent.DATABASE_ERROR,
+                                        regex=r".*raft - .* failed with: raft::transport_error .* connection is closed",
+                                        extra_time_to_expiration=timeout),
+            EventsSeverityChangerFilter(new_severity=Severity.WARNING,
+                                        event_class=DatabaseLogEvent.DATABASE_ERROR,
+                                        regex=r".*raft - .*Transferring snapshot to.*Request is aborted by a caller",
+                                        extra_time_to_expiration=timeout),
+            EventsSeverityChangerFilter(new_severity=Severity.WARNING,
+                                        event_class=DatabaseLogEvent.DATABASE_ERROR,
+                                        regex=r".*raft.*applier fiber stopped because of the error.*abort requested",
                                         extra_time_to_expiration=timeout),
         )
 
