@@ -5105,6 +5105,27 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
                 enabled_features_state.append(feature in enabled_features)
         return all(enabled_features_state)
 
+    def get_node_status_from_system_by(self, verification_node: BaseNode, *, ip_address: str = "", host_id: str = "") -> dict[str, Any]:
+        query = "select peer, host_id, status, up from system.cluster_status"
+        if ip_address:
+            query += f" where peer = '{ip_address}'"
+        elif host_id:
+            query += f" where host_id={host_id} ALLOW FILTERING"
+        else:
+            self.log.warning("Ip address or host id were not provided")
+            return {}
+
+        with self.cql_connection_patient(node=verification_node) as session:
+            session.default_timeout = 300
+            results = session.execute(query)
+            row = results.one()
+            if not row:
+                return {}
+            node_status = {"ip_address": row.peer, "host_id": str(
+                row.host_id), "state": row.status, "up": row.up}
+            LOGGER.debug("Node status %s", node_status)
+            return node_status
+
 
 class BaseLoaderSet():
 
