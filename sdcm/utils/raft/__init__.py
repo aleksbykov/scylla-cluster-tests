@@ -5,6 +5,7 @@ import random
 from enum import Enum
 from typing import Protocol, NamedTuple, Mapping, Iterable
 from collections import namedtuple
+from itertools import cycle
 
 from sdcm.sct_events.database import DatabaseLogEvent
 from sdcm.sct_events.filters import EventsSeverityChangerFilter
@@ -106,6 +107,7 @@ class RaftFeatureOperations(Protocol):
 
     def get_random_log_message(self, operation: TopologyOperations, seed: int | None = None):
         random.seed(seed)
+
         log_patterns = self.TOPOLOGY_OPERATION_LOG_PATTERNS.get(operation)
         log_pattern = random.choice(log_patterns)
         return self.get_message_waiting_timeout(log_pattern)
@@ -120,6 +122,7 @@ class RaftFeature(RaftFeatureOperations):
         TopologyOperations.DECOMMISSION: ABORT_DECOMMISSION_LOG_PATTERNS,
         TopologyOperations.BOOTSTRAP: ABORT_BOOTSTRAP_LOG_PATTERNS,
     }
+    message_iter = None
 
     def __init__(self, node: "BaseNode") -> None:
         super().__init__()
@@ -134,6 +137,15 @@ class RaftFeature(RaftFeatureOperations):
         """Check whether CONSISTENT_TOPOLOGY_CHANGES feature is enabled"""
         with self._node.parent_cluster.cql_connection_patient(node=self._node) as session:
             return is_consistent_topology_changes_feature_enabled(session)
+
+    def get_random_log_message(self, operation: TopologyOperations, seed: int | None = None):
+        random.seed(seed)
+
+        log_patterns = self.TOPOLOGY_OPERATION_LOG_PATTERNS.get(operation)
+        if not self.message_iter:
+            self.message_iter = cycle(log_patterns)
+        log_pattern = next(self.message_iter)
+        return self.get_message_waiting_timeout(log_pattern)
 
     def get_status(self) -> str:
         """ get raft status """
