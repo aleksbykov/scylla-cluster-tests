@@ -87,7 +87,7 @@ from sdcm.sct_events.group_common_events import (
     ignore_ycsb_connection_refused,
     decorate_with_context,
     ignore_reactor_stall_errors,
-    ignore_disk_quota_exceeded_errors,
+    ignore_disk_quota_exceeded_errors, ignore_raft_transport_failing,
 )
 from sdcm.sct_events.health import DataValidatorEvent
 from sdcm.sct_events.loaders import CassandraStressLogEvent, ScyllaBenchEvent
@@ -130,7 +130,7 @@ from sdcm.utils.sstable.sstable_utils import SstableUtils
 from sdcm.utils.toppartition_util import NewApiTopPartitionCmd, OldApiTopPartitionCmd
 from sdcm.utils.version_utils import MethodVersionNotFound, scylla_versions
 from sdcm.utils.raft import Group0MembersNotConsistentWithTokenRingMembersException, TopologyOperations
-from sdcm.utils.raft.common import NodeBootstrapAbortManager
+from sdcm.utils.raft.common import NodeBootstrapAbortManager, MonitorDecommissionOperation
 from sdcm.utils.issues import SkipPerIssues
 from sdcm.wait import wait_for, wait_for_log_lines
 from sdcm.exceptions import (
@@ -5034,7 +5034,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             raise AuditLogTestFailure("\n".join(errors))
 
     def disrupt_bootstrap_streaming_error(self):
-        """Abort bootstrap procces at different point
+        """Abort bootstrap process at different point
 
         During bootstrap new node stream data from token ring
         If bootstrap is aborted, according to Failed topology
@@ -5046,6 +5046,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         If node was not added anyway, clean it from cluster
         and return the cluster to initial state(by num of nodes)
         """
+        self.cluster.wait_all_nodes_un()
+
         new_node: BaseNode = self.cluster.add_nodes(
             count=1, dc_idx=self.target_node.dc_idx, enable_auto_bootstrap=True, rack=self.target_node.rack)[0]
         self.monitoring_set.reconfigure_scylla_monitoring()
@@ -5056,21 +5058,23 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         bootstrapabortmanager = NodeBootstrapAbortManager(bootstrap_node=new_node, verification_node=self.target_node)
 
-        bootstrapabortmanager.run_bootstrap_and_abort_with_action(terminate_pattern, abort_action=new_node.stop_scylla)
-        bootstrapabortmanager.clean_and_restart_bootstrap_after_abort()
+        with ignore_stream_mutation_fragments_errors(), ignore_raft_topology_cmd_failing(), ignore_raft_transport_failing():
+            bootstrapabortmanager.run_bootstrap_and_abort_with_action(
+                terminate_pattern, abort_action=new_node.stop_scylla)
+            bootstrapabortmanager.clean_and_restart_bootstrap_after_abort()
 
-        if new_node.db_up() and not self.target_node.raft.is_cluster_topology_consistent():
-            LOGGER.error("New host %s was not properly bootstrapped. Terminate it", new_node.name)
-            bootstrapabortmanager.clean_unbootstrapped_node()
-            self.log.info("Failed bootstrapped node %s removed. Cluster is in initial state", new_node.name)
-            raise BootstrapStreamErrorFailure(f"Node {new_node.name} failed to bootstrap")
+            if new_node.db_up() and not self.target_node.raft.is_cluster_topology_consistent():
+                LOGGER.error("New host %s was not properly bootstrapped. Terminate it", new_node.name)
+                bootstrapabortmanager.clean_unbootstrapped_node()
+                self.log.info("Failed bootstrapped node %s removed. Cluster is in initial state", new_node.name)
+                raise BootstrapStreamErrorFailure(f"Node {new_node.name} failed to bootstrap")
 
         if new_node.db_up() and self.target_node.raft.is_cluster_topology_consistent():
             self.log.info("Wait 5 minutes with new topology")
             time.sleep(300)
-
             self.log.info("Decommission added new node")
-            self.cluster.decommission(new_node, timeout=7200)
+            with MonitorDecommissionOperation(target_node=new_node, timeout=7300):
+                self.cluster.decommission(new_node, timeout=7200)
 
     def disrupt_disable_binary_gossip_execute_major_compaction(self):
         with nodetool_context(node=self.target_node, start_command="disablebinary", end_command="enablebinary"):

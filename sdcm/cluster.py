@@ -1767,7 +1767,8 @@ class BaseNode(AutoSshContainerMixin):  # pylint: disable=too-many-instance-attr
             self.install_package('gnupg2')
             self.remoter.sudo("mkdir -p /etc/apt/keyrings")
             for apt_key in self.parent_cluster.params.get("scylla_apt_keys"):
-                self.remoter.sudo(f"apt-key adv --keyserver keyserver.ubuntu.com --recv-keys {apt_key}", retry=3)
+                self.remoter.sudo(
+                    f"apt-key adv --keyserver keyserver.ubuntu.com --receive-keys {apt_key}", retry=3)
                 self.remoter.sudo(f"gpg --homedir /tmp --no-default-keyring --keyring /etc/apt/keyrings/scylladb.gpg "
                                   f"--keyserver hkp://keyserver.ubuntu.com:80 --recv-keys {apt_key}", retry=3)
         self.update_repo_cache()
@@ -1787,7 +1788,7 @@ class BaseNode(AutoSshContainerMixin):  # pylint: disable=too-many-instance-attr
         if self.distro.is_debian_like:
             self.remoter.sudo("mkdir -p /etc/apt/keyrings")
             for apt_key in self.parent_cluster.params.get("scylla_apt_keys"):
-                self.remoter.sudo(f"apt-key adv --keyserver keyserver.ubuntu.com --recv-keys {apt_key}", retry=3)
+                self.remoter.sudo(f"apt-key adv --keyserver keyserver.ubuntu.com --receive-keys {apt_key}", retry=3)
                 self.remoter.sudo(f"gpg --homedir /tmp --no-default-keyring --keyring /etc/apt/keyrings/scylladb.gpg "
                                   f"--keyserver hkp://keyserver.ubuntu.com:80 --recv-keys {apt_key}", retry=3)
             self.remoter.sudo("apt-get update", ignore_status=True)
@@ -5052,6 +5053,24 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
             for feature in feature_list:
                 enabled_features_state.append(feature in enabled_features)
         return all(enabled_features_state)
+
+    def get_node_state(self, *, ip_address: str = "", host_id: str = "") -> dict[str, Any]:
+        verification_node = random.choice(self.get_nodes_up_and_normal())
+        query = "select peer, host_id, status, up from system.cluster_status"
+        if ip_address:
+            query += f" where peer = '{ip_address}'"
+        elif host_id:
+            query += f" where host_id={host_id} ALLOW FILTERING"
+
+        with self.cql_connection(node=verification_node, timeout=300) as session:
+            results = session.execute(query)
+            row = results.one()
+            if not row:
+                return {}
+            node_status = {"ip_address": self.target_node_ip, "host_id": str(
+                row.host_id), "state": row.status, "up": row.up}
+            LOGGER.debug("Node status %s", node_status)
+            return node_status
 
 
 class BaseLoaderSet():
