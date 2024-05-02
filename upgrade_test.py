@@ -886,6 +886,9 @@ class UpgradeTest(FillDatabaseData, loader_utils.LoaderUtilsMixin):
     def _start_and_wait_for_node_upgrade(self, node: BaseNode, step: int) -> None:
         InfoEvent(
             message=f"Step {step} - Upgrade {node.name} from dc {node.dc_idx}").publish()
+        InfoEvent(message="Enable consistent-cluster-management").publish()
+        self._update_scylla_yaml_on_node(node, {"consistent_cluster_management": True})
+
         InfoEvent(message='Upgrade Node %s begins' % node.name).publish()
         with ignore_ycsb_connection_refused():
             self.upgrade_node(node, upgrade_sstables=self.params.get('upgrade_sstables'))
@@ -897,6 +900,9 @@ class UpgradeTest(FillDatabaseData, loader_utils.LoaderUtilsMixin):
             message=f"Step {step} - "
                     f"Rollback {node.name} from dc {node.dc_idx}"
         ).publish()
+        InfoEvent(message="Disable consistent_cluster_management").publish()
+        self._update_scylla_yaml_on_node(node, {"consistent_cluster_management": False})
+
         InfoEvent(message='Rollback Node %s begin' % node).publish()
         with ignore_ycsb_connection_refused():
             self.rollback_node(node, upgrade_sstables=self.params.get('upgrade_sstables'))
@@ -986,6 +992,10 @@ class UpgradeTest(FillDatabaseData, loader_utils.LoaderUtilsMixin):
         # Upgrade all nodes
         for node_to_upgrade in nodes_to_upgrade:
             self._start_and_wait_for_node_upgrade(node_to_upgrade, step=next(step))
+
+        for node in self.db_cluster.nodes:
+            raft_upgrade_done = node.follow_system_log(["raft_group0_upgrade - Raft upgrade finished"], True)
+            assert list(raft_upgrade_done), f"Check logs, raft upgrade procedure was not finished on node {node.name}"
 
         InfoEvent(message="All nodes were upgraded successfully").publish()
 
