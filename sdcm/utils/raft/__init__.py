@@ -5,6 +5,7 @@ import random
 from enum import Enum
 from typing import Protocol, NamedTuple, Mapping, Iterable
 from collections import namedtuple
+from itertools import cycle
 
 from sdcm.sct_events.database import DatabaseLogEvent
 from sdcm.sct_events.filters import EventsSeverityChangerFilter
@@ -115,10 +116,19 @@ class RaftFeature(RaftFeatureOperations):
         TopologyOperations.DECOMMISSION: ABORT_DECOMMISSION_LOG_PATTERNS,
         TopologyOperations.BOOTSTRAP: ABORT_BOOTSTRAP_LOG_PATTERNS,
     }
+    CYCLE_MSG_ITERATOR = None
 
     def __init__(self, node: "BaseNode") -> None:
         super().__init__()
         self._node = node
+
+    def get_random_log_message(self, operation: TopologyOperations, seed: int | None = None):
+        random.seed(seed)
+        log_patterns = self.TOPOLOGY_OPERATION_LOG_PATTERNS.get(operation)
+        if not self.CYCLE_MSG_ITERATOR:
+            RaftFeature.CYCLE_MSG_ITERATOR = cycle(log_patterns)
+        log_pattern = next(self.CYCLE_MSG_ITERATOR)
+        return self.get_message_waiting_timeout(log_pattern)
 
     @property
     def is_enabled(self) -> bool:
