@@ -5017,6 +5017,9 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
     def disrupt_refuse_connection_with_send_sigstop_signal_to_scylla_on_banned_node(self):
         self._refuse_connection_from_banned_node(use_iptables=False)
 
+    def disrupt_refuse_connection_with_flag(self, use_iptable=False):
+        self._refuse_connection_from_banned_node(use_iptables=use_iptable)
+
     def _refuse_connection_from_banned_node(self, use_iptables=False):
         """Banned node could not connect with rest nodes in cluster
 
@@ -6710,4 +6713,4 @@ class IsolateNodeNemesis(Nemesis):
 
     def disrupt(self):
         random.seed(100)
-        self._refuse_connection_from_banned_node(use_iptables=random.choice([True, False]))
+        self.disrupt_refuse_connection_with_flag(use_iptable=random.choice([True, False]))

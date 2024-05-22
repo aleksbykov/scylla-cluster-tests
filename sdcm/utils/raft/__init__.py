@@ -135,6 +135,7 @@ class RaftFeature(RaftFeatureOperations):
         """Check whether CONSISTENT_TOPOLOGY_CHANGES feature is enabled"""
         with self._node.parent_cluster.cql_connection_patient(node=self._node) as session:
             enabled_features = self._node.parent_cluster.get_enabled_features(session)
+            self._node.log.info("Enabled features %s", enabled_features)
             return self.RAFT_TOPOLOGY_CHANGES_FEATURE in enabled_features
 
     def get_status(self) -> str:
