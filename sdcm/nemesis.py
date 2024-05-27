@@ -6566,3 +6566,24 @@ class EndOfQuotaNemesis(Nemesis):
 
     def disrupt(self):
         self.disrupt_end_of_quota_nemesis()
+
+
+class StreamingErrorsOperationsMonkey(Nemesis):
+    """
+    Selected disrupt methods with streaming errors expected
+    """
+    disruptive = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.disrupt_methods_list = [
+            'disrupt_repair_streaming_err',
+            'disrupt_rebuild_streaming_err',
+            'disrupt_decommission_streaming_err',
+            'disrupt_bootstrap_streaming_error'
+        ]
+
+    def disrupt(self):
+        if not self.target_node:
+            self.set_target_node()
+        self.call_random_disrupt_method(disrupt_methods=self.disrupt_methods_list, predefined_sequence=True)
