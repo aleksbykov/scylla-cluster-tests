@@ -138,8 +138,8 @@ class NodeBootstrapAbortManager:
         self.bootstrap_node.stop_scylla_server(ignore_status=True, timeout=600)
         # Clean garbage from group 0 and scylla data and restart setup
         try:
-            if self.verification_node.raft.get_diff_group0_token_ring_members() and \
-                    not self.verification_node.raft.get_group0_non_voters():
+            if self.verification_node.raft.get_diff_group0_token_ring_members() or \
+                    self.verification_node.raft.get_group0_non_voters():
                 self.verification_node.raft.clean_group0_garbage(raise_exception=True)
             LOGGER.debug("Clean old scylla data and restart scylla service")
             self.bootstrap_node.clean_scylla_data()
