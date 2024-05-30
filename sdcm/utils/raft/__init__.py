@@ -142,9 +142,9 @@ class RaftFeature(RaftFeatureOperations):
         random.seed(seed)
 
         log_patterns = self.TOPOLOGY_OPERATION_LOG_PATTERNS.get(operation)
-        if not self.message_iter:
-            self.message_iter = cycle(log_patterns)
-        log_pattern = next(self.message_iter)
+        if not RaftFeature.message_iter:
+            RaftFeature.message_iter = cycle(log_patterns)
+        log_pattern = next(RaftFeature.message_iter)
         return self.get_message_waiting_timeout(log_pattern)
 
     def get_status(self) -> str:
