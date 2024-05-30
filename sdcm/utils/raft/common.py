@@ -4,6 +4,7 @@ import contextlib
 from typing import Iterable, Callable
 from functools import partial
 
+from sdcm.sct_events.decorators import raise_event_on_failure
 from sdcm.exceptions import BootstrapStreamErrorFailure
 from sdcm.cluster import BaseNode, BaseScyllaCluster, BaseMonitorSet
 from sdcm.wait import wait_for
@@ -60,11 +61,15 @@ class NodeBootstrapAbortManager:
             self.bootstrap_node.stop_wait_db_up_event.set()
         LOGGER.debug("Stop event was set for node %s", self.bootstrap_node.name)
 
+    @raise_event_on_failure
     def _start_bootstrap(self):
         try:
             LOGGER.debug("Starting bootstrap process %s", self.bootstrap_node.name)
-            self.bootstrap_node.parent_cluster.node_setup(self.bootstrap_node, verbose=True)
-            self.bootstrap_node.parent_cluster.node_startup(self.bootstrap_node, verbose=True)
+            # self.bootstrap_node.parent_cluster.node_setup(self.bootstrap_node, verbose=True)
+            # self.bootstrap_node.parent_cluster.node_startup(self.bootstrap_node, verbose=True)
+            with adaptive_timeout(Operations.NEW_NODE, node=self.verification_node, timeout=3600):
+                self.verification_node.parent_cluster.wait_for_init(
+                    node_list=[self.bootstrap_node], timeout=3600, check_node_health=False)
             LOGGER.debug("Node %s was bootstrapped", self.bootstrap_node.name)
         except Exception as exc:  # pylint: disable=broad-except  # noqa: BLE001
             LOGGER.error("Setup failed for node %s with err %s", self.bootstrap_node.name, exc)
@@ -99,10 +104,15 @@ class NodeBootstrapAbortManager:
         self.db_cluster.terminate_node(self.bootstrap_node)
         self.monitors.reconfigure_scylla_monitoring()
         self.verification_node.raft.clean_group0_garbage(raise_exception=True)
+
+        up_and_normal_nodes = self.verification_node.parent_cluster.get_nodes_up_and_normal(self.verification_node)
+        if self.bootstrap_node not in up_and_normal_nodes:
+            node_host_ids.append(self.bootstrap_node.host_id)
+
         if node_host_ids:
-            for host_id in node_host_ids:
+            for host_id in set(node_host_ids):
                 self.verification_node.run_nodetool(
-                    f"removenode {host_id}", ignore_status=True, retry=3, warning_event_on_exception=True)
+                    f"removenode {host_id}", ignore_status=True, retry=3)
 
         assert self.verification_node.raft.is_cluster_topology_consistent(), \
             "Group0, Token Ring and number of node in cluster are differs. Check logs"
