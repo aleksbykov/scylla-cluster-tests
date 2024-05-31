@@ -273,6 +273,11 @@ class RaftFeature(RaftFeatureOperations):
                                         event_class=DatabaseLogEvent.DATABASE_ERROR,
                                         regex=r".*node_ops - bootstrap.*Operation failed.*seastar::abort_requested_exception",
                                         extra_time_to_expiration=timeout),
+            EventsSeverityChangerFilter(new_severity=Severity.WARNING,
+                                        event_class=DatabaseLogEvent.DATABASE_ERROR,
+                                        regex=r".*raft - .* failed with: raft::transport_error .* connection is closed",
+                                        extra_time_to_expiration=timeout),
+
         )
 
     def is_cluster_topology_consistent(self) -> bool:
