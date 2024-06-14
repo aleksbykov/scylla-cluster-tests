@@ -4958,7 +4958,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             raise AuditLogTestFailure("\n".join(errors))
 
     def disrupt_bootstrap_streaming_error(self):
-        """Abort bootstrap procces at different point
+        """Abort bootstrap process at different point
 
         During bootstrap new node stream data from token ring
         If bootstrap is aborted, according to Failed topology
@@ -4970,12 +4970,12 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         If node was not added anyway, clean it from cluster
         and return the cluster to initial state(by num of nodes)
         """
+        self.cluster.wait_all_nodes_un()
+
         new_node: BaseNode = self.cluster.add_nodes(
             count=1, dc_idx=self.target_node.dc_idx, enable_auto_bootstrap=True, rack=self.target_node.rack)[0]
         self.monitoring_set.reconfigure_scylla_monitoring()
         self.set_current_running_nemesis(node=new_node)  # prevent to run nemesis on new node when running in parallel
-
-        self.cluster.wait_all_nodes_un()
 
         terminate_pattern = self.target_node.raft.get_random_log_message(operation=TopologyOperations.BOOTSTRAP,
                                                                          seed=self.tester.params.get("nemesis_seed"))
@@ -5015,6 +5015,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                     wait_for(func=lambda: not get_node_state(new_node_ip, self.target_node), step=15, timeout=3600,
                              throw_exc=False, text=f"Waiting decommission is finished for {new_node_host_id}...")
                     self.cluster.terminate_node(new_node)
+            finally:
                 bootstrapabortmanager.clean_unbootstrapped_node()
 
     def disrupt_disable_binary_gossip_execute_major_compaction(self):
