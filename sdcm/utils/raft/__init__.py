@@ -4,13 +4,11 @@ import random
 
 from enum import Enum
 from typing import Protocol, NamedTuple, Mapping, Iterable
-from collections import namedtuple
 from itertools import cycle
 
 from sdcm.sct_events.database import DatabaseLogEvent
 from sdcm.sct_events.filters import EventsSeverityChangerFilter
 from sdcm.sct_events import Severity
-from sdcm.utils.version_utils import ComparableScyllaVersion
 from sdcm.utils.features import is_consistent_topology_changes_feature_enabled, is_consistent_cluster_management_feature_enabled
 
 
@@ -277,7 +275,6 @@ class RaftFeature(RaftFeatureOperations):
                                         event_class=DatabaseLogEvent.DATABASE_ERROR,
                                         regex=r".*raft - .* failed with: raft::transport_error .* connection is closed",
                                         extra_time_to_expiration=timeout),
-
         )
 
     def is_cluster_topology_consistent(self) -> bool:

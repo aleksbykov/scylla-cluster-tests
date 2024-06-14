@@ -4975,6 +4975,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self.monitoring_set.reconfigure_scylla_monitoring()
         self.set_current_running_nemesis(node=new_node)  # prevent to run nemesis on new node when running in parallel
 
+        self.cluster.wait_all_nodes_un()
+
         terminate_pattern = self.target_node.raft.get_random_log_message(operation=TopologyOperations.BOOTSTRAP,
                                                                          seed=self.tester.params.get("nemesis_seed"))
 
@@ -4982,6 +4984,14 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         bootstrapabortmanager.run_bootstrap_and_abort_with_action(terminate_pattern, abort_action=new_node.stop_scylla)
         bootstrapabortmanager.clean_and_restart_bootstrap_after_abort()
+
+        def get_node_state(target_node_ip: str, verification_node: BaseNode) -> dict | None:
+            with self.cluster.cql_connection(node=verification_node) as session:
+                cluster_status = session.execute(
+                    f"select host_id, status, up from system.cluster_status where peer = '{target_node_ip}'")
+                cluster_status = {row.id: {"state": row.status, "up": row.up} for row in cluster_status}
+                self.log.info("Cluster status %s", cluster_status)
+                return cluster_status.get(new_node_host_id, None)
 
         if new_node.db_up() and not self.target_node.raft.is_cluster_topology_consistent():
             LOGGER.error("New host %s was not properly bootstrapped. Terminate it", new_node.name)
@@ -4992,9 +5002,20 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         if new_node.db_up() and self.target_node.raft.is_cluster_topology_consistent():
             self.log.info("Wait 5 minutes with new topology")
             time.sleep(300)
-
+            new_node_host_id = new_node.host_id
+            new_node_ip = new_node.ip_address
             self.log.info("Decommission added new node")
-            self.cluster.decommission(new_node, timeout=7200)
+            try:
+                self.cluster.decommission(new_node, timeout=7200)
+            except Exception as exc:  # pylint: disable=broad-except
+                self.log.info("Decommission failed with error %s", exc)
+                new_node_state = get_node_state(new_node_ip, self.target_node)
+                self.log.info("New node %s state after decommission failed: $s", new_node.name, new_node_state)
+                if new_node_state and new_node_state["state"] == "DECOMMISSIONING":
+                    wait_for(func=lambda: not get_node_state(new_node_ip, self.target_node), step=15, timeout=3600,
+                             throw_exc=False, text=f"Waiting decommission is finished for {new_node_host_id}...")
+                    self.cluster.terminate_node(new_node)
+                bootstrapabortmanager.clean_unbootstrapped_node()
 
     def disrupt_disable_binary_gossip_execute_major_compaction(self):
         with nodetool_context(node=self.target_node, start_command="disablebinary", end_command="enablebinary"):
