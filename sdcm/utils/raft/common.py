@@ -65,11 +65,8 @@ class NodeBootstrapAbortManager:
     def _start_bootstrap(self):
         try:
             LOGGER.debug("Starting bootstrap process %s", self.bootstrap_node.name)
-            # self.bootstrap_node.parent_cluster.node_setup(self.bootstrap_node, verbose=True)
-            # self.bootstrap_node.parent_cluster.node_startup(self.bootstrap_node, verbose=True)
-            with adaptive_timeout(Operations.NEW_NODE, node=self.verification_node, timeout=3600):
-                self.verification_node.parent_cluster.wait_for_init(
-                    node_list=[self.bootstrap_node], timeout=3600, check_node_health=False)
+            self.bootstrap_node.parent_cluster.node_setup(self.bootstrap_node, verbose=True)
+            self.bootstrap_node.parent_cluster.node_startup(self.bootstrap_node, verbose=True)
             LOGGER.debug("Node %s was bootstrapped", self.bootstrap_node.name)
         except Exception as exc:  # pylint: disable=broad-except  # noqa: BLE001
             LOGGER.error("Setup failed for node %s with err %s", self.bootstrap_node.name, exc)
