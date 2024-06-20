@@ -5007,16 +5007,14 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             self.log.info("Decommission added new node")
             try:
                 self.cluster.decommission(new_node, timeout=7200)
-            except Exception as exc:  # pylint: disable=broad-except
+            except Exception as exc:  # noqa: BLE001
                 self.log.info("Decommission failed with error %s", exc)
                 new_node_state = get_node_state(new_node_ip, self.target_node)
-                self.log.info("New node %s state after decommission failed: $s", new_node.name, new_node_state)
+                self.log.info("New node %s state after decommission failed: %s", new_node.name, new_node_state)
                 if new_node_state and new_node_state["state"] == "DECOMMISSIONING":
                     wait_for(func=lambda: not get_node_state(new_node_ip, self.target_node), step=15, timeout=3600,
                              throw_exc=False, text=f"Waiting decommission is finished for {new_node_host_id}...")
-                    self.cluster.terminate_node(new_node)
-            finally:
-                bootstrapabortmanager.clean_unbootstrapped_node()
+                self.cluster.verify_decommission(new_node)
 
     def disrupt_disable_binary_gossip_execute_major_compaction(self):
         with nodetool_context(node=self.target_node, start_command="disablebinary", end_command="enablebinary"):
