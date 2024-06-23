@@ -144,9 +144,9 @@ class NodeBootstrapAbortManager:
                                  timeout=3600) as bootstrap_timeout:
             self.bootstrap_node.start_scylla_server(verify_up_timeout=bootstrap_timeout, verify_down=True)
             self.bootstrap_node.start_scylla_jmx()
-            self._set_wait_stop_event()
         self.db_cluster.check_nodes_up_and_normal(
             nodes=[self.bootstrap_node], verification_node=self.verification_node)
+        self._set_wait_stop_event()
 
     def watch_start_failed(self, timeout=600):
         start_time = time.time_ns()
