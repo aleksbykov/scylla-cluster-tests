@@ -98,6 +98,7 @@ class NodeBootstrapAbortManager:
                 new_node_host_id = line.split(" ")[-1].strip()
                 LOGGER.debug("Node %s has host id: %s in log", self.bootstrap_node.name, new_node_host_id)
                 node_host_ids.append(new_node_host_id)
+        bootstrap_node_host_id = self.bootstrap_node.host_id
         self.bootstrap_node.log.debug("New host was not properly bootstrapped. Terminate it")
         self.db_cluster.terminate_node(self.bootstrap_node)
         self.monitors.reconfigure_scylla_monitoring()
@@ -105,7 +106,7 @@ class NodeBootstrapAbortManager:
 
         up_and_normal_nodes = self.verification_node.parent_cluster.get_nodes_up_and_normal(self.verification_node)
         if self.bootstrap_node not in up_and_normal_nodes:
-            node_host_ids.append(self.bootstrap_node.host_id)
+            node_host_ids.append(bootstrap_node_host_id)
 
         if node_host_ids:
             for host_id in set(node_host_ids):
@@ -150,13 +151,13 @@ class NodeBootstrapAbortManager:
         log_follower = self.bootstrap_node.follow_system_log(patterns=[".*Startup failed.*"])
         LOGGER.debug("Found startup error %s", list(log_follower))
         LOGGER.debug("Current time %s - %s < %s is %s", time.time_ns(),
-                     start_time, timeout, time.time_ns() - start_time < timeout)
+                     start_time, timeout, time.perf_counter() - start_time < timeout)
         LOGGER.debug("Current state of event %s", not self.bootstrap_node.stop_wait_db_up_event.is_set())
         while time.perf_counter() - start_time < timeout and not self.bootstrap_node.stop_wait_db_up_event.is_set():
             found_errors = list(log_follower)
             LOGGER.debug("Found startup error %s", found_errors)
-            LOGGER.debug("Current time %s - %s < %s is %s", time.time_ns(), start_time, timeout,
-                         time.time_ns() - start_time < timeout)
+            LOGGER.debug("Current time %s - %s < %s is %s", time.perf_counter(), start_time, timeout,
+                         time.perf_counter() - start_time < timeout)
             LOGGER.debug("Current state of event %s", not self.bootstrap_node.stop_wait_db_up_event.is_set())
 
             if found_errors:
@@ -179,6 +180,8 @@ class NodeBootstrapAbortManager:
                 self.verification_node.raft.clean_group0_garbage(raise_exception=True)
             LOGGER.debug("Clean old scylla data and restart scylla service")
             self.bootstrap_node.clean_scylla_data()
+            LOGGER.debug("Wait all nodes remove failed bootstrap node from gossip")
+            time.sleep(60)
             LOGGER.debug("Start watching log for bootstrap failed")
             watcher_startup_failed = partial(self.watch_start_failed, timeout=3600)
             LOGGER.debug("Start rebootstrap as new node")
