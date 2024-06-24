@@ -139,21 +139,27 @@ class NodeBootstrapAbortManager:
         self.bootstrap_node.stop_wait_db_up_event.clear()
 
     def _rebootstrap_node(self):
-        with ignore_raft_topology_cmd_failing(), \
-                adaptive_timeout(operation=Operations.NEW_NODE, node=self.verification_node,
-                                 timeout=3600) as bootstrap_timeout:
-            self.bootstrap_node.start_scylla_server(verify_up_timeout=bootstrap_timeout, verify_down=True)
-            self.bootstrap_node.start_scylla_jmx()
+        self.bootstrap_node.start_scylla_server(verify_up_timeout=3600, verify_down=True)
+        self.bootstrap_node.start_scylla_jmx()
         self.db_cluster.check_nodes_up_and_normal(
             nodes=[self.bootstrap_node], verification_node=self.verification_node)
         self._set_wait_stop_event()
 
     def watch_start_failed(self, timeout=600):
-        start_time = time.time_ns()
+        start_time = time.perf_counter()
         log_follower = self.bootstrap_node.follow_system_log(patterns=[".*Startup failed.*"])
+        LOGGER.debug("Found startup error %s", list(log_follower))
+        LOGGER.debug("Current time %s - %s < %s is %s", time.time_ns(),
+                     start_time, timeout, time.time_ns() - start_time < timeout)
+        LOGGER.debug("Current state of event %s", not self.bootstrap_node.stop_wait_db_up_event.is_set())
+        while time.perf_counter() - start_time < timeout and not self.bootstrap_node.stop_wait_db_up_event.is_set():
+            found_errors = list(log_follower)
+            LOGGER.debug("Found startup error %s", found_errors)
+            LOGGER.debug("Current time %s - %s < %s is %s", time.time_ns(), start_time, timeout,
+                         time.time_ns() - start_time < timeout)
+            LOGGER.debug("Current state of event %s", not self.bootstrap_node.stop_wait_db_up_event.is_set())
 
-        while time.time_ns() - start_time < timeout and not self.bootstrap_node.stop_wait_db_up_event.is_set():
-            if list(log_follower):
+            if found_errors:
                 self._set_wait_stop_event()
                 break
             time.sleep(5)
@@ -173,10 +179,12 @@ class NodeBootstrapAbortManager:
                 self.verification_node.raft.clean_group0_garbage(raise_exception=True)
             LOGGER.debug("Clean old scylla data and restart scylla service")
             self.bootstrap_node.clean_scylla_data()
+            LOGGER.debug("Start watching log for bootstrap failed")
             watcher_startup_failed = partial(self.watch_start_failed, timeout=3600)
+            LOGGER.debug("Start rebootstrap as new node")
             ParallelObject(objects=[self._rebootstrap_node, watcher_startup_failed],
-                           timeout=3800).call_objects(ignore_exceptions=True)
-
+                           timeout=3800).call_objects()
+            LOGGER.debug("Node is up")
         except Exception as exc:  # pylint: disable=broad-except  # noqa: BLE001
             LOGGER.error("Scylla service restart failed: %s", exc)
             self.clean_unbootstrapped_node()
