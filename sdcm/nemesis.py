@@ -5000,8 +5000,9 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             raise BootstrapStreamErrorFailure(f"Node {new_node.name} failed to bootstrap")
 
         if new_node.db_up() and self.target_node.raft.is_cluster_topology_consistent():
-            self.log.info("Wait 5 minutes with new topology")
-            time.sleep(300)
+            self.log.info("Wait 15 minutes with new topology")
+
+            time.sleep(900)
             new_node_host_id = new_node.host_id
             new_node_ip = new_node.ip_address
             self.log.info("Decommission added new node")
