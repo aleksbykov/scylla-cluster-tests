@@ -93,20 +93,27 @@ class NodeBootstrapAbortManager:
     @decorate_with_context(ignore_ycsb_connection_refused)
     def clean_unbootstrapped_node(self):
         node_host_ids = []
-        if found_stings := list(self.host_id_searcher):
-            for line in found_stings:
+        found_strings = list(self.host_id_searcher)
+        LOGGER.info("Found local host ids: %s", found_strings)
+        if found_strings:
+            for line in found_strings:
                 new_node_host_id = line.split(" ")[-1].strip()
+                LOGGER.info("Found host id: %s", new_node_host_id)
                 LOGGER.debug("Node %s has host id: %s in log", self.bootstrap_node.name, new_node_host_id)
                 node_host_ids.append(new_node_host_id)
-        bootstrap_node_host_id = self.bootstrap_node.host_id
         self.bootstrap_node.log.debug("New host was not properly bootstrapped. Terminate it")
         self.db_cluster.terminate_node(self.bootstrap_node)
         self.monitors.reconfigure_scylla_monitoring()
         self.verification_node.raft.clean_group0_garbage(raise_exception=True)
+        node: BaseNode
 
-        up_and_normal_nodes = self.verification_node.parent_cluster.get_nodes_up_and_normal(self.verification_node)
-        if self.bootstrap_node not in up_and_normal_nodes:
-            node_host_ids.append(bootstrap_node_host_id)
+        for node in self.verification_node.parent_cluster.nodes:
+            token_ring = node.get_token_ring_members()
+            LOGGER.info("Token ring on node %s is: \n %s", node.name, "\n".join(token_ring))
+        # up_and_normal_nodes = self.verification_node.parent_cluster.get_nodes_up_and_normal(self.verification_node)
+
+        # if self.bootstrap_node not in up_and_normal_nodes:
+        #     node_host_ids.append(bootstrap_node_host_id)
 
         if node_host_ids:
             for host_id in set(node_host_ids):
