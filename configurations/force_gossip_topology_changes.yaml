@@ -1,2 +1,4 @@
 append_scylla_yaml:
   force_gossip_topology_changes: true
+  enable_tablets: false
+parallel_node_operations: false
