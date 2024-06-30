@@ -109,7 +109,7 @@ class NodeBootstrapAbortManager:
 
         for node in self.verification_node.parent_cluster.nodes:
             token_ring = node.get_token_ring_members()
-            LOGGER.info("Token ring on node %s is: \n %s", node.name, "\n".join(token_ring))
+            LOGGER.info("Token ring on node %s is: \n %s", node.name, token_ring)
         # up_and_normal_nodes = self.verification_node.parent_cluster.get_nodes_up_and_normal(self.verification_node)
 
         # if self.bootstrap_node not in up_and_normal_nodes:
