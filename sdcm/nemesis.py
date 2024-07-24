@@ -4068,7 +4068,6 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
     @latency_calculator_decorator(legend="Doubling cluster load")
     def _double_cluster_load(self, duration: int) -> None:
-        duration = 30
         self.log.info("Doubling the load on the cluster for %s minutes", duration)
         stress_queue = self.tester.run_stress_thread(
             stress_cmd=self.tester.stress_cmd, stress_num=1, stats_aggregate_cmds=False, duration=duration)
@@ -4076,14 +4075,19 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self.log.info(f"Double load results: {results}")
 
     def disrupt_grow_shrink_cluster(self):
+        repeat = self.tester.params.get('repeat_nemesis')
         sleep_time_between_ops = self.cluster.params.get('nemesis_sequence_sleep_between_ops')
         if not self.has_steady_run and sleep_time_between_ops:
             self.steady_state_latency()
             self.has_steady_run = True
-        self._grow_cluster(rack=None)
-        if duration := self.tester.params.get('nemesis_double_load_during_grow_shrink_duration'):
-            self._double_cluster_load(duration)
-        self._shrink_cluster(rack=None)
+
+        for _ in range(repeat):
+            if not self.target_node:
+                self.set_target_node()
+            self._grow_cluster(rack=None)
+            if duration := self.tester.params.get('nemesis_double_load_during_grow_shrink_duration'):
+                self._double_cluster_load(duration)
+            self._shrink_cluster(rack=None)
 
     # NOTE: version limitation is caused by the following:
     #       - https://github.com/scylladb/scylla-enterprise/issues/3211
