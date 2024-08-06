@@ -286,7 +286,7 @@ class RaftFeature(RaftFeatureOperations):
         description LIKE 'Starting new topology coordinator%' ALLOW FILTERING;"
         with self._node.parent_cluster.cql_connection_patient(self._node) as session:
             result = list(session.execute(stm))
-        LOGGER.info("all records %s", results)
+        LOGGER.info("all records %s", result)
         coordinators_ids = []
         for row in result:
             if match := UUID_REGEX.search(row.description):
