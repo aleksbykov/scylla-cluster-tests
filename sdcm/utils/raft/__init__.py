@@ -284,7 +284,7 @@ class RaftFeature(RaftFeatureOperations):
         stm = "select description from system.group0_history where key = 'history' and \
         description LIKE 'Starting new topology coordinator%' ALLOW FILTERING;"
         with self._node.parent_cluster.cql_connection_patient(self._node) as session:
-            result = session.execute(stm)
+            result = list(session.execute(stm))
         coordinators_ids = []
         for row in result:
             if match := UUID_REGEX.search(row.description):
@@ -292,7 +292,7 @@ class RaftFeature(RaftFeatureOperations):
         if not coordinators_ids:
             raise RaftTopologyCoordinatorNotFound("No host ids were found in raft group0 history")
         for node in self._node.parent_cluster.nodes:
-            if node.host_id() == coordinators_ids[0]:
+            if node.host_id == coordinators_ids[0]:
                 return node
         raise RaftTopologyCoordinatorNotFound(f"The node with host id {coordinators_ids[0]} was not found")
 
