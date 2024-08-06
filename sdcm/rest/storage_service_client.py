@@ -53,4 +53,4 @@ class StorageServiceClient(RemoteCurlClient):
 
     def get_local_hostid(self):
         path = "hostid/local"
-        return self.run_remoter_curl(method="GET", path=path, retry=3)
+        return self.run_remoter_curl(method="GET", path=path, params=None, retry=3)
