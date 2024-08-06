@@ -11,6 +11,7 @@ from sdcm.sct_events.filters import EventsSeverityChangerFilter
 from sdcm.sct_events import Severity
 from sdcm.utils.features import is_consistent_topology_changes_feature_enabled, is_consistent_cluster_management_feature_enabled
 from sdcm.exceptions import RaftTopologyCoordinatorNotFound
+from sdcm.rest.storage_service_client import StorageServiceClient
 
 
 LOGGER = logging.getLogger(__name__)
@@ -285,14 +286,19 @@ class RaftFeature(RaftFeatureOperations):
         description LIKE 'Starting new topology coordinator%' ALLOW FILTERING;"
         with self._node.parent_cluster.cql_connection_patient(self._node) as session:
             result = list(session.execute(stm))
+        LOGGER.info("all records %s", results)
         coordinators_ids = []
         for row in result:
             if match := UUID_REGEX.search(row.description):
                 coordinators_ids.append(match.group(1))
         if not coordinators_ids:
             raise RaftTopologyCoordinatorNotFound("No host ids were found in raft group0 history")
+        LOGGER.info("All coordinators history ids: %s", coordinators_ids)
         for node in self._node.parent_cluster.nodes:
-            if node.host_id == coordinators_ids[0]:
+            rest_client = StorageServiceClient(node=self._node)
+            node_hostid = rest_client.get_local_hostid()
+            LOGGER.info("Node %s host id is %s", node.name, node_hostid)
+            if node_hostid == coordinators_ids[0]:
                 return node
         raise RaftTopologyCoordinatorNotFound(f"The node with host id {coordinators_ids[0]} was not found")
 
