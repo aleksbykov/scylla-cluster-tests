@@ -5119,6 +5119,19 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             time.sleep(5)
         self.log.info("Tablets are balanced")
 
+    def disrupt_kill_topology_coordinator_node(self):
+        if not self.target_node.raft.is_consistent_topology_changes_enabled:
+            raise UnsupportedNemesis("Consistent topology changes feature is disaled")
+        coordinator_node: BaseNode = self.target_node.raft.get_topology_coordinator_node()
+        self.log.info("Coordinator node: %s, %s", coordinator_node, coordinator_node.name)
+        coordinator_node.stop_scylla()
+        time.sleep(10)
+        new_coordinator_node: BaseNode = self.target_node.raft.get_topology_coordinator_node()
+        self.log.info("Coordinator node: %s, %s", new_coordinator_node, new_coordinator_node.name)
+        coordinator_node.start_scylla()
+        self.cluster.wait_for_nodes_up_and_normal(nodes=self.cluster.nodes, timeout=900, sleep_time=5,
+                                                  verification_node=self.target_node)
+
 
 def disrupt_method_wrapper(method, is_exclusive=False):  # pylint: disable=too-many-statements  # noqa: PLR0915
     """
@@ -6634,3 +6647,12 @@ class EndOfQuotaNemesis(Nemesis):
 
     def disrupt(self):
         self.disrupt_end_of_quota_nemesis()
+
+
+class FindTopologyCoordinatorNemesis(Nemesis):
+
+    disruptive = True
+    topology_changes = True
+
+    def disrupt(self):
+        self.disrupt_kill_topology_coordinator_node()
