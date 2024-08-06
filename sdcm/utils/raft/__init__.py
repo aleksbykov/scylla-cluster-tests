@@ -295,7 +295,7 @@ class RaftFeature(RaftFeatureOperations):
             raise RaftTopologyCoordinatorNotFound("No host ids were found in raft group0 history")
         LOGGER.info("All coordinators history ids: %s", coordinators_ids)
         for node in self._node.parent_cluster.nodes:
-            rest_client = StorageServiceClient(node=self._node)
+            rest_client = StorageServiceClient(node)
             node_hostid = rest_client.get_local_hostid()
             LOGGER.info("Node %s host id is %s", node.name, node_hostid)
             if node_hostid == coordinators_ids[0]:
