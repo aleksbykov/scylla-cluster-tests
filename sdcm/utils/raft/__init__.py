@@ -283,6 +283,7 @@ class RaftFeature(RaftFeatureOperations):
         return not diff and not non_voters_ids and len(group0_ids) == len(token_ring_ids) == num_of_nodes
 
     def get_topology_coordinator_node(self) -> "BaseNode":
+        nodes = self._node.parent_cluster.get_nodes_up_and_normal()
         stm = "select description from system.group0_history where key = 'history' and \
         description LIKE 'Starting new topology coordinator%' ALLOW FILTERING;"
         with self._node.parent_cluster.cql_connection_patient(self._node) as session:
@@ -295,7 +296,7 @@ class RaftFeature(RaftFeatureOperations):
         if not coordinators_ids:
             raise RaftTopologyCoordinatorNotFound("No host ids were found in raft group0 history")
         LOGGER.info("All coordinators history ids: %s", coordinators_ids)
-        for node in self._node.parent_cluster.nodes:
+        for node in nodes:
             rest_client = StorageServiceClient(node)
             node_hostid = loads(rest_client.get_local_hostid().stdout)
             LOGGER.info("Node %s host id is %s, type(%s)", node.name, node_hostid, type(node_hostid))

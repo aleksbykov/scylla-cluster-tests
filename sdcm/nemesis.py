@@ -5131,6 +5131,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         coordinator_node.start_scylla()
         self.cluster.wait_for_nodes_up_and_normal(nodes=self.cluster.nodes, timeout=900, sleep_time=5,
                                                   verification_node=self.target_node)
+        coordinator_node: BaseNode = self.target_node.raft.get_topology_coordinator_node()
+        self.log.info("Coordinator node: %s, %s", coordinator_node, coordinator_node.name)
 
 
 def disrupt_method_wrapper(method, is_exclusive=False):  # pylint: disable=too-many-statements  # noqa: PLR0915
