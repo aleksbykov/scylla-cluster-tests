@@ -5,6 +5,7 @@ import re
 
 from enum import Enum
 from typing import Protocol, NamedTuple, Mapping, Iterable
+from json import loads
 
 from sdcm.sct_events.database import DatabaseLogEvent
 from sdcm.sct_events.filters import EventsSeverityChangerFilter
@@ -296,8 +297,8 @@ class RaftFeature(RaftFeatureOperations):
         LOGGER.info("All coordinators history ids: %s", coordinators_ids)
         for node in self._node.parent_cluster.nodes:
             rest_client = StorageServiceClient(node)
-            node_hostid = rest_client.get_local_hostid()
-            LOGGER.info("Node %s host id is %s", node.name, node_hostid)
+            node_hostid = loads(rest_client.get_local_hostid().stdout)
+            LOGGER.info("Node %s host id is %s, type(%s)", node.name, node_hostid, type(node_hostid))
             if node_hostid == coordinators_ids[0]:
                 return node
         raise RaftTopologyCoordinatorNotFound(f"The node with host id {coordinators_ids[0]} was not found")
