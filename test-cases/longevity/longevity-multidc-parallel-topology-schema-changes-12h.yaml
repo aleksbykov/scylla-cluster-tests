@@ -10,22 +10,22 @@ stress_cmd: ["cassandra-stress write cl=LOCAL_QUORUM duration=720m -schema 'repl
              ]
 
 availability_zone: 'a,b,c'
-n_db_nodes: '6 6'
+n_db_nodes: '4 4'
 n_loaders: '2 1'
 region_aware_loader: true
 n_monitor_nodes: 1
 
 instance_type_db: 'i3en.2xlarge'
 
-nemesis_class_name: 'SisyphusMonkey:1 SisyphusMonkey:1'
-nemesis_selector: [["topology_changes"],["!disruptive","schema_changes"]]
+nemesis_class_name: 'NodeTerminateAndReplace:1 SisyphusMonkey:1'
+nemesis_selector: [[],["!disruptive","schema_changes"]]
 nemesis_interval: 10
 nemesis_filter_seeds: false
 nemesis_during_prepare: false
 nemesis_add_node_cnt: 3
 nemesis_multiply_factor: 18
 
-seeds_num: 3
+seeds_num: 2
 round_robin: true
 
 server_encrypt: true
