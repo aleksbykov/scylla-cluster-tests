@@ -129,7 +129,7 @@ from sdcm.utils.sstable.sstable_utils import SstableUtils
 from sdcm.utils.toppartition_util import NewApiTopPartitionCmd, OldApiTopPartitionCmd
 from sdcm.utils.version_utils import MethodVersionNotFound, scylla_versions
 from sdcm.utils.raft import Group0MembersNotConsistentWithTokenRingMembersException, TopologyOperations
-from sdcm.utils.raft.common import NodeBootstrapAbortManager
+from sdcm.utils.raft.common import NodeBootstrapAbortManager, get_current_topology_coordinator_node
 from sdcm.utils.issues import SkipPerIssues
 from sdcm.wait import wait_for, wait_for_log_lines
 from sdcm.exceptions import (
@@ -5121,17 +5121,17 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
     def disrupt_kill_topology_coordinator_node(self):
         if not self.target_node.raft.is_consistent_topology_changes_enabled:
-            raise UnsupportedNemesis("Consistent topology changes feature is disaled")
-        coordinator_node: BaseNode = self.target_node.raft.get_topology_coordinator_node()
+            raise UnsupportedNemesis("Consistent topology changes feature is disabled")
+        coordinator_node: BaseNode = get_current_topology_coordinator_node(cluster=self.cluster)
         self.log.info("Coordinator node: %s, %s", coordinator_node, coordinator_node.name)
         coordinator_node.stop_scylla()
         time.sleep(10)
-        new_coordinator_node: BaseNode = self.target_node.raft.get_topology_coordinator_node()
+        new_coordinator_node: BaseNode = get_current_topology_coordinator_node(cluster=self.cluster)
         self.log.info("Coordinator node: %s, %s", new_coordinator_node, new_coordinator_node.name)
         coordinator_node.start_scylla()
         self.cluster.wait_for_nodes_up_and_normal(nodes=self.cluster.nodes, timeout=900, sleep_time=5,
                                                   verification_node=self.target_node)
-        coordinator_node: BaseNode = self.target_node.raft.get_topology_coordinator_node()
+        coordinator_node: BaseNode = get_current_topology_coordinator_node(cluster=self.cluster)
         self.log.info("Coordinator node: %s, %s", coordinator_node, coordinator_node.name)
 
 

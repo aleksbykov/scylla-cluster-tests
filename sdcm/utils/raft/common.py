@@ -1,8 +1,10 @@
 import logging
 import contextlib
+import re
 
 from typing import Iterable, Callable
 from functools import partial
+from json import loads
 
 from sdcm.exceptions import BootstrapStreamErrorFailure
 from sdcm.cluster import BaseNode, BaseScyllaCluster, BaseMonitorSet
@@ -11,8 +13,11 @@ from sdcm.sct_events.group_common_events import decorate_with_context, \
     ignore_stream_mutation_fragments_errors, ignore_ycsb_connection_refused, ignore_raft_topology_cmd_failing, ignore_raft_transport_failing
 from sdcm.utils.adaptive_timeouts import Operations, adaptive_timeout
 from sdcm.utils.common import ParallelObject
+from sdcm.exceptions import RaftTopologyCoordinatorNotFound
+from sdcm.rest.storage_service_client import StorageServiceClient
 
 LOGGER = logging.getLogger(__name__)
+UUID_REGEX = re.compile(r"([0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12})")
 
 
 class RaftException(Exception):
@@ -39,6 +44,27 @@ def validate_raft_on_nodes(nodes: list["BaseNode"]) -> None:
     if not all(nodes_raft_status):
         raise RaftException("Raft is not ready")
     LOGGER.debug("Raft is ready!")
+
+
+def get_current_topology_coordinator_node(cluster: BaseScyllaCluster) -> BaseNode:
+    active_nodes = cluster.get_nodes_up_and_normal()
+    stm = "select description from system.group0_history where key = 'history' and \
+            description LIKE 'Starting new topology coordinator%' ALLOW FILTERING;"
+    with cluster.cql_connection_patient(active_nodes[0]) as session:
+        result = list(session.execute(stm))
+    coordinators_ids = []
+    for row in result:
+        if match := UUID_REGEX.search(row.description):
+            coordinators_ids.append(match.group(1))
+    if not coordinators_ids:
+        raise RaftTopologyCoordinatorNotFound("No host ids were found in raft group0 history")
+    LOGGER.info("All coordinators history ids: %s", coordinators_ids)
+    for node in active_nodes:
+        node_hostid = loads(StorageServiceClient(node).get_local_hostid().stdout)
+        LOGGER.info("Node %s host id is %s, type(%s)", node.name, node_hostid, type(node_hostid))
+        if node_hostid == coordinators_ids[0]:
+            return node
+    raise RaftTopologyCoordinatorNotFound(f"The node with host id {coordinators_ids[0]} was not found")
 
 
 class NodeBootstrapAbortManager:

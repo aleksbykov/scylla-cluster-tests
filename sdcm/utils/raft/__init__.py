@@ -1,23 +1,19 @@
 import contextlib
 import logging
 import random
-import re
 
 from enum import Enum
 from typing import Protocol, NamedTuple, Mapping, Iterable
-from json import loads
 
 from sdcm.sct_events.database import DatabaseLogEvent
 from sdcm.sct_events.filters import EventsSeverityChangerFilter
 from sdcm.sct_events import Severity
 from sdcm.utils.features import is_consistent_topology_changes_feature_enabled, is_consistent_cluster_management_feature_enabled
 from sdcm.exceptions import RaftTopologyCoordinatorNotFound
-from sdcm.rest.storage_service_client import StorageServiceClient
 
 
 LOGGER = logging.getLogger(__name__)
 RAFT_DEFAULT_SCYLLA_VERSION = "5.5.0-dev"
-UUID_REGEX = re.compile(r"([0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12})")
 
 
 class Group0MembersNotConsistentWithTokenRingMembersException(Exception):
@@ -98,9 +94,6 @@ class RaftFeatureOperations(Protocol):
         ...
 
     def clean_group0_garbage(self, raise_exception: bool = False) -> None:
-        ...
-
-    def get_topology_coordinator_node(self) -> "BaseNode":
         ...
 
     def get_message_waiting_timeout(self, message_position: MessagePosition) -> MessageTimeout:
@@ -282,28 +275,6 @@ class RaftFeature(RaftFeatureOperations):
 
         return not diff and not non_voters_ids and len(group0_ids) == len(token_ring_ids) == num_of_nodes
 
-    def get_topology_coordinator_node(self) -> "BaseNode":
-        nodes = self._node.parent_cluster.get_nodes_up_and_normal()
-        stm = "select description from system.group0_history where key = 'history' and \
-        description LIKE 'Starting new topology coordinator%' ALLOW FILTERING;"
-        with self._node.parent_cluster.cql_connection_patient(self._node) as session:
-            result = list(session.execute(stm))
-        LOGGER.info("all records %s", result)
-        coordinators_ids = []
-        for row in result:
-            if match := UUID_REGEX.search(row.description):
-                coordinators_ids.append(match.group(1))
-        if not coordinators_ids:
-            raise RaftTopologyCoordinatorNotFound("No host ids were found in raft group0 history")
-        LOGGER.info("All coordinators history ids: %s", coordinators_ids)
-        for node in nodes:
-            rest_client = StorageServiceClient(node)
-            node_hostid = loads(rest_client.get_local_hostid().stdout)
-            LOGGER.info("Node %s host id is %s, type(%s)", node.name, node_hostid, type(node_hostid))
-            if node_hostid == coordinators_ids[0]:
-                return node
-        raise RaftTopologyCoordinatorNotFound(f"The node with host id {coordinators_ids[0]} was not found")
-
 
 class NoRaft(RaftFeatureOperations):
     TOPOLOGY_OPERATION_LOG_PATTERNS = {
@@ -356,9 +327,6 @@ class NoRaft(RaftFeatureOperations):
 
         return len(token_ring_ids) == num_of_nodes
 
-    def get_topology_coordinator_node(self) -> None:
-        return
-
 
 def get_raft_mode(node) -> RaftFeature | NoRaft:
     with node.parent_cluster.cql_connection_patient(node) as session:
@@ -367,4 +335,5 @@ def get_raft_mode(node) -> RaftFeature | NoRaft:
 
 __all__ = ["get_raft_mode",
            "Group0MembersNotConsistentWithTokenRingMembersException",
+           "TopologyOperations", "RaftTopologyCoordinatorNotFound"
            ]
