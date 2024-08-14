@@ -5151,8 +5151,9 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         coordinator_node.start_scylla()
         self.cluster.wait_for_nodes_up_and_normal(nodes=[node for node in self.cluster.nodes if node != new_node],
                                                   timeout=900, sleep_time=5, verification_node=self.target_node)
+        if not new_node.db_up():
+            bootstrapabortmanager.clean_unbootstrapped_node()
 
-        bootstrapabortmanager.clean_unbootstrapped_node()
         self.cluster.wait_for_nodes_up_and_normal(nodes=self.cluster.nodes,
                                                   timeout=900, sleep_time=5, verification_node=self.target_node)
 
