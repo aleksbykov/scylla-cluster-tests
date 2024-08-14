@@ -5124,15 +5124,37 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             raise UnsupportedNemesis("Consistent topology changes feature is disabled")
         coordinator_node: BaseNode = get_current_topology_coordinator_node(cluster=self.cluster)
         self.log.info("Coordinator node: %s, %s", coordinator_node, coordinator_node.name)
-        coordinator_node.stop_scylla()
-        time.sleep(10)
+        self.log.info("Target node: %s, %s", self.target_node, self.target_node.name)
+        self.set_current_running_nemesis(coordinator_node)
+        if coordinator_node == self.target_node:
+            with self.run_nemesis(node_list=self.cluster.nodes, label="disrupt_kill_topology_coordinator_node") as free_node:
+                self.unset_current_running_nemesis(self.target_node)
+                self.target_node: BaseNode = free_node
+                self.set_current_disruption(self.target_node)
+
+        self.log.info("Target node: %s, %s", self.target_node, self.target_node.name)
+
+        new_node: BaseNode = self.cluster.add_nodes(
+            count=1, dc_idx=self.target_node.dc_idx, enable_auto_bootstrap=True, rack=self.target_node.rack)[0]
+        self.monitoring_set.reconfigure_scylla_monitoring()
+        self.set_current_running_nemesis(node=new_node)  # prevent to run nemesis on new node when running in parallel
+
+        terminate_pattern = self.target_node.raft.get_random_log_message(operation=TopologyOperations.BOOTSTRAP,
+                                                                         seed=self.tester.params.get("nemesis_seed"))
+
+        bootstrapabortmanager = NodeBootstrapAbortManager(bootstrap_node=new_node, verification_node=self.target_node)
+
+        bootstrapabortmanager.run_bootstrap_and_abort_with_action(
+            terminate_pattern, abort_action=coordinator_node.stop_scylla)
         new_coordinator_node: BaseNode = get_current_topology_coordinator_node(cluster=self.cluster)
         self.log.info("Coordinator node: %s, %s", new_coordinator_node, new_coordinator_node.name)
         coordinator_node.start_scylla()
-        self.cluster.wait_for_nodes_up_and_normal(nodes=self.cluster.nodes, timeout=900, sleep_time=5,
-                                                  verification_node=self.target_node)
-        coordinator_node: BaseNode = get_current_topology_coordinator_node(cluster=self.cluster)
-        self.log.info("Coordinator node: %s, %s", coordinator_node, coordinator_node.name)
+        self.cluster.wait_for_nodes_up_and_normal(nodes=[node for node in self.cluster.nodes if node != new_node],
+                                                  timeout=900, sleep_time=5, verification_node=self.target_node)
+
+        bootstrapabortmanager.clean_unbootstrapped_node()
+        self.cluster.wait_for_nodes_up_and_normal(nodes=self.cluster.nodes,
+                                                  timeout=900, sleep_time=5, verification_node=self.target_node)
 
 
 def disrupt_method_wrapper(method, is_exclusive=False):  # pylint: disable=too-many-statements  # noqa: PLR0915
