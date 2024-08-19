@@ -5157,6 +5157,10 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self.cluster.wait_for_nodes_up_and_normal(nodes=self.cluster.nodes,
                                                   timeout=900, sleep_time=5, verification_node=self.target_node)
 
+        if new_node.db_up():
+            self.cluster.decommission(new_node)
+        self.unset_current_running_nemesis(coordinator_node)
+
 
 def disrupt_method_wrapper(method, is_exclusive=False):  # pylint: disable=too-many-statements  # noqa: PLR0915
     """
