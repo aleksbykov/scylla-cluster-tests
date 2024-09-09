@@ -5062,7 +5062,8 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         elif host_id:
             query += f" where host_id={host_id} ALLOW FILTERING"
 
-        with self.cql_connection(node=verification_node, timeout=300) as session:
+        with self.cql_connection_patient(node=verification_node) as session:
+            session.default_timeout = 300
             results = session.execute(query)
             row = results.one()
             if not row:
