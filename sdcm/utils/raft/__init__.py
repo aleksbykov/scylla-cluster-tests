@@ -116,7 +116,7 @@ class RaftFeatureOperations(ABC):
         random.seed(seed)
         # log_patterns = self.TOPOLOGY_OPERATION_LOG_PATTERNS.get(operation)
         # log_pattern = random.choice(log_patterns)
-        log_pattern = MessagePosition("setup_group0: joining group 0", LogPosition.BEGIN)
+        log_pattern = MessagePosition("Starting to bootstrap", LogPosition.BEGIN)
         return self.get_message_waiting_timeout(log_pattern)
 
     def get_all_messages_timeouts(self, operation: TopologyOperations):
