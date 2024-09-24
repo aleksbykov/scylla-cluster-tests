@@ -114,8 +114,9 @@ class RaftFeatureOperations(ABC):
 
     def get_random_log_message(self, operation: TopologyOperations, seed: int | None = None):
         random.seed(seed)
-        log_patterns = self.TOPOLOGY_OPERATION_LOG_PATTERNS.get(operation)
-        log_pattern = random.choice(log_patterns)
+        # log_patterns = self.TOPOLOGY_OPERATION_LOG_PATTERNS.get(operation)
+        # log_pattern = random.choice(log_patterns)
+        log_pattern = MessagePosition("setup_group0: joining group 0", LogPosition.BEGIN)
         return self.get_message_waiting_timeout(log_pattern)
 
     def get_all_messages_timeouts(self, operation: TopologyOperations):
