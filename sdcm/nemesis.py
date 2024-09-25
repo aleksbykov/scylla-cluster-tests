@@ -5093,7 +5093,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             time.sleep(300)
             self.log.info("Decommission added node")
             decommission_timeout = 7200
-            monitoring_decommission_timeout = adaptive_decommission_timeout + 100
+            monitoring_decommission_timeout = decommission_timeout + 100
             un_nodes = self.cluster.get_nodes_up_and_normal()
             with Nemesis.run_nemesis(node_list=un_nodes, nemesis_label="BootstrapStreaminError") as verification_node, \
                     FailedDecommissionOperationMonitoring(target_node=new_node, verification_node=verification_node, timeout=monitoring_decommission_timeout):

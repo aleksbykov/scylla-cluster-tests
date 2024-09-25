@@ -4,14 +4,13 @@ import random
 
 from enum import Enum
 from abc import ABC, abstractmethod
-from typing import NamedTuple, Mapping, Iterable
+from typing import NamedTuple, Mapping, Iterable, Any
 
 from sdcm.sct_events.database import DatabaseLogEvent
 from sdcm.sct_events.filters import EventsSeverityChangerFilter
 from sdcm.sct_events import Severity
 from sdcm.utils.features import is_consistent_topology_changes_feature_enabled, is_consistent_cluster_management_feature_enabled
 from sdcm.wait import wait_for
-from sdcm.utils.raft.common import get_node_status_from_system_by
 
 LOGGER = logging.getLogger(__name__)
 RAFT_DEFAULT_SCYLLA_VERSION = "5.5.0-dev"
@@ -368,6 +367,35 @@ def get_raft_mode(node) -> RaftFeature | NoRaft:
         return RaftFeature(node) if is_consistent_cluster_management_feature_enabled(session) else NoRaft(node)
 
 
+def get_node_status_from_system_by(verification_node: "BaseNode", *, ip_address: str = "", host_id: str = "") -> dict[str, Any]:
+    """Get node status from system.cluster_status table
+
+    The table contains actual information about nodes statuses in cluster
+    updating by raft. it is faster to get required node state by ip or hostid
+    from this table
+    """
+    query = "select peer, host_id, status, up from system.cluster_status"
+    if ip_address:
+        query += f" where peer = '{ip_address}'"
+    elif host_id:
+        query += f" where host_id={host_id} ALLOW FILTERING"
+    else:
+        LOGGER.warning("Ip address or host id were not provided")
+        return {}
+
+    with verification_node.parent_cluster.cql_connection_patient(node=verification_node) as session:
+        session.default_timeout = 300
+        results = session.execute(query)
+        row = results.one()
+        if not row:
+            return {}
+        node_status = {"ip_address": row.peer, "host_id": str(
+            row.host_id), "state": row.status, "up": row.up}
+        LOGGER.debug("Node status: %s", node_status)
+        return node_status
+
+
 __all__ = ["get_raft_mode",
+           "get_node_status_from_system_by",
            "Group0MembersNotConsistentWithTokenRingMembersException",
            ]

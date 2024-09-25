@@ -3,17 +3,18 @@ import contextlib
 import time
 import traceback
 
-from typing import Iterable, Callable, Any
+from typing import Iterable, Callable
 from functools import partial
 
 from sdcm.sct_events.decorators import raise_event_on_failure
 from sdcm.exceptions import BootstrapStreamErrorFailure, ExitByEventError
-from sdcm.cluster import BaseNode, BaseScyllaCluster, BaseMonitorSet, NodeSetupFailed
 from sdcm.wait import wait_for
+
 from sdcm.sct_events.group_common_events import decorate_with_context, \
     ignore_ycsb_connection_refused
 from sdcm.utils.common import ParallelObject
-
+from sdcm.utils.raft import get_node_status_from_system_by
+from sdcm.cluster import BaseMonitorSet, NodeSetupFailed, BaseScyllaCluster, BaseNode
 LOGGER = logging.getLogger(__name__)
 
 
@@ -43,34 +44,6 @@ def validate_raft_on_nodes(nodes: list[BaseNode]) -> None:
     LOGGER.debug("Raft is ready!")
 
 
-def get_node_status_from_system_by(verification_node: BaseNode, *, ip_address: str = "", host_id: str = "") -> dict[str, Any]:
-    """Get node status from system.cluster_status table
-
-    The table contains actual information about nodes statuses in cluster
-    updating by raft. it is faster to get required node state by ip or hostid
-    from this table
-    """
-    query = "select peer, host_id, status, up from system.cluster_status"
-    if ip_address:
-        query += f" where peer = '{ip_address}'"
-    elif host_id:
-        query += f" where host_id={host_id} ALLOW FILTERING"
-    else:
-        LOGGER.warning("Ip address or host id were not provided")
-        return {}
-
-    with verification_node.parent_cluster.cql_connection_patient(node=verification_node) as session:
-        session.default_timeout = 300
-        results = session.execute(query)
-        row = results.one()
-        if not row:
-            return {}
-        node_status = {"ip_address": row.peer, "host_id": str(
-            row.host_id), "state": row.status, "up": row.up}
-        LOGGER.debug("Node status: %s", node_status)
-        return node_status
-
-
 class NodeBootstrapAbortManager:
     INSTANCE_START_TIMEOUT = 600
     SUCCESS_BOOTSTRAP_TIMEOUT = 3600
@@ -78,7 +51,7 @@ class NodeBootstrapAbortManager:
     def __init__(self, bootstrap_node: BaseNode, verification_node: BaseNode):
         self.bootstrap_node = bootstrap_node
         self.verification_node = verification_node
-        self.db_cluster: BaseScyllaCluster = self.verification_node.parent_cluster
+        self.db_cluster: BaseScyllaCluster = verification_node.parent_cluster
         self.monitors: BaseMonitorSet = self.verification_node.test_config.tester_obj().monitors
 
     @property
@@ -268,7 +241,7 @@ class FailedDecommissionOperationMonitoring:
     def __init__(self, target_node: BaseNode, verification_node: BaseNode, timeout=7200):
         self.timeout = timeout
         self.target_node = target_node
-        self.db_cluster: BaseScyllaCluster = target_node.parent_cluster
+        self.db_cluster = verification_node.parent_cluster
         self.target_node_ip = target_node.ip_address
         self.verification_node = verification_node
 
