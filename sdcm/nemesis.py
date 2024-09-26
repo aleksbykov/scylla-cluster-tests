@@ -3521,6 +3521,11 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         node_to_remove = self.target_node
         up_normal_nodes = self.cluster.get_nodes_up_and_normal(verification_node=node_to_remove)
+
+        with Nemesis.run_nemesis(node_list=up_normal_nodes, nemesis_label="RemoveNodeAddNode") as verification_node:
+            self._remove_node_add_node(verification_node=verification_node, node_to_remove=node_to_remove)
+
+    def _remove_node_add_node(self, verification_node, node_to_remove, remove_node_host_id=None, was_removed=False):
         # node_to_remove must be different than node
         # node_to_remove is single/last seed in cluster, before
         # it will be terminated, choose new seed node
@@ -3530,10 +3535,6 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             new_seed_node.set_seed_flag(True)
             self.cluster.update_seed_provider()
 
-        with Nemesis.run_nemesis(node_list=up_normal_nodes, nemesis_label="RemoveNodeAddNode") as verification_node:
-            self._remove_node_add_node(verification_node=verification_node, node_to_remove=node_to_remove)
-
-    def _remove_node_add_node(self, verification_node, node_to_remove, remove_node_host_id=None, was_removed=False):
         # get node's host_id
         if not remove_node_host_id:
             removed_node_status = self.cluster.get_node_status_dictionary(
