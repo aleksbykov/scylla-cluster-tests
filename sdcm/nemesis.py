@@ -3609,7 +3609,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             "Node was not removed properly (Node status:{})".format(removed_node_status)
 
         # add new node
-        new_node = self._add_and_init_new_cluster_node(rack=node_to_remove.rack)
+        new_node = self._add_and_init_new_cluster_nodes(count=1, rack=node_to_remove.rack)
         # in case the removed node was not last seed.
         if node_to_remove.is_seed and num_of_seed_nodes > 1:
             new_node.set_seed_flag(True)
@@ -6757,8 +6757,8 @@ class PredefinedNemesis(Nemesis):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.disrupt_methods_list = [
-            "IsolateNodeWithProcessSignalNemesis",
-            "IsolateNodeWithIptableRuleNemesis",
+            "disrupt_refuse_connection_with_block_scylla_ports_on_banned_node",
+            "disrupt_refuse_connection_with_send_sigstop_signal_to_scylla_on_banned_node",
             "disrupt_remove_node_then_add_node"
         ]
 
