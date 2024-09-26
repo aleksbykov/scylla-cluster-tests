@@ -5169,55 +5169,49 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         simulate_node_unavailability = node_operations.block_scylla_ports if use_iptables else node_operations.stop_scylla_with_sigstop
         with self.run_nemesis(node_list=self.cluster.nodes,
-                              nemesis_label=f"Running {simulate_node_unavailability.__name__}") as working_node:
+                              nemesis_label=f"Running {simulate_node_unavailability.__name__}") as working_node, ExitStack() as stack:
             target_host_id = self.target_node.host_id
 
+            stack.callback(self._remove_node_add_node, verification_node=working_node, node_to_remove=self.target_node,
+                           remove_node_host_id=target_host_id)
+
             prepare_test_keyspace(self.target_node)
-            try:
-                with simulate_node_unavailability(self.target_node):
-                    # target node stopped by Contextmanger. Wait while its status will be updated
-                    wait_for(node_operations.is_node_seen_as_down, timeout=600, throw_exc=True,
-                             down_node=self.target_node, verification_node=working_node, text=f"Wait other nodes see {self.target_node.name} as DOWN...")
-                    self.log.debug("Remove node %s : hostid: %s with blocked scylla from cluster",
-                                   self.target_node.name, target_host_id)
-                    working_node.run_nodetool(f"removenode {target_host_id}", retry=3)
-                    self.log.debug("Wait while all node update topology status")
-                    wait_for(node_operations.is_node_removed_from_cluster, timeout=300, throw_exc=True,
-                             removed_node=self.target_node, verification_node=working_node, text=f"Waite other nodes mark node {self.target_node.name} as REMOVED...")
-                    # Run read barrier on working node to validate that it update raft topology state
-                    working_node.raft.call_read_barrier()
+            with simulate_node_unavailability(self.target_node):
+                # target node stopped by Contextmanger. Wait while its status will be updated
+                wait_for(node_operations.is_node_seen_as_down, timeout=600, throw_exc=True,
+                         down_node=self.target_node, verification_node=working_node, text=f"Wait other nodes see {self.target_node.name} as DOWN...")
+                self.log.debug("Remove node %s : hostid: %s with blocked scylla from cluster",
+                               self.target_node.name, target_host_id)
+                working_node.run_nodetool(f"removenode {target_host_id}", retry=3)
+                self.log.debug("Wait while all node update topology status")
+                wait_for(node_operations.is_node_removed_from_cluster, timeout=300, throw_exc=True,
+                         removed_node=self.target_node, verification_node=working_node, text=f"Waite other nodes mark node {self.target_node.name} as REMOVED...")
+                # Run read barrier on working node to validate that it update raft topology state
+                working_node.raft.call_read_barrier()
 
                 # Context manager at exit  start scylla on target node.
                 # But node already removed from cluster. So any operations from it
                 # should be banned. If query executed succesfull, raise an error
                 assert self.target_node.db_up(), f"Scylla was not up on node {self.target_node.name}"
 
-                with self.cluster.cql_connection_exclusive(node=self.target_node) as session:
-                    try:
-                        stmt = SimpleStatement(f"INSERT INTO {keyspace_name}.{table_name} (key, name) VALUES (1, 'name1');",
-                                               consistency_level=ConsistencyLevel.QUORUM)
-                        session.execute(stmt)
-                        self.log.error("Banned query passed to cluster from banned node")
-                        raise BannedQueryExecUnexpectedSuccess(
-                            "Query from banned node was executed succesful with Consistency.ALL")
-                    except (NoHostAvailable, OperationTimedOut, Unavailable) as exc:
-                        self.log.debug("Query failed with error: %s as expected", exc)
+            with self.cluster.cql_connection_exclusive(node=self.target_node) as session:
+                try:
+                    stmt = SimpleStatement(f"INSERT INTO {keyspace_name}.{table_name} (key, name) VALUES (1, 'name1');",
+                                           consistency_level=ConsistencyLevel.QUORUM)
+                    session.execute(stmt)
+                    self.log.error("Banned query passed to cluster from banned node")
+                    raise BannedQueryExecUnexpectedSuccess(
+                        "Query from banned node was executed succesful with Consistency.ALL")
+                except (NoHostAvailable, OperationTimedOut, Unavailable) as exc:
+                    self.log.debug("Query failed with error: %s as expected", exc)
 
-                with self.cluster.cql_connection_patient(working_node) as session:
-                    LOGGER.debug("Check keyspace %s.%s is empty", keyspace_name, table_name)
-                    result = list(session.execute(f"SELECT * from {keyspace_name}.{table_name}"))
-                    LOGGER.debug("Query result %s", result)
-                    assert not result, f"New rows were added from banned node, {result}"
-
-            except Exception as exc:  # pylint: disable=broad-except
-                self.log.error("Isolate node with %s failed with error %s", simulate_node_unavailability.__name__, exc)
-                raise
-            finally:
-                self._remove_node_add_node(verification_node=working_node, node_to_remove=self.target_node,
-                                           remove_node_host_id=target_host_id)
-                with self.cluster.cql_connection_patient(working_node) as session:
-                    LOGGER.debug("Drop keyspace %s", keyspace_name)
-                    session.execute(f"DROP KEYSPACE IF EXISTS {keyspace_name}", timeout=300)
+            with self.cluster.cql_connection_patient(working_node) as session:
+                LOGGER.debug("Check keyspace %s.%s is empty", keyspace_name, table_name)
+                result = list(session.execute(f"SELECT * from {keyspace_name}.{table_name}"))
+                LOGGER.debug("Query result %s", result)
+                assert not result, f"New rows were added from banned node, {result}"
+                LOGGER.debug("Drop keyspace %s", keyspace_name)
+                session.execute(f"DROP KEYSPACE IF EXISTS {keyspace_name}", timeout=300)
 
 
 def disrupt_method_wrapper(method, is_exclusive=False):  # pylint: disable=too-many-statements  # noqa: PLR0915
