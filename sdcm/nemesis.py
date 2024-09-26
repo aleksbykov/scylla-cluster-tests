@@ -3610,7 +3610,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             "Node was not removed properly (Node status:{})".format(removed_node_status)
 
         # add new node
-        new_node = self._add_and_init_new_cluster_nodes(count=1, rack=node_to_remove.rack)
+        new_node = self._add_and_init_new_cluster_nodes(count=1, rack=node_to_remove.rack)[0]
         # in case the removed node was not last seed.
         if node_to_remove.is_seed and num_of_seed_nodes > 1:
             new_node.set_seed_flag(True)
@@ -5150,7 +5150,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         5. Execute cql command on target node and validate that no operation
         from target node passed to cluster
         """
-        if not self.target_node.raft.consistent_topology_changes_enabled:
+        if not self.target_node.raft.is_consistent_topology_changes_enabled:
             raise UnsupportedNemesis("Raft feature: consistent-topology-changes is not enabled")
         if self._is_it_on_kubernetes():
             raise UnsupportedNemesis("Skip test for K8S because no supported yet")

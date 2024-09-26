@@ -119,9 +119,6 @@ class RaftFeature(RaftFeatureOperations):
         TopologyOperations.BOOTSTRAP: ABORT_BOOTSTRAP_LOG_PATTERNS,
     }
 
-    RAFT_SCHEMA_MANAGEMENT_FEATURE = "SUPPORTS_RAFT_CLUSTER_MANAGEMENT"
-    RAFT_TOPOLOGY_CHANGES_FEATURE = "SUPPORTS_CONSISTENT_TOPOLOGY_CHANGES"
-
     def __init__(self, node: "BaseNode") -> None:
         super().__init__()
         self._node = node
