@@ -5192,7 +5192,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 # Context manager at exit  start scylla on target node.
                 # But node already removed from cluster. So any operations from it
                 # should be banned. If query executed succesfull, raise an error
-                assert self.target_node.db_up(), f"Scylla was not up on node {self.target_node.name}"
+            assert self.target_node.db_up(), f"Scylla was not up on node {self.target_node.name}"
 
             with self.cluster.cql_connection_exclusive(node=self.target_node) as session:
                 try:
