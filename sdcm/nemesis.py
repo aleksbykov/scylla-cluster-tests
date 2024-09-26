@@ -160,6 +160,7 @@ from test_lib.compaction import CompactionStrategy, get_compaction_strategy, get
     get_gc_mode, GcMode
 from test_lib.cql_types import CQLTypeBuilder
 from test_lib.sla import ServiceLevel, MAX_ALLOWED_SERVICE_LEVELS
+from sdcm.utils.tablets.common import TabletsConfiguration
 
 
 LOGGER = logging.getLogger(__name__)
@@ -5163,7 +5164,12 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             Create new keyspace and table which allow to
             verify that no operations come from banned node
             """
-            self.tester.create_keyspace(keyspace_name, replication_factor=3)
+
+            with self.cluster.cql_connection_exclusive(node=node) as session:
+                tablets_config = TabletsConfiguration(
+                    enabled=True) if is_tablets_feature_enabled(session=session) else None
+
+            self.tester.create_keyspace(keyspace_name, replication_factor=3, tablets_config=tablets_config)
             self.tester.create_table(name=table_name, keyspace_name=keyspace_name, key_type="bigint",
                                      columns={"name": "text"})
 
