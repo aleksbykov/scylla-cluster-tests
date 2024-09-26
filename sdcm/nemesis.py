@@ -5185,7 +5185,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                     wait_for(node_operations.is_node_removed_from_cluster, timeout=300, throw_exc=True,
                              removed_node=self.target_node, verification_node=working_node, text=f"Waite other nodes mark node {self.target_node.name} as REMOVED...")
                     # Run read barrier on working node to validate that it update raft topology state
-                    self.cluster.call_read_barrier(working_node)
+                    working_node.raft.call_read_barrier()
 
                 # Context manager at exit  start scylla on target node.
                 # But node already removed from cluster. So any operations from it
