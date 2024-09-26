@@ -6749,3 +6749,19 @@ class IsolateNodeWithIptableRuleNemesis(Nemesis):
 
     def disrupt(self):
         self.disrupt_refuse_connection_with_block_scylla_ports_on_banned_node()
+
+
+class PredefinedNemesis(Nemesis):
+    disruptive = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.disrupt_methods_list = [
+            "IsolateNodeWithProcessSignalNemesis",
+            "IsolateNodeWithIptableRuleNemesis",
+            "disrupt_remove_node_then_add_node"
+        ]
+
+    def disrupt(self):
+
+        self.call_random_disrupt_method(disrupt_methods=self.disrupt_methods_list, predefined_sequence=True)
