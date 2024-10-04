@@ -6659,3 +6659,18 @@ class EndOfQuotaNemesis(Nemesis):
 
     def disrupt(self):
         self.disrupt_end_of_quota_nemesis()
+
+
+class BootstrapDecommissionErr(Nemesis):
+
+    disruptive = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.disrupt_methods_list = [
+            'disrupt_bootstrap_streaming_error',
+            'disrupt_decommission_streaming_err'
+        ]
+
+    def disrupt(self):
+        self.call_random_disrupt_method(disrupt_methods=self.disrupt_methods_list * 6, predefined_sequence=True)
