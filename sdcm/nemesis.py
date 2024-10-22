@@ -1639,7 +1639,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
     def _terminate_and_replace_node(self):
         def get_node_state(node_ip: str) -> List["str"] | None:
             """Gets node state by IP address from nodetool status response"""
-            status = self.cluster.get_nodetool_status()
+            status = self.cluster.get_nodes_status()
             states = [val['state'] for dc in status.values() for ip, val in dc.items() if ip == node_ip]
             return states[0] if states else None
 
@@ -4777,7 +4777,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         if not node.raft.is_consistent_topology_changes_enabled:  # auth-v2 is used when consistent topology is enabled
             system_keyspaces.insert(0, "system_auth")
         self._switch_to_network_replication_strategy(self.cluster.get_test_keyspaces() + system_keyspaces)
-        datacenters = list(self.tester.db_cluster.get_nodetool_status().keys())
+        datacenters = list(self.tester.db_cluster.get_nodes_status().keys())
         self.tester.create_keyspace("keyspace_new_dc", replication_factor={
                                     datacenters[0]: min(3, len(self.cluster.data_nodes))})
         node_added = False
@@ -4794,7 +4794,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             with temporary_replication_strategy_setter(node) as replication_strategy_setter:
                 new_node = self._add_new_node_in_new_dc()
                 node_added = True
-                status = self.tester.db_cluster.get_nodetool_status()
+                status = self.tester.db_cluster.get_nodes_status()
                 new_dc_list = [dc for dc in list(status.keys()) if dc.endswith("_nemesis_dc")]
                 assert new_dc_list, "new datacenter was not registered"
                 # Mark a new node as "running nemesis" to prevent it be marked as "target node" by parallel nemesis.
@@ -4816,13 +4816,13 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 InfoEvent(message='Running full cluster repair on each data node').publish()
                 for cluster_node in self.cluster.data_nodes:
                     cluster_node.run_nodetool(sub_cmd="repair -pr", publish_event=True)
-                datacenters = list(self.tester.db_cluster.get_nodetool_status().keys())
+                datacenters = list(self.tester.db_cluster.get_nodes_status().keys())
                 self._write_read_data_to_multi_dc_keyspace(datacenters)
 
             self.cluster.decommission(new_node)
             node_added = False
 
-            datacenters = list(self.tester.db_cluster.get_nodetool_status().keys())
+            datacenters = list(self.tester.db_cluster.get_nodes_status().keys())
             assert not [dc for dc in datacenters if dc.endswith("_nemesis_dc")], "new datacenter was not unregistered"
             self._verify_multi_dc_keyspace_data(consistency_level="QUORUM")
 
