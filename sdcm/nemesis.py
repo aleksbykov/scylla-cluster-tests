@@ -430,7 +430,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self.unset_current_running_nemesis(self.target_node)
 
         with NEMESIS_TARGET_SELECTION_LOCK:
-            nodes = self._get_target_data_nodes(is_seed=is_seed, dc_idx=dc_idx, rack=rack)
+            nodes = self._get_target_nodes(is_seed=is_seed, dc_idx=dc_idx, rack=rack)
             if not nodes:
                 dc_str = '' if dc_idx is None else f'dc {dc_idx} '
                 rack_str = '' if rack is None else f'rack {rack} '
