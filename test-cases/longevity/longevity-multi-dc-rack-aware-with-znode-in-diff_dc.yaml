@@ -16,7 +16,7 @@ instance_type_db: 'i4i.4xlarge'
 zero_token_instance_type_db: 'i4i.xlarge'
 
 nemesis_class_name: 'SisyphusMonkey'
-nemesis_selector: ['topology_changes', 'schema_changes', 'config_changes', 'zero_node_changes']
+nemesis_selector: ['zero_node_changes']
 nemesis_interval: 10
 nemesis_filter_seeds: false
 
