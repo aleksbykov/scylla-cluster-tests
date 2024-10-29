@@ -4494,7 +4494,7 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         """Checks via nodetool that node joined the cluster and reached 'UN' state"""
         if not nodes:
             nodes = self.nodes
-        status = self.get_nodetool_status(verification_node=verification_node)
+        status = self.get_nodes_status(verification_node=verification_node)
         up_statuses = []
         for node in nodes:
             found_node_status = False
@@ -4526,7 +4526,7 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         node_status = None
         if ip_address is None:
             return node_status
-        status = self.get_nodetool_status(verification_node=verification_node)
+        status = self.get_nodes_status(verification_node=verification_node)
         for dc_status in status.values():
             ip_status = dc_status.get(ip_address)
             if ip_status:
@@ -5010,7 +5010,7 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
 
     def get_node(self):
         if not self._node_cycle:
-            self._node_cycle = itertools.cycle(self.nodes)
+            self._node_cycle = itertools.cycle(self.data_nodes)
         return next(self._node_cycle)
 
     def backup_keyspace(self, ks):
@@ -5051,7 +5051,7 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         def get_node_ip_list(verification_node):
             try:
                 ip_node_list = []
-                status = self.get_nodetool_status(verification_node)
+                status = self.get_nodes_status(verification_node)
                 for nodes_ips in status.values():
                     ip_node_list.extend(nodes_ips.keys())
                 return ip_node_list
