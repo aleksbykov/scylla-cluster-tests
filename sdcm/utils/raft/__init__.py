@@ -401,7 +401,12 @@ class NoRaft(RaftFeatureOperations):
 
     def check_group0_tokenring_consistency(
             self, group0_members: list[dict[str, str]],
-            tokenring_members: list[dict[str, str]]) -> None:
+            tokenring_members: list[dict[str, str]]) -> HealthEventsGenerator:
+        if False:
+            yield ClusterHealthValidatorEvent.Group0TokenRingInconsistency(
+                severity=Severity.Info,
+                node=self._node.name,
+                error="Raft feature is disabled on node %s (host_id=%s)".format(self._node.name, self._node.host_id))
         LOGGER.debug("Raft feature is disabled on node %s (host_id=%s)", self._node.name, self._node.host_id)
 
 
