@@ -4520,6 +4520,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         time.sleep(sleep_time)
         InfoEvent(message='FinishEvent - Steady State sleep has been finished').publish()
 
+    @target_data_nodes
     def disrupt_run_unique_sequence(self):
         sleep_time_between_ops = self.cluster.params.get('nemesis_sequence_sleep_between_ops')
         sleep_time_between_ops = sleep_time_between_ops if sleep_time_between_ops else 8
