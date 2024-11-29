@@ -4760,9 +4760,9 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             raise UnsupportedNemesis(
                 "add_remove_dc skipped for multi-dc scenario (https://github.com/scylladb/scylla-cluster-tests/issues/5369)")
         InfoEvent(message='Starting New DC Nemesis').publish()
-        node = self.cluster.data_nodes[0]
         system_keyspaces = ["system_distributed", "system_traces"]
-        if not node.raft.is_consistent_topology_changes_enabled:  # auth-v2 is used when consistent topology is enabled
+        # use target_node to avoid possible node kill in parallel nemesis
+        if not self.target_node.raft.is_consistent_topology_changes_enabled:  # auth-v2 is used when consistent topology is enabled
             system_keyspaces.insert(0, "system_auth")
         self._switch_to_network_replication_strategy(self.cluster.get_test_keyspaces() + system_keyspaces)
         datacenters = list(self.tester.db_cluster.get_nodetool_status().keys())
@@ -4779,16 +4779,18 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                         self.cluster.decommission(new_node)
             context_manager.push(finalizer)
 
-            with temporary_replication_strategy_setter(node) as replication_strategy_setter:
+            # use safe way to choose node for switching replication strategy with parallel nemesis
+            with self.run_nemesis(node_list=self.cluster.data_nodes, nemesis_label=self.current_disruption) as node, \
+                    temporary_replication_strategy_setter(node) as replication_strategy_setter:
                 new_node = self._add_new_node_in_new_dc()
+                # Mark a new node as "running nemesis" to prevent it be marked as "target node" by parallel nemesis asap.
+                # This new node should not be unset as running nemesis because the node will be terminated in the end of nemesis
+                # and removed from the list of nodes
+                self.set_current_disruption(new_node)
                 node_added = True
                 status = self.tester.db_cluster.get_nodetool_status()
                 new_dc_list = [dc for dc in list(status.keys()) if dc.endswith("_nemesis_dc")]
                 assert new_dc_list, "new datacenter was not registered"
-                # Mark a new node as "running nemesis" to prevent it be marked as "target node" by parallel nemesis.
-                # This new node should not be unset as running nemesis because the node will be terminated in the end of nemesis
-                # and removed from the list of nodes
-                self.set_current_running_nemesis(new_node)
                 new_dc_name = new_dc_list[0]
                 for keyspace in system_keyspaces + ["keyspace_new_dc"]:
                     strategy = ReplicationStrategy.get(node, keyspace)
