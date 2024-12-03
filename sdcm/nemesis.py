@@ -5554,6 +5554,7 @@ def disrupt_method_wrapper(method, is_exclusive=False):  # pylint: disable=too-m
 class SslHotReloadingNemesis(Nemesis):
     disruptive = False
     config_changes = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_hot_reloading_internode_certificate()
@@ -5598,6 +5599,7 @@ class GrowShrinkClusterNemesis(Nemesis):
     disruptive = True
     kubernetes = True
     topology_changes = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_grow_shrink_cluster()
@@ -5626,6 +5628,7 @@ class StopStartMonkey(Nemesis):
     disruptive = True
     kubernetes = True
     limited = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_stop_start_scylla_server()
@@ -5650,6 +5653,7 @@ class EnableDisableTableEncryptionAwsKmsProviderWithoutRotationMonkey(Nemesis):
 class EnableDisableTableEncryptionAwsKmsProviderMonkey(Nemesis):
     disruptive = True
     kubernetes = False  # Enable it when EKS SCT code starts supporting the KMS service
+    zero_node_changes = True
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -5674,6 +5678,7 @@ class MultipleHardRebootNodeMonkey(Nemesis):
     disruptive = True
     kubernetes = True
     free_tier_set = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_multiple_hard_reboot_node()
@@ -5684,6 +5689,7 @@ class HardRebootNodeMonkey(Nemesis):
     kubernetes = True
     limited = True
     free_tier_set = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_hard_reboot_node()
@@ -5694,6 +5700,7 @@ class SoftRebootNodeMonkey(Nemesis):
     kubernetes = True
     limited = True
     free_tier_set = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_soft_reboot_node()
@@ -5704,6 +5711,7 @@ class DrainerMonkey(Nemesis):
     kubernetes = True
     limited = True
     topology_changes = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_nodetool_drain()
@@ -5712,6 +5720,7 @@ class DrainerMonkey(Nemesis):
 class CorruptThenRepairMonkey(Nemesis):
     disruptive = True
     kubernetes = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_destroy_data_then_repair()
@@ -5720,6 +5729,7 @@ class CorruptThenRepairMonkey(Nemesis):
 class CorruptThenRebuildMonkey(Nemesis):
     disruptive = True
     kubernetes = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_destroy_data_then_rebuild()
@@ -5729,6 +5739,7 @@ class DecommissionMonkey(Nemesis):
     disruptive = True
     limited = True
     topology_changes = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_nodetool_decommission()
@@ -5737,6 +5748,7 @@ class DecommissionMonkey(Nemesis):
 class DecommissionSeedNode(Nemesis):
     disruptive = True
     topology_changes = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_nodetool_seed_decommission()
@@ -5765,6 +5777,7 @@ class RefreshMonkey(Nemesis):
     run_with_gemini = False
     kubernetes = True
     limited = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_nodetool_refresh(big_sstable=False)
@@ -6357,6 +6370,7 @@ class ScyllaKillMonkey(Nemesis):
     disruptive = True
     kubernetes = True
     free_tier_set = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_kill_scylla()
@@ -6385,6 +6399,7 @@ class NodeRestartWithResharding(Nemesis):
     kubernetes = True
     topology_changes = True
     config_changes = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_restart_with_resharding()
@@ -6394,6 +6409,7 @@ class ClusterRollingRestart(Nemesis):
     disruptive = True
     kubernetes = True
     free_tier_set = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_rolling_restart_cluster(random_order=False)
@@ -6403,6 +6419,7 @@ class RollingRestartConfigChangeInternodeCompression(Nemesis):
     disruptive = True
     full_cluster_restart = True
     config_changes = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_rolling_config_change_internode_compression()
@@ -6412,6 +6429,7 @@ class ClusterRollingRestartRandomOrder(Nemesis):
     disruptive = True
     kubernetes = True
     free_tier_set = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_rolling_restart_cluster(random_order=True)
@@ -6420,6 +6438,7 @@ class ClusterRollingRestartRandomOrder(Nemesis):
 class SwitchBetweenPasswordAuthAndSaslauthdAuth(Nemesis):
     disruptive = True  # the nemesis has rolling restart
     config_changes = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_switch_between_password_authenticator_and_saslauthd_authenticator_and_back()
@@ -6486,6 +6505,7 @@ class StopStartInterfacesNetworkMonkey(Nemesis):
     disruptive = True
     networking = True
     run_with_gemini = False
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_network_start_stop_interface()
@@ -6614,6 +6634,7 @@ class TerminateAndRemoveNodeMonkey(Nemesis):
     # While on kubernetes we put it all on scylla-operator
     kubernetes = False
     topology_changes = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_remove_node_then_add_node()
@@ -6652,6 +6673,7 @@ class DecommissionStreamingErrMonkey(Nemesis):
 
     disruptive = True
     topology_changes = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_decommission_streaming_err()
@@ -6696,6 +6718,7 @@ class CorruptThenScrubMonkey(Nemesis):
 class MemoryStressMonkey(Nemesis):
     disruptive = True
     free_tier_set = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_memory_stress()
@@ -6705,6 +6728,7 @@ class ResetLocalSchemaMonkey(Nemesis):
     disruptive = False
     config_changes = True
     free_tier_set = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_resetlocalschema()
@@ -6857,6 +6881,7 @@ class BootstrapStreamingErrorNemesis(Nemesis):
 
     disruptive = True
     topology_changes = True
+    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_bootstrap_streaming_error()
