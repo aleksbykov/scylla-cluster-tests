@@ -674,6 +674,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
     @target_all_nodes
     def disrupt_stop_wait_start_scylla_server(self, sleep_time=300):  # pylint: disable=invalid-name
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         self.target_node.stop_scylla_server(verify_up=False, verify_down=True)
         self.log.info("Sleep for %s seconds", sleep_time)
         time.sleep(sleep_time)
@@ -686,6 +688,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
     @decorate_with_context(ignore_ycsb_connection_refused)
     @target_all_nodes
     def disrupt_stop_start_scylla_server(self):  # pylint: disable=invalid-name
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         self.target_node.stop_scylla_server(verify_up=False, verify_down=True)
         self.target_node.start_scylla_server(verify_up=True, verify_down=False)
 
@@ -917,6 +921,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
     @target_data_nodes
     def disrupt_resetlocalschema(self):  # pylint: disable=invalid-name
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         rlocal_schema_res = self.target_node.follow_system_log(patterns=["schema_tables - Schema version changed to"])
         self.target_node.run_nodetool("resetlocalschema")
 
@@ -934,11 +940,15 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
     @target_all_nodes
     def disrupt_hard_reboot_node(self):
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         self.reboot_node(target_node=self.target_node, hard=True)
         self.target_node.wait_node_fully_start()
 
     @target_all_nodes
     def disrupt_multiple_hard_reboot_node(self) -> None:
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         cdc_expected_error_patterns = [
             "cdc - Could not update CDC description table with generation",
         ]
@@ -985,12 +995,16 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
     @target_all_nodes
     def disrupt_soft_reboot_node(self):
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         self.reboot_node(target_node=self.target_node, hard=False)
         self.target_node.wait_node_fully_start()
 
     @decorate_with_context(ignore_ycsb_connection_refused)
     @target_all_nodes
     def disrupt_rolling_restart_cluster(self, random_order=False):
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         self.cluster.restart_scylla(random_order=random_order)
 
     @target_all_nodes
@@ -1008,6 +1022,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         if not self.cluster.nodes[0].is_enterprise:
             raise UnsupportedNemesis("SaslauthdAuthenticator is only supported by Scylla Enterprise")
 
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         with self.target_node.remote_scylla_yaml() as scylla_yml:
             orig_auth = scylla_yml.authenticator
             if orig_auth == SASLAUTHD_AUTHENTICATOR:
@@ -1033,6 +1049,9 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
     @decorate_with_context(ignore_ycsb_connection_refused)
     @target_all_nodes
     def disrupt_rolling_config_change_internode_compression(self):
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
+
         def get_internode_compression_new_value_randomly(current_compression):
             self.log.debug(f"Current compression is {current_compression}")
             values = ['dc', 'all', None]
@@ -1067,6 +1086,9 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             if is_tablets_feature_enabled(session=session):
                 if SkipPerIssues('https://github.com/scylladb/scylladb/issues/16739', params=self.tester.params):
                     raise UnsupportedNemesis('https://github.com/scylladb/scylladb/issues/16739')
+
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
 
         murmur3_partitioner_ignore_msb_bits = 15  # pylint: disable=invalid-name
         self.log.info(f'Restart node with resharding. New murmur3_partitioner_ignore_msb_bits value: '
@@ -1223,6 +1245,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
     @decorate_with_context(ignore_ycsb_connection_refused)
     @target_all_nodes
     def disrupt_nodetool_drain(self):
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         result = self.target_node.run_nodetool("drain", timeout=15*60, coredump_on_timeout=True)
         self.target_node.run_nodetool("status", ignore_status=True, verbose=True,
                                       warning_event_on_exception=(Exception,))
@@ -1412,6 +1436,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
     @target_all_nodes
     def disrupt_nodetool_decommission(self, add_node=True):
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         return self._nodetool_decommission(add_node=add_node)
 
     @target_all_nodes
@@ -1707,6 +1733,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
     @decorate_with_context(ignore_ycsb_connection_refused)
     @target_all_nodes
     def disrupt_kill_scylla(self):
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         self._kill_scylla_daemon()
 
     @target_data_nodes
@@ -1769,6 +1797,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
     # pylint: disable=too-many-statements
     @target_data_nodes
     def disrupt_nodetool_refresh(self, big_sstable: bool = False):
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         # Checking the columns number of keyspace1.standard1
         self.log.debug('Prepare keyspace1.standard1 if it does not exist')
         self._prepare_test_table(ks='keyspace1', table='standard1')
@@ -3673,7 +3703,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                                      "is tested by CloudReplaceNonResponsiveNode nemesis")
         if self._is_it_on_kubernetes():
             raise UnsupportedNemesis("On K8S nodes get removed differently. Skipping.")
-
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         node_to_remove = self.target_node
         up_normal_nodes = self.cluster.get_nodes_up_and_normal(verification_node=node_to_remove)
         # node_to_remove must be different than node
@@ -3967,7 +3998,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
     def disrupt_network_start_stop_interface(self):  # pylint: disable=invalid-name
         if not self.cluster.extra_network_interface:
             raise UnsupportedNemesis("for this nemesis to work, you need to set `extra_network_interface: True`")
-
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         list_of_timeout_options = [10, 60, 120, 300, 500]
         wait_time = random.choice(list_of_timeout_options)
         self.log.debug("Taking down eth1 for %dsec", wait_time)
@@ -4159,7 +4191,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             raise UnsupportedNemesis(
                 "This nemesis logic is not compatible with K8S approach "
                 "for handling Scylla member's decommissioning.")
-
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         with ignore_stream_mutation_fragments_errors(), ignore_raft_topology_cmd_failing():
             self.start_and_interrupt_decommission_streaming()
 
@@ -4353,11 +4386,15 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
     # TODO: add encryption for a table with large partitions?
 
     def disrupt_enable_disable_table_encryption_aws_kms_provider_without_rotation(self):
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         self._enable_disable_table_encryption(
             enable_kms_key_rotation=False,
             additional_scylla_encryption_options={'key_provider': 'KmsKeyProviderFactory'})
 
     def disrupt_enable_disable_table_encryption_aws_kms_provider_with_rotation(self):
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         self._enable_disable_table_encryption(
             enable_kms_key_rotation=True,
             additional_scylla_encryption_options={'key_provider': 'KmsKeyProviderFactory'})
@@ -4509,6 +4546,9 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         """
         if not self.cluster.params.get('server_encrypt'):
             raise UnsupportedNemesis('Server Encryption is not enabled, hence skipping')
+
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
 
         @timeout_decor(timeout=600, allowed_exceptions=(LogContentNotFound, ))
         def check_ssl_reload_log(node_system_log):
@@ -5253,7 +5293,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         and return the cluster to initial state(by num of nodes)
         """
         self.cluster.wait_all_nodes_un()
-
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         new_node: BaseNode = skip_on_capacity_issues(self.cluster.add_nodes)(
             count=1, dc_idx=self.target_node.dc_idx, enable_auto_bootstrap=True, rack=self.target_node.rack)[0]
         self.monitoring_set.reconfigure_scylla_monitoring()
@@ -5309,12 +5350,13 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             self.target_node.restart_scylla_server()
             raise
 
-    @target_all_nodes
+    @target_zero_nodes
     def disrupt_grow_shrink_zero_nodes(self):
         """"Add/remove znodes to same dc where target node. The target node could be any node"""
         if not self.cluster.params.get('use_zero_nodes'):
             raise UnsupportedNemesis("The zero tokens support is not enabled")
-
+        self.log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                                                     node.running_nemesis) for node in self._target_node_pool])
         duration_with_znode = 300
         new_znode = self._add_and_init_new_cluster_nodes(count=1, is_zero_node=True)[0]
         self.log.debug("Run with zero-token node %s for %ds", new_znode.name, duration_with_znode)
@@ -5604,7 +5646,6 @@ class GrowShrinkClusterNemesis(Nemesis):
     disruptive = True
     kubernetes = True
     topology_changes = True
-    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_grow_shrink_cluster()
@@ -5725,7 +5766,6 @@ class DrainerMonkey(Nemesis):
 class CorruptThenRepairMonkey(Nemesis):
     disruptive = True
     kubernetes = True
-    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_destroy_data_then_repair()
@@ -5734,7 +5774,6 @@ class CorruptThenRepairMonkey(Nemesis):
 class CorruptThenRebuildMonkey(Nemesis):
     disruptive = True
     kubernetes = True
-    zero_node_changes = True
 
     def disrupt(self):
         self.disrupt_destroy_data_then_rebuild()
