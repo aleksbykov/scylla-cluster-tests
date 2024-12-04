@@ -5346,6 +5346,9 @@ def disrupt_method_wrapper(method, is_exclusive=False):  # pylint: disable=too-m
             current_disruption = "".join(p.capitalize() for p in method_name.replace("disrupt_", "").split("_"))
             args[0].set_target_node(current_disruption=current_disruption)
 
+            args[0].log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
+                             node.running_nemesis) for node in args[0]._target_node_pool])
+
             args[0].cluster.check_cluster_health()
             num_data_nodes_before = len(args[0].cluster.data_nodes)
             num_zero_nodes_before = len(args[0].cluster.zero_nodes)
