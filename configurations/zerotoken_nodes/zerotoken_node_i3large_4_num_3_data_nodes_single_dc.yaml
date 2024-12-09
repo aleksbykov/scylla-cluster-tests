@@ -2,5 +2,7 @@ n_db_zero_token_nodes: 5
 n_db_nodes: 4
 zero_token_instance_type_db: 'i3.large'
 use_zero_nodes: true
-nemesis_class_name: 'SisyphusMonkey'
-nemesis_selector: ['zero_node_changes']
+# nemesis_class_name: 'SisyphusMonkey'
+# nemesis_selector: ['zero_node_changes']
+nemesis_class_name: 'SisyphusMonkey:1 SisyphusMonkey:1'
+nemesis_selector: [["zero_node_changes"],["!disruptive","schema_changes"]]
