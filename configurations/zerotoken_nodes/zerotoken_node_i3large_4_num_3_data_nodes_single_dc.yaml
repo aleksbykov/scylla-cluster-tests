@@ -6,4 +6,4 @@ use_zero_nodes: true
 # nemesis_selector: ['zero_node_changes']
 # nemesis_class_name: 'SisyphusMonkey:1 SisyphusMonkey:1'
 # nemesis_selector: [["zero_node_changes"],["!disruptive","schema_changes"]]
-nemesis_class_name: 'ModifyTableMonkey:2 AddRemoveDcNemesis:1'
+nemesis_class_name: 'ModifyTableMonkey:2 AddRemoveDcNemesis:1 ZeroTokenSetMonkey:1'
