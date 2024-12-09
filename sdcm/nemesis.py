@@ -684,6 +684,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             return
         self.target_node.start_scylla_server(verify_up=True, verify_down=False)
 
+    @target_all_nodes
     @decorate_with_context(ignore_ycsb_connection_refused)
     def disrupt_stop_start_scylla_server(self):  # pylint: disable=invalid-name
         self.target_node.stop_scylla_server(verify_up=False, verify_down=True)
@@ -731,6 +732,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             compaction_ops=CompactionOps(cluster=self.cluster, node=self.target_node)
         )
 
+    @target_data_nodes
     def disrupt_start_stop_major_compaction(self):
         """
         Start and stop a major compaction on a non-system columnfamily.
@@ -778,6 +780,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         result = self.target_node.run_nodetool("clearsnapshot")
         self.log.debug(result)
 
+    @target_data_nodes
     def disrupt_start_stop_scrub_compaction(self):
         """
         Start and stop a scrub compaction on a non-system columnfamily.
@@ -819,6 +822,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         self.clear_snapshots()
 
+    @target_data_nodes
     def disrupt_start_stop_cleanup_compaction(self):
         """
         Start and stop a cleanup compaction on a non-system columnfamily.
@@ -858,6 +862,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             allow_trigger_exceptions=True
         )
 
+    @target_data_nodes
     def disrupt_start_stop_validation_compaction(self):
         """
         Start and stop a validation compaction on a non-system columnfamily.
@@ -900,6 +905,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
     # This nemesis should be run with "private" ip_ssh_connections till the issue #665 is not fixed
 
+    @target_data_nodes
     def disrupt_restart_then_repair_node(self):  # pylint: disable=invalid-name
         with DbEventsFilter(db_event=DatabaseLogEvent.DATABASE_ERROR,
                             line="Can't find a column family with UUID", node=self.target_node), \
@@ -910,6 +916,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self.target_node.wait_node_fully_start(timeout=28800)  # 8 hours
         self.repair_nodetool_repair()
 
+    @target_all_nodes
     def disrupt_resetlocalschema(self):  # pylint: disable=invalid-name
         rlocal_schema_res = self.target_node.follow_system_log(patterns=["schema_tables - Schema version changed to"])
         self.target_node.run_nodetool("resetlocalschema")
@@ -926,10 +933,12 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self.log.debug("Sleep for 60 sec: the other nodes should pull new version")
         time.sleep(60)
 
+    @target_all_nodes
     def disrupt_hard_reboot_node(self):
         self.reboot_node(target_node=self.target_node, hard=True)
         self.target_node.wait_node_fully_start()
 
+    @target_all_nodes
     def disrupt_multiple_hard_reboot_node(self) -> None:
         cdc_expected_error_patterns = [
             "cdc - Could not update CDC description table with generation",
@@ -975,14 +984,17 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             raise CdcStreamsWasNotUpdated(
                 f"After '{found_cdc_error[0]}', messages '{' or '.join(cdc_success_msg)}' were not found")
 
+    @target_all_nodes
     def disrupt_soft_reboot_node(self):
         self.reboot_node(target_node=self.target_node, hard=False)
         self.target_node.wait_node_fully_start()
 
     @decorate_with_context(ignore_ycsb_connection_refused)
+    @target_all_nodes
     def disrupt_rolling_restart_cluster(self, random_order=False):
         self.cluster.restart_scylla(random_order=random_order)
 
+    @target_all_nodes
     def disrupt_switch_between_password_authenticator_and_saslauthd_authenticator_and_back(self):
         """
         If prepare_saslauthd is enabled, saslauthd and ldap environment will be prepared for
@@ -1020,6 +1032,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 session.execute('DROP KEYSPACE keyspace_for_authenticator_switch')
 
     @decorate_with_context(ignore_ycsb_connection_refused)
+    @target_all_nodes
     def disrupt_rolling_config_change_internode_compression(self):
         def get_internode_compression_new_value_randomly(current_compression):
             self.log.debug(f"Current compression is {current_compression}")
@@ -1043,6 +1056,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             node.restart_scylla_server()
 
     @decorate_with_context(ignore_ycsb_connection_refused)
+    @target_data_nodes
     def disrupt_restart_with_resharding(self):
         if self._is_it_on_kubernetes():
             raise UnsupportedNemesis(
@@ -1195,16 +1209,19 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self.log.debug('Set current_disruption -> %s', label)
         self.current_disruption = label
 
+    @target_data_nodes
     def disrupt_destroy_data_then_repair(self):  # pylint: disable=invalid-name
         self._destroy_data_and_restart_scylla()
         # try to save the node
         self.repair_nodetool_repair()
 
+    @target_data_nodes
     def disrupt_destroy_data_then_rebuild(self):  # pylint: disable=invalid-name
         self._destroy_data_and_restart_scylla()
         # try to save the node
         self.repair_nodetool_rebuild()
 
+    @target_all_nodes
     @decorate_with_context(ignore_ycsb_connection_refused)
     def disrupt_nodetool_drain(self):
         result = self.target_node.run_nodetool("drain", timeout=15*60, coredump_on_timeout=True)
@@ -1218,6 +1235,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             self.target_node.stop_scylla_server(verify_up=False, verify_down=True, ignore_status=True)
             self.target_node.start_scylla_server(verify_up=True, verify_down=False)
 
+    @target_all_nodes
     def disrupt_ldap_connection_toggle(self):
         if not self.cluster.params.get('use_ldap_authorization'):
             raise UnsupportedNemesis('Cluster is not configured to run with LDAP authorization, hence skipping')
@@ -1234,6 +1252,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         ContainerManager.unpause_container(self.tester.localhost, 'ldap')
         self.log.info('finished with nemesis')
 
+    @target_all_nodes
     def disrupt_disable_enable_ldap_authorization(self):
         if not self.cluster.params.get('use_ldap_authorization'):
             raise UnsupportedNemesis('Cluster is not configured to run with LDAP authorization, hence skipping')
@@ -1392,9 +1411,11 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 self.unset_current_running_nemesis(new_node)
         return new_node
 
+    @target_all_nodes
     def disrupt_nodetool_decommission(self, add_node=True):
         return self._nodetool_decommission(add_node=add_node)
 
+    @target_all_nodes
     def disrupt_nodetool_seed_decommission(self, add_node=True):
         if len(self.cluster.seed_nodes) < 2:
             raise UnsupportedNemesis("To running seed decommission the cluster must contains at least 2 seed nodes")
@@ -1689,6 +1710,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
     def disrupt_kill_scylla(self):
         self._kill_scylla_daemon()
 
+    @target_data_nodes
     def disrupt_no_corrupt_repair(self):
 
         if SkipPerIssues("https://github.com/scylladb/scylladb/issues/18059", self.tester.params):
@@ -1717,6 +1739,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         with adaptive_timeout(Operations.MAJOR_COMPACT, self.target_node, timeout=8000):
             self.target_node.run_nodetool("compact")
 
+    @target_data_nodes
     def disrupt_major_compaction(self):
         self._major_compaction()
 
@@ -1816,7 +1839,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             node.restart_scylla_server(verify_up_after=True)
             assert no_space_errors, "There are no 'No space left on device' errors in db log during enospc disruption."
 
-    @target_data_nodes
+    @target_all_nodes
     def disrupt_nodetool_enospc(self, sleep_time=30, all_nodes=False):
 
         if all_nodes:
@@ -1880,6 +1903,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             node.restart_scylla_server()
             node.wait_db_up()
 
+    @target_all_nodes
     def disrupt_remove_service_level_while_load(self):
         # Temporary solution. We do not want to run SLA nemeses during not-SLA test until the feature is stable
         if not self.cluster.params.get('sla'):
@@ -2059,6 +2083,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             32, len(self.cluster.nodes)), timeout=HOUR_IN_SEC * 48)
         parallel_objects.run(_nodetool_cleanup)
 
+    @target_all_nodes
     def disrupt_nodetool_cleanup(self):
         self.nodetool_cleanup_on_all_nodes_parallel()
 
@@ -2086,6 +2111,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         # NOTE: 'self' is used by the 'scylla_versions' decorator
         return ''
 
+    @target_data_nodes
     def disrupt_truncate(self):
         keyspace_truncate = 'ks_truncate'
         table = 'standard1'
@@ -2102,6 +2128,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             cmd=f'TRUNCATE {keyspace_truncate}.{table}{truncate_cmd_timeout_suffix}',
             timeout=truncate_timeout)
 
+    @target_data_nodes
     def disrupt_truncate_large_partition(self):
         """
         Introduced a new truncate nemesis, it truncates a large-partition table,
@@ -2510,6 +2537,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         return list(partitions_for_delete.keys()) + partitions_for_exclude
 
+    @target_data_nodes
     def disrupt_delete_10_full_partitions(self):
         """
         Delete few partitions in the table with large partitions
@@ -2528,6 +2556,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         self.run_deletions(queries=queries, ks_cf=ks_cf)
 
+    @target_data_nodes
     def disrupt_delete_overlapping_row_ranges(self):
         """
         Delete several overlapping row ranges in the table with large partitions.
@@ -2550,6 +2579,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 queries.append(f"delete from {ks_cf} where pk = {pkey} and ck > {min_ck} and ck < {max_ck}")
         self.run_deletions(queries=queries, ks_cf=ks_cf)
 
+    @target_data_nodes
     def disrupt_delete_by_rows_range(self):
         """
         Delete few partitions in the table with large partitions
@@ -3542,6 +3572,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         experiment.wait_until_finished()
         self.cluster.wait_all_nodes_un()
 
+    @target_all_nodes
     def disrupt_network_random_interruptions(self):  # pylint: disable=invalid-name
         # pylint: disable=too-many-locals
         list_of_timeout_options = [10, 60, 120, 300, 500]
@@ -3602,6 +3633,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         time.sleep(15)
         self.cluster.wait_all_nodes_un()
 
+    @target_all_nodes
     def disrupt_network_block(self):
         list_of_timeout_options = [10, 60, 120, 300, 500]
         if self._is_it_on_kubernetes():
@@ -4118,6 +4150,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         with adaptive_timeout(Operations.REBUILD, self.target_node, timeout=HOUR_IN_SEC * 48):
             self.target_node.run_nodetool("rebuild", long_running=True, retry=0)
 
+    @target_data_nodes
     def disrupt_decommission_streaming_err(self):
         """
         Stop decommission in middle to trigger some streaming fails, then rebuild the data on the node.
@@ -4131,6 +4164,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         with ignore_stream_mutation_fragments_errors(), ignore_raft_topology_cmd_failing():
             self.start_and_interrupt_decommission_streaming()
 
+    @target_data_nodes
     def disrupt_rebuild_streaming_err(self):
         """
         Stop rebuild in middle to trigger some streaming fails, then rebuild the data on the node.
@@ -4138,6 +4172,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         with ignore_stream_mutation_fragments_errors(), ignore_raft_topology_cmd_failing():
             self.start_and_interrupt_rebuild_streaming()
 
+    @target_data_nodes
     def disrupt_repair_streaming_err(self):
         """
         Stop repair in middle to trigger some streaming fails, then rebuild the data on the node.
@@ -4570,6 +4605,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         experiment.wait_until_finished()
 
     @decorate_with_context(ignore_reactor_stall_errors)
+    @target_all_nodes
     def disrupt_memory_stress(self):
         """
         Try to run stress-ng to preempt allocated memory of scylla process,
@@ -5102,6 +5138,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         finally:
             self.unset_current_running_nemesis(cql_query_executor_node)
 
+    @target_all_nodes
     def disrupt_toggle_audit_syslog(self):
         self._disrupt_toggle_audit(store="syslog")
 
@@ -5402,6 +5439,8 @@ def disrupt_method_wrapper(method, is_exclusive=False):  # pylint: disable=too-m
             current_disruption = "".join(p.capitalize() for p in method_name.replace("disrupt_", "").split("_"))
             args[0].set_target_node_pool(target_pool)
             args[0].set_target_node(current_disruption=current_disruption)
+            args[0].log.info("Target node : %s from pool %s with nodes in pool: %s", args[0].target_node.name, target_pool_name,
+                             [(node.name, node._is_zero_token_node, node.running_nemesis) for node in args[0]._target_node_pool])
 
             args[0].cluster.check_cluster_health()
             num_data_nodes_before = len(args[0].cluster.data_nodes)
