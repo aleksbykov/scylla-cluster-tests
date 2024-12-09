@@ -181,35 +181,33 @@ class DefaultValue:  # pylint: disable=too-few-public-methods
 
 
 def target_data_nodes(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            args[0].set_target_node_pool(args[0].cluster.data_nodes)
+    try:
+        setattr(func, "target_pool", "data_nodes")
+    finally:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
-        finally:
-            args[0].set_target_node_pool(args[0].cluster.data_nodes)
-    return wrapper
+        return wrapper
 
 
 def target_zero_nodes(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            args[0].set_target_node_pool(args[0].cluster.zero_nodes)
+    try:
+        setattr(func, "target_pool", "zero_nodes")
+    finally:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
-        finally:
-            args[0].set_target_node_pool(args[0].cluster.data_nodes)
-    return wrapper
+        return wrapper
 
 
 def target_all_nodes(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            args[0].set_target_node_pool(args[0].cluster.nodes)
+    try:
+        setattr(func, "target_pool", "nodes")
+    finally:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
-        finally:
-            args[0].set_target_node_pool(args[0].cluster.data_nodes)
+        return wrapper
     return wrapper
 
 
@@ -5460,6 +5458,7 @@ def disrupt_method_wrapper(method, is_exclusive=False):  # pylint: disable=too-m
         # pylint: disable=too-many-locals
         # pylint: disable=too-many-branches
         method_name = method.__name__
+        target_pool = getattr(args[0].cluster, getattr(method, "target_pool"))
         nemesis_run_info_key = f"{id(args[0])}--{method_name}"
         try:
             NEMESIS_LOCK.acquire()  # pylint: disable=consider-using-with
@@ -5472,6 +5471,7 @@ def disrupt_method_wrapper(method, is_exclusive=False):  # pylint: disable=too-m
                     time.sleep(10)
 
             current_disruption = "".join(p.capitalize() for p in method_name.replace("disrupt_", "").split("_"))
+            args[0].set_target_node_pool(target_pool)
             args[0].set_target_node(current_disruption=current_disruption)
 
             args[0].log.info("Current nodes in pool: %s", [(node.name, node._is_zero_token_node,
