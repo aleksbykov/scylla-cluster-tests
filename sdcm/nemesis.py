@@ -36,7 +36,7 @@ from typing import Any, List, Optional, Type, Tuple, Callable, Dict, Set, Union,
 from functools import wraps, partial
 from collections import defaultdict, Counter, namedtuple
 from concurrent.futures import ThreadPoolExecutor
-from threading import Lock, current_thread
+from threading import Lock
 from types import MethodType  # pylint: disable=no-name-in-module
 
 from cassandra import ConsistencyLevel, InvalidRequest
@@ -2571,11 +2571,6 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         If there is no such table it draw an error and quit
         It keeps tracking what columns where added and never drops column that were added by someone else.
         """
-        self.log.debug("AddDropColumnMonkey: Started")
-        self.log.info(">>>>>>>>>>>>>>>>>>>>>>>>>")
-        self.log.info("Current thread: %s, Target node pool: %s", current_thread().name, self._target_node_pool)
-        self.log.info("Current nemesis: %s, All nodes: %s", self.current_disruption, self.cluster.nodes)
-        self.log.info("<<<<<<<<<<<<<<<<<<<<<<<<<")
         self._add_drop_column_target_table = self._add_drop_column_get_target_table(
             self._add_drop_column_target_table)
         if self._add_drop_column_target_table is None:
@@ -4760,10 +4755,6 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             network_replication.apply(node, keyspace)
 
     def disrupt_add_remove_dc(self) -> None:
-        self.log.info(">>>>>>>>>>>>>>>>>>>>>>>>>")
-        self.log.info("Current thread: %s, Target node pool: %s", current_thread().name, self._target_node_pool)
-        self.log.info("Current nemesis: %s, All nodes: %s", self.current_disruption, self.cluster.nodes)
-        self.log.info("<<<<<<<<<<<<<<<<<<<<<<<<<")
         if self._is_it_on_kubernetes():
             raise UnsupportedNemesis("Operator doesn't support multi-DC yet. Skipping.")
         if self.cluster.test_config.MULTI_REGION:
