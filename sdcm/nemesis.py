@@ -4786,7 +4786,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 # Mark a new node as "running nemesis" to prevent it be marked as "target node" by parallel nemesis asap.
                 # This new node should not be unset as running nemesis because the node will be terminated in the end of nemesis
                 # and removed from the list of nodes
-                self.set_current_disruption(new_node)
+                self.set_current_running_nemesis(new_node)
                 node_added = True
                 status = self.tester.db_cluster.get_nodetool_status()
                 new_dc_list = [dc for dc in list(status.keys()) if dc.endswith("_nemesis_dc")]
