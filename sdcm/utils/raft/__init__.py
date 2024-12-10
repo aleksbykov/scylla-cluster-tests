@@ -45,7 +45,7 @@ class MessageTimeout(NamedTuple):
 
 BACKEND_TIMEOUTS: dict[str, Mapping[LogPosition, int]] = {
     "aws": {LogPosition.BEGIN: 300, LogPosition.END: 3600},
-    "gce": {LogPosition.BEGIN: 300, LogPosition.END: 3600},
+    "gce": {LogPosition.BEGIN: 600, LogPosition.END: 6000},
     "azure": {LogPosition.BEGIN: 1200, LogPosition.END: 7200},
 }
 
