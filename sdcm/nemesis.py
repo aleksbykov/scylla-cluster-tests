@@ -4065,7 +4065,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                                                                          seed=self.tester.params.get("nemesis_seed"))
         self.log.debug("Reboot node after log message: '%s'", terminate_pattern.log_message)
 
-        nodetool_decommission_timeout = terminate_pattern.timeout + 600
+        nodetool_decommission_timeout = terminate_pattern.timeout + 1200
 
         log_follower = self.target_node.follow_system_log(patterns=[terminate_pattern.log_message])
 
@@ -4083,6 +4083,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             delay=0
         )
         full_operations_timeout = nodetool_decommission_timeout + 600
+        decommission_to_finish_background_timeout = full_operations_timeout + 600
         with contextlib.ExitStack() as stack:
             for expected_start_failed_context in self.target_node.raft.get_severity_change_filters_scylla_start_failed(
                     terminate_pattern.timeout):
@@ -4091,7 +4092,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 self.run_nemesis(node_list=self.cluster.data_nodes, nemesis_label="DecommissionStreamingErr") as verification_node, \
                 FailedDecommissionOperationMonitoring(target_node=self.target_node,
                                                       verification_node=verification_node,
-                                                      timeout=full_operations_timeout):
+                                                      timeout=decommission_to_finish_background_timeout):
 
                 ParallelObject(objects=[trigger, watcher], timeout=full_operations_timeout).call_objects()
             if new_node := decommission_post_action():
