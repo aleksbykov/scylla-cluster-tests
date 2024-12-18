@@ -282,7 +282,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         }
         self.es_publisher = NemesisElasticSearchPublisher(self.tester)
         self._init_num_deletions_factor()
-        self._target_node_pool_type = NEMESIS_TARGET_POOLS.data_nodes
+        self._target_node_pool_type = NEMESIS_TARGET_POOLS.zero_nodes
         self.hdr_tags = []
         self.log.debug('Instantiated %s nemesis with %d seed', self.__class__.__name__, self.nemesis_seed)
 
@@ -682,8 +682,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             self.target_node.wait_jmx_up()
         self.cluster.wait_for_schema_agreement()
 
-    @decorate_with_context(ignore_raft_topology_cmd_failing)
-    @target_all_nodes
+    @target_zero_nodes
     def disrupt_stop_wait_start_scylla_server(self, sleep_time=300):  # pylint: disable=invalid-name
         self.target_node.stop_scylla_server(verify_up=False, verify_down=True)
         self.log.info("Sleep for %s seconds", sleep_time)
@@ -1657,7 +1656,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self.log.info('Wait till %s is ready', node)
         node.wait_for_pod_readiness()
 
-    @target_all_nodes
+    @target_zero_nodes
     def disrupt_terminate_and_replace_node(self):  # pylint: disable=invalid-name
         self._terminate_and_replace_node()
 
@@ -1709,7 +1708,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 self.cluster.update_seed_provider()
 
     @decorate_with_context([ignore_ycsb_connection_refused, ignore_raft_topology_cmd_failing])
-    @target_all_nodes
+    @target_zero_nodes
     def disrupt_kill_scylla(self):
         self._kill_scylla_daemon()
 
@@ -1744,7 +1743,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
     def disrupt_major_compaction(self):
         self._major_compaction()
 
-    @target_data_nodes
+    @target_zero_nodes
     def disrupt_load_and_stream(self):
         # Checking the columns number of keyspace1.standard1
         self.log.debug('Prepare keyspace1.standard1 if it does not exist')
@@ -1770,7 +1769,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 SstableLoadUtils.run_load_and_stream(load_on_node, **kwargs)
 
     # pylint: disable=too-many-statements
-    @target_all_nodes
+    @target_zero_nodes
     def disrupt_nodetool_refresh(self, big_sstable: bool = False):
         # Checking the columns number of keyspace1.standard1
         self.log.debug('Prepare keyspace1.standard1 if it does not exist')
@@ -1839,7 +1838,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             node.restart_scylla_server(verify_up_after=True)
             assert no_space_errors, "There are no 'No space left on device' errors in db log during enospc disruption."
 
-    @target_all_nodes
+    @target_zero_nodes
     def disrupt_nodetool_enospc(self, sleep_time=30, all_nodes=False):
 
         if all_nodes:
@@ -1863,7 +1862,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                     finally:
                         clean_enospc_on_node(target_node=node, sleep_time=sleep_time)
 
-    @target_all_nodes
+    @target_zero_nodes
     def disrupt_end_of_quota_nemesis(self, sleep_time=30):
         """
         Nemesis flow
@@ -3027,15 +3026,15 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         disrupt_func = getattr(self, disrupt_func_name)
         disrupt_func()
 
-    @target_data_nodes
+    @target_zero_nodes
     def disrupt_mgmt_backup_specific_keyspaces(self):
         self._mgmt_backup(backup_specific_tables=True)
 
-    @target_data_nodes
+    @target_zero_nodes
     def disrupt_mgmt_backup(self):
         self._mgmt_backup(backup_specific_tables=False)
 
-    @target_data_nodes
+    @target_zero_nodes
     def disrupt_mgmt_restore(self):
         def get_total_scylla_partition_size():
             result = self.cluster.data_nodes[0].remoter.run("df -k | grep /var/lib/scylla")  # Size in KB
@@ -3294,7 +3293,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self.log.debug("Execute a complete repair for target node")
         self.repair_nodetool_repair()
 
-    @target_data_nodes
+    @target_zero_nodes
     def disrupt_validate_hh_short_downtime(self):  # pylint: disable=invalid-name
         """
             Validates that hinted handoff mechanism works: there were no drops and errors
@@ -3392,7 +3391,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                                  f"Expected content: {sorted(keyspace_table)} \n "
                                  f"Actual snapshot content: {sorted(snapshot_content_list)}")
 
-    @target_all_nodes
+    @target_zero_nodes
     def disrupt_snapshot_operations(self):  # pylint: disable=too-many-statements
         """
         Extend this nemesis to run 'nodetool snapshot' more options including multiple tables.
@@ -3701,7 +3700,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 self.target_node.traffic_control(None)
                 self.cluster.wait_all_nodes_un()
 
-    @target_all_nodes
+    @target_zero_nodes
     def disrupt_remove_node_then_add_node(self):  # pylint: disable=too-many-branches
         """
         https://docs.scylladb.com/operating-scylla/procedures/cluster-management/remove_node/
@@ -4326,7 +4325,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self.log.info(f"Double load results: {results}")
         return stress_queue
 
-    @target_data_nodes
+    @target_zero_nodes
     def disrupt_grow_shrink_cluster(self):
         sleep_time_between_ops = self.cluster.params.get('nemesis_sequence_sleep_between_ops')
         if not self.has_steady_run and sleep_time_between_ops:
@@ -4424,6 +4423,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
     @decorate_with_context(ignore_ycsb_connection_refused)
     @scylla_versions(("2023.1.1-dev", None))
+    @target_zero_nodes
     def _enable_disable_table_encryption(self, enable_kms_key_rotation, additional_scylla_encryption_options=None):  # noqa: PLR0914
         if self.cluster.params.get("cluster_backend") != "aws":
             raise UnsupportedNemesis("This nemesis is supported only on the AWS cluster backend")
@@ -5148,7 +5148,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             finally:
                 drop_index(session, ks, index_name)
 
-    @target_data_nodes
+    @target_zero_nodes
     def disrupt_add_remove_mv(self):
         """
         Create a Materialized view on an existing table while a node is down.
@@ -5315,7 +5315,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         if errors:
             raise AuditLogTestFailure("\n".join(errors))
 
-    @target_data_nodes
+    @target_zero_nodes
     def disrupt_bootstrap_streaming_error(self):
         """Abort bootstrap process at different point
 
@@ -5386,7 +5386,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             self.target_node.restart_scylla_server()
             raise
 
-    @target_all_nodes
+    @target_zero_nodes
     def disrupt_grow_shrink_zero_nodes(self):
         """"Add/remove znodes to same dc where target node. The target node could be any node"""
         if not self.cluster.params.get('use_zero_nodes'):
@@ -5399,7 +5399,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         znode = random.choice([node for node in self.cluster.zero_nodes if node.dc_idx == self.target_node.dc_idx])
         self.decommission_nodes(nodes=[znode])
 
-    @target_all_nodes
+    @target_zero_nodes
     def disrupt_serial_restart_elected_topology_coordinator(self):
         """ Serial restart of elected topology coordinator node,
         should trigger new coordinator node election
@@ -5643,7 +5643,7 @@ def disrupt_method_wrapper(method, is_exclusive=False):  # pylint: disable=too-m
                 #       gets killed/aborted. So, use safe 'pop' call with the default 'None' value.
                 NEMESIS_RUN_INFO.pop(nemesis_run_info_key, None)
 
-            args[0].set_target_node_pool_type(NEMESIS_TARGET_POOLS.data_nodes)
+            args[0].set_target_node_pool_type(NEMESIS_TARGET_POOLS.zero_nodes)
 
         return result
 

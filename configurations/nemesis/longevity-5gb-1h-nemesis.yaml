@@ -28,10 +28,13 @@ nemesis_during_prepare: true
 
 gce_n_local_ssd_disk_db: 1
 
+n_db_zero_token_nodes: 5
+zero_token_instance_type_db: 'i3.large'
+use_zero_nodes: true
 
 server_encrypt: true
 client_encrypt: true
 
 teardown_validators:
   scrub:
-    enabled: true
+    enabled: false
