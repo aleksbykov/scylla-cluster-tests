@@ -1498,15 +1498,17 @@ def create_nemesis_pipelines(base_job: str, backend: list[str]):
 @click.argument('branch', type=str)
 @click.argument('username', envvar='JENKINS_USERNAME', type=str, required=False)
 @click.argument('password', envvar='JENKINS_PASSWORD', type=str, required=False)
+@click.option('--pipeline-dir-path', default='', type=str)
 @click.option('--sct_branch', default='master', type=str)
 @click.option('--sct_repo', default='git@github.com:scylladb/scylla-cluster-tests.git', type=str)
-def create_test_release_jobs(branch, username, password, sct_branch, sct_repo):
+def create_test_release_jobs(branch, username, password, sct_branch, sct_repo, pipeline_dir_path):
     add_file_logger()
 
     base_job_dir = f'{branch}'
     server = JenkinsPipelines(username=username, password=password, base_job_dir=base_job_dir,
                               sct_branch_name=sct_branch, sct_repo=sct_repo)
-    base_path = f'{server.base_sct_dir}/jenkins-pipelines/oss'
+    subdir = f"/{pipeline_dir_path}" if pipeline_dir_path else ""
+    base_path = f'{server.base_sct_dir}/jenkins-pipelines/oss{subdir}'
     server.create_job_tree(base_path)
 
     if branch == "scylla-master":
