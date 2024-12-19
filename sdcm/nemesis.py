@@ -5502,7 +5502,7 @@ def disrupt_method_wrapper(method, is_exclusive=False):  # pylint: disable=too-m
         # pylint: disable=too-many-locals
         # pylint: disable=too-many-branches
         method_name = method.__name__
-        target_pool_type = getattr(method, DISRUPT_POOL_PROPERTY_NAME, NEMESIS_TARGET_POOLS.data_nodes)
+        target_pool_type = getattr(method, DISRUPT_POOL_PROPERTY_NAME, NEMESIS_TARGET_POOLS.zero_nodes)
         nemesis_run_info_key = f"{id(args[0])}--{method_name}"
         try:
             NEMESIS_LOCK.acquire()  # pylint: disable=consider-using-with
