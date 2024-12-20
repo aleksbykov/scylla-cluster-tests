@@ -16,6 +16,7 @@ from pytz import utc
 from cassandra import ConsistencyLevel, OperationTimedOut, ReadTimeout
 from cassandra.cluster import ResponseFuture, ResultSet  # pylint: disable=no-name-in-module
 from cassandra.query import SimpleStatement  # pylint: disable=no-name-in-module
+from cassandra.policies import ExponentialBackoffRetryPolicy
 
 from sdcm.remote import LocalCmdRunner
 from sdcm.sct_events import Severity
@@ -146,6 +147,10 @@ class FullscanOperationBase:
                     connect_timeout=300,
                     user=self.fullscan_params.user,
                     password=self.fullscan_params.user_password) as session:
+
+                session.cluster.default_retry_policy = ExponentialBackoffRetryPolicy(
+                    max_num_retries=10.0, min_interval=1.0, max_interval=30.0)
+                session.default_timeout = 900
                 try:
                     scan_op_event.message = ''
                     start_time = time.time()
@@ -351,6 +356,10 @@ class FullPartitionScanOperation(FullscanOperationBase):
         self.log.debug('Will run command "%s"', cmd)
         session.default_fetch_size = self.fullscan_params.page_size
         session.default_consistency_level = ConsistencyLevel.ONE
+        session.cluster.default_retry_policy = ExponentialBackoffRetryPolicy(
+            max_num_retries=10.0, min_interval=1.0, max_interval=30.0)
+        session.default_timeout = 900
+
         return session.execute_async(cmd)
 
     def reset_output_files(self):
