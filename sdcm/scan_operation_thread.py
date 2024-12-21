@@ -149,8 +149,8 @@ class FullscanOperationBase:
                     password=self.fullscan_params.user_password) as session:
 
                 session.cluster.default_retry_policy = ExponentialBackoffRetryPolicy(
-                    max_num_retries=10.0, min_interval=1.0, max_interval=30.0)
-                session.default_timeout = 900
+                    max_num_retries=15.0, min_interval=1.0, max_interval=300.0)
+                session.default_timeout = 1800
                 try:
                     scan_op_event.message = ''
                     start_time = time.time()
@@ -358,7 +358,7 @@ class FullPartitionScanOperation(FullscanOperationBase):
         session.default_consistency_level = ConsistencyLevel.ONE
         session.cluster.default_retry_policy = ExponentialBackoffRetryPolicy(
             max_num_retries=10.0, min_interval=1.0, max_interval=30.0)
-        session.default_timeout = 900
+        session.default_timeout = 1800
 
         return session.execute_async(cmd)
 
@@ -469,6 +469,10 @@ class FullScanAggregatesOperation(FullscanOperationBase):
                                   | FullPartitionScanReversedOrderEvent]) -> None:
         self.log.debug('Will run command %s', cmd)
         validate_mapreduce_service_requests_start_time = time.time()
+        session.cluster.default_retry_policy = ExponentialBackoffRetryPolicy(
+            max_num_retries=10.0, min_interval=1.0, max_interval=30.0)
+        session.default_timeout = self._session_execution_timeout
+
         try:
             cmd_result = session.execute(
                 query=cmd, trace=False, timeout=self._session_execution_timeout)
