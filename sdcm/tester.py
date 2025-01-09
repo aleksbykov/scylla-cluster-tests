@@ -2254,7 +2254,7 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
                                         stress_cmd=stress_cmd,
                                         timeout=timeout,
                                         stress_num=stress_num,
-                                        node_list=self.db_cluster.nodes,
+                                        node_list=self.db_cluster.data_nodes,
                                         round_robin=round_robin, params=self.params).run()
 
     # pylint: disable=too-many-arguments
