@@ -1,2 +1,5 @@
 nemesis_class_name: 'CDCStressorMonkey'
 user_prefix: 'longevity-5gb-1h-CDCStressorMonkey'
+pre_create_keyspace: "CREATE KEYSPACE cdc_test WITH replication = {'class': 'NetworkTopologyStrategy', 'replication_factor': '3'}  AND durable_writes = true;"
+stress_cmd: [ "cassandra-stress user no-warmup profile=/tmp/cdc_profile_preimage_postimage.yaml ops'(insert=2,read1=1,update_number=1,update_name=1,delete1=1)' cl=QUORUM duration=200m -mode cql3 native -rate threads=100"
+             ]
