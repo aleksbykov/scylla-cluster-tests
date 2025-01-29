@@ -2521,7 +2521,8 @@ class SCTConfiguration(dict):
         seeds_num = self.get('seeds_num')
         assert seeds_num > 0, "Seed number should be at least one"
 
-        num_of_db_nodes = sum([int(i) for i in str(self.get('n_db_nodes')).split(' ')])
+     #    num_of_db_nodes = sum([int(i) for i in str(self.get('n_db_nodes')).split(' ')])
+        num_of_db_nodes = sum(self.total_db_nodes)
         assert not num_of_db_nodes or seeds_num <= num_of_db_nodes, \
             f"Seeds number ({seeds_num}) should be not more then nodes number ({num_of_db_nodes})"
 
