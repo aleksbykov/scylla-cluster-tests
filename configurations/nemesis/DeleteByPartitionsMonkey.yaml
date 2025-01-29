@@ -1,3 +1,7 @@
 nemesis_class_name: 'DeleteByPartitionsMonkey'
 user_prefix: 'longevity-5gb-1h-DeleteByPartitionsMonkey'
-max_partitions_in_test_table: 25
+data_validation: |
+  validate_partitions: false
+  table_name: "scylla_bench.test"
+  primary_key_column: "pk"
+  max_partitions_in_test_table: 20
