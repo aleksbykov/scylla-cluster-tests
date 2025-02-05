@@ -31,13 +31,12 @@ from sdcm.sct_events.group_common_events import \
     ignore_max_memory_for_unlimited_query_soft_limit
 from sdcm.tester import ClusterTester
 from sdcm.utils import loader_utils
-from sdcm.utils.adaptive_timeouts import adaptive_timeout, Operations
 from sdcm.utils.common import skip_optional_stage
 from sdcm.utils.decorators import optional_stage
 from sdcm.utils.operations_thread import ThreadParams
 from sdcm.sct_events.system import InfoEvent
 from sdcm.sct_events import Severity
-from sdcm.cluster import MAX_TIME_WAIT_FOR_NEW_NODE_UP
+from sdcm.cluster import MAX_TIME_WAIT_FOR_NEW_NODE_UP, timeit_and_log
 
 
 class LongevityTest(ClusterTester, loader_utils.LoaderUtilsMixin):
@@ -161,13 +160,14 @@ class LongevityTest(ClusterTester, loader_utils.LoaderUtilsMixin):
             InfoEvent(message=f"Starting to grow cluster from {node_cnt} to {cluster_target_size}").publish()
 
             while node_cnt < cluster_target_size:
-                InfoEvent(message=f"Adding node number {node_cnt + 1}").publish()
+                InfoEvent(message=f"Adding node number {node_cnt + add_node_cnt}").publish()
                 new_nodes = self.db_cluster.add_nodes(count=add_node_cnt, enable_auto_bootstrap=True)
                 self.monitors.reconfigure_scylla_monitoring()
                 up_timeout = MAX_TIME_WAIT_FOR_NEW_NODE_UP
-                with adaptive_timeout(Operations.NEW_NODE, node=self.db_cluster.data_nodes[0], timeout=up_timeout):
-                    self.db_cluster.wait_for_init(node_list=new_nodes, timeout=up_timeout, check_node_health=False)
-                self.db_cluster.wait_for_nodes_up_and_normal(nodes=new_nodes)
+                # with adaptive_timeout(Operations.NEW_NODE, node=self.db_cluster.data_nodes[0], timeout=up_timeout):
+                self.db_cluster.wait_for_init(node_list=new_nodes, timeout=up_timeout, check_node_health=False)
+                with timeit_and_log(self.log, "nodes up and normal in test"):
+                    self.db_cluster.wait_for_nodes_up_and_normal(nodes=new_nodes)
                 node_cnt = len(self.db_cluster.data_nodes)
 
             InfoEvent(message=f"Growing cluster finished, new cluster size is {node_cnt}").publish()
