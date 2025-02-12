@@ -4949,8 +4949,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         if not self.cluster.params.get('sla'):
             raise UnsupportedNemesis("SLA nemesis can be run during SLA test only")
 
-        if not self.cluster.nodes[0].is_enterprise:
-            raise UnsupportedNemesis("SLA feature is only supported by Scylla Enterprise")
+        # if not self.cluster.nodes[0].is_enterprise:
+        #     raise UnsupportedNemesis("SLA feature is only supported by Scylla Enterprise")
 
         if not self.cluster.params.get('authenticator'):
             raise UnsupportedNemesis("SLA feature can't work without authenticator")
@@ -4974,8 +4974,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         if not self.cluster.params.get('sla'):
             raise UnsupportedNemesis("SLA nemesis can be run during SLA test only")
 
-        if not self.cluster.nodes[0].is_enterprise:
-            raise UnsupportedNemesis("SLA feature is only supported by Scylla Enterprise")
+        # if not self.cluster.nodes[0].is_enterprise:
+        #     raise UnsupportedNemesis("SLA feature is only supported by Scylla Enterprise")
 
         if not self.cluster.params.get('authenticator'):
             raise UnsupportedNemesis("SLA feature can't work without authenticator")
@@ -4999,8 +4999,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         if not self.cluster.params.get('sla'):
             raise UnsupportedNemesis("SLA nemesis can be run during SLA test only")
 
-        if not self.cluster.nodes[0].is_enterprise:
-            raise UnsupportedNemesis("SLA feature is only supported by Scylla Enterprise")
+        # if not self.cluster.nodes[0].is_enterprise:
+        #     raise UnsupportedNemesis("SLA feature is only supported by Scylla Enterprise")
 
         if not self.cluster.params.get('authenticator'):
             raise UnsupportedNemesis("SLA feature can't work without authenticator")
@@ -5025,8 +5025,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         if not self.cluster.params.get('sla'):
             raise UnsupportedNemesis("SLA nemesis can be run during SLA test only")
 
-        if not self.cluster.nodes[0].is_enterprise:
-            raise UnsupportedNemesis("SLA feature is only supported by Scylla Enterprise")
+        # if not self.cluster.nodes[0].is_enterprise:
+        #     raise UnsupportedNemesis("SLA feature is only supported by Scylla Enterprise")
 
         if not self.cluster.params.get('authenticator'):
             raise UnsupportedNemesis("SLA feature can't work without authenticator")
@@ -5052,8 +5052,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         if not self.cluster.params.get('sla'):
             raise UnsupportedNemesis("SLA nemesis can be run during SLA test only")
 
-        if not self.cluster.nodes[0].is_enterprise:
-            raise UnsupportedNemesis("SLA feature is only supported by Scylla Enterprise")
+        # if not self.cluster.nodes[0].is_enterprise:
+        #     raise UnsupportedNemesis("SLA feature is only supported by Scylla Enterprise")
 
         if not self.cluster.params.get('authenticator'):
             raise UnsupportedNemesis("SLA feature can't work without authenticator")
@@ -5079,8 +5079,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         if not self.cluster.params.get('sla'):
             raise UnsupportedNemesis("SLA nemesis can be run during SLA test only")
 
-        if not self.cluster.nodes[0].is_enterprise:
-            raise UnsupportedNemesis("SLA feature is only supported by Scylla Enterprise")
+        # if not self.cluster.nodes[0].is_enterprise:
+        #     raise UnsupportedNemesis("SLA feature is only supported by Scylla Enterprise")
 
         if not self.cluster.params.get('authenticator'):
             raise UnsupportedNemesis("SLA feature can't work without authenticator")
@@ -5219,8 +5219,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             reduce categories by excluding DML and QUERY,
             verify DDL are logged in audit log correctly. Leaves audit log enabled this way.
         """
-        if not self.target_node.is_enterprise:
-            raise UnsupportedNemesis("Auditing feature is only supported by Scylla Enterprise")
+        # if not self.target_node.is_enterprise:
+        #     raise UnsupportedNemesis("Auditing feature is only supported by Scylla Enterprise")
 
         if store == "syslog" and self._is_it_on_kubernetes():
             # generally syslog is not supported on K8S because of different log line format
