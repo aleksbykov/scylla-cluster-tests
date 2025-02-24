@@ -1,0 +1,29 @@
+test_duration: 6000
+n_db_nodes: 3
+add_node_cnt: 3
+cluster_target_size: 10
+
+user_prefix: 'cluster-scale-10-100-test'
+nemesis_class_name: 'NoOpMonkey'
+# This is in order to start the basic cluster faster
+use_legacy_cluster_init: false
+parallel_node_operations: true
+seeds_num: 2
+# Takes too long on big clusters
+cluster_health_check: false
+
+backtrace_decoding: true
+
+prepare_write_cmd:  [ "cassandra-stress write cl=ALL n=500000 -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3)' -mode cql3 native -rate threads=25 -pop seq=1..500000          -col 'n=FIXED(3) size=FIXED(32)' -log interval=5",
+                      "cassandra-stress write cl=ALL n=500000 -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3)' -mode cql3 native -rate threads=25 -pop seq=500001..1000000   -col 'n=FIXED(3) size=FIXED(32)' -log interval=5",
+                      "cassandra-stress write cl=ALL n=500000 -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3)' -mode cql3 native -rate threads=25 -pop seq=1000001..1500000  -col 'n=FIXED(3) size=FIXED(32)' -log interval=5",
+                      "cassandra-stress write cl=ALL n=500000 -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3)' -mode cql3 native -rate threads=25 -pop seq=1500001..2000000  -col 'n=FIXED(3) size=FIXED(32)' -log interval=5"
+                    ]
+
+stress_cmd: [ "cassandra-stress mixed cl=QUORUM duration=180m -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3)' -mode cql3 native -rate threads=25 -pop seq=1..500000          -col 'n=FIXED(3) size=FIXED(32)' -log interval=5",
+              "cassandra-stress mixed cl=QUORUM duration=180m -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3)' -mode cql3 native -rate threads=25 -pop seq=500001..1000000   -col 'n=FIXED(3) size=FIXED(32)' -log interval=5",
+              "cassandra-stress mixed cl=QUORUM duration=180m -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3)' -mode cql3 native -rate threads=25 -pop seq=1000001..1500000  -col 'n=FIXED(3) size=FIXED(32)' -log interval=5",
+              "cassandra-stress mixed cl=QUORUM duration=180m -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3)' -mode cql3 native -rate threads=25 -pop seq=1500001..2000000  -col 'n=FIXED(3) size=FIXED(32)' -log interval=5"
+             ]
+
+instance_type_db: 'i4i.xlarge'

@@ -4834,7 +4834,7 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         if self.params.get('use_mgmt') and self.node_type == "scylla-db":  # pylint: disable=no-member
             self.install_scylla_manager(node)
 
-    def node_startup(self, node: BaseNode, verbose: bool = False, timeout: int = 10800):
+    def node_startup(self, node: BaseNode, verbose: bool = False, timeout: int = 28800):
         if not self.test_config.REUSE_CLUSTER:
             self.log.debug('io.conf before reboot: %s', node.remoter.sudo(
                 f'cat {node.add_install_prefix("/etc/scylla.d/io.conf")}').stdout)
@@ -5771,7 +5771,7 @@ class BaseMonitorSet:  # pylint: disable=too-many-public-methods,too-many-instan
                     # NOTE: monitoring-4.7 expects that node export metrics are part of exactly the "node_export" job
                     if scrape_config.get("job_name", "unknown") != job_name:
                         continue
-                    if "static_configs" not in base_scrape_configs[i]:
+                    if "static_configs" not in scrape_config:
                         base_scrape_configs[i]["static_configs"] = []
                     base_scrape_configs[i]["static_configs"] += static_config_list
                     break
