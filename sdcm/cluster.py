@@ -4451,35 +4451,26 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         self.log.debug('Schema agreement is reached')
         return True
 
-    def check_nodes_up_and_normal(self, nodes=None, verification_node=None):
-        """Checks via nodetool that node joined the cluster and reached 'UN' state"""
+    def check_nodes_up_and_normal(self, nodes: Optional[list[BaseNode]] = None, verification_node: Optional[BaseNode] = None):
+        """Checks via nodetool executed on verification node that nodes joined the cluster and reached 'UN' state"""
         if not nodes:
             nodes = self.nodes
         status = self.get_nodetool_status(verification_node=verification_node)
-        up_statuses = []
+        ip_statuses = {key: value for dc_value in status.values() for key, value in dc_value.items()}
         for node in nodes:
-            found_node_status = False
-            for dc_status in status.values():
-                ip_status = dc_status.get(node.ip_address)
-                if ip_status:
-                    found_node_status = True
-                    up_statuses.append(ip_status["state"] == "UN")
-                    break
-            if not found_node_status:
-                up_statuses.append(False)
-        if not all(up_statuses):
-            raise ClusterNodesNotReady("Not all nodes joined the cluster")
+            ip_status = ip_statuses.get(node.ip_address)
+            if not ip_status or ip_status["state"] != "UN":
+                raise ClusterNodesNotReady("Node %s with ip %s didn't join to the cluster", node.name, node.ip_address)
 
     def get_nodes_up_and_normal(self, verification_node=None):
         """Checks via nodetool that node joined the cluster and reached 'UN' state"""
         status = self.get_nodetool_status(verification_node=verification_node)
+        ip_statuses = {key: value for dc_value in status.values() for key, value in dc_value.items()}
         up_nodes = []
         for node in self.nodes:
-            for dc_status in status.values():
-                ip_status = dc_status.get(node.ip_address)
-                if ip_status:
-                    if ip_status["state"] == "UN":
-                        up_nodes.append(node)
+            ip_status = ip_statuses.get(node.ip_address)
+            if ip_status and ip_status["state"] == "UN":
+                up_nodes.append(node)
         return up_nodes
 
     def get_node_status_dictionary(self, ip_address=None, verification_node=None):
