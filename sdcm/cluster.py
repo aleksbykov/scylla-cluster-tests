@@ -4822,7 +4822,8 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         if self.params.get('use_mgmt') and self.node_type == "scylla-db":  # pylint: disable=no-member
             self.install_scylla_manager(node)
 
-    def node_startup(self, node: BaseNode, verbose: bool = False, timeout: int = 28800):
+    def node_startup(self, node: BaseNode, verbose: bool = False, timeout: int = 3600):
+        InfoEvent(message=f">>>>>>>>>>>>>>>>>>Timeout for node start up is {timeout}").publish()
         if not self.test_config.REUSE_CLUSTER:
             self.log.debug('io.conf before reboot: %s', node.remoter.sudo(
                 f'cat {node.add_install_prefix("/etc/scylla.d/io.conf")}').stdout)
@@ -4841,8 +4842,8 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
                 node.log.info("node %s has scylla-manager-agent version %s", node.name, manager_agent_version)
 
         node.wait_db_up(verbose=verbose, timeout=timeout)
-        # nodes_status = node.get_nodes_status()
-        # check_nodes_status(nodes_status=nodes_status, current_node=node)
+        nodes_status = node.get_nodes_status()
+        check_nodes_status(nodes_status=nodes_status, current_node=node)
         self.clean_replacement_node_options(node)
 
     def install_scylla_manager(self, node):
