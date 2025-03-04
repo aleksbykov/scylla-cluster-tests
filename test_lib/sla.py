@@ -385,7 +385,7 @@ class Role(UserRoleBase):
 
         LOGGER.debug("Service level from LIST: %s", service_level[0].service_level)
         LOGGER.debug("Attached Service level name: %s", self.attached_service_level_name)
-        if service_level[0].service_level == self.attached_service_level_name:
+        if f"'{service_level[0].service_level}'" == self.attached_service_level_name:
             db_service_level = self.attached_service_level.list_service_level()
             LOGGER.debug("db_service_level: %s", db_service_level)
             if db_service_level.shares != self.attached_service_level_shares:
