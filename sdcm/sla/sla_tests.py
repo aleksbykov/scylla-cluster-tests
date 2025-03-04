@@ -118,7 +118,7 @@ class Steps(SlaUtils):
                                 f"Validate io_queue_operations during load") as wp_event:
             try:
                 role_for_attach.attach_service_level(new_service_level)
-                role_for_attach.validate_role_service_level_attributes_against_db()
+                validate_role_service_level_attributes_against_db()
 
                 # Fix for issue https://github.com/scylladb/scylla-enterprise/issues/2572
                 for node in tester.db_cluster.nodes:
