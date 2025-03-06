@@ -3751,7 +3751,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         with ignore_ycsb_connection_refused():
             # node stop and make sure its "DN"
-            node_to_remove.stop_scylla_server(verify_up=True, verify_down=True)
+            node_to_remove.stop_scylla_server(verify_up=False, verify_down=True)
 
             # terminate node
             self._terminate_cluster_node(node_to_remove)
