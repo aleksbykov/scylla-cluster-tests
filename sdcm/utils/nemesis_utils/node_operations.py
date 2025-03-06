@@ -13,7 +13,7 @@ def block_scylla_ports(target_node: "BaseNode", ports: list[int] | None = None):
     ports = ports or [7001, 7000, 9042, 9142, 19042, 19142]
     target_node.install_package("iptables")
 
-    target_node.start_service("iptables")
+    target_node.start_service("iptables", ignore_status=True)
     target_node.log.debug("Block connections %s", target_node.name)
     for port in ports:
         target_node.remoter.sudo(f"iptables -A INPUT -p tcp --dport {port} -j DROP")
@@ -23,7 +23,7 @@ def block_scylla_ports(target_node: "BaseNode", ports: list[int] | None = None):
     for port in ports:
         target_node.remoter.sudo(f"iptables -D INPUT -p tcp --dport {port} -j DROP")
         target_node.remoter.sudo(f"iptables -D OUTPUT -p tcp --dport {port} -j DROP")
-    target_node.stop_service("iptables")
+    target_node.stop_service("iptables", ignore_status=True)
 
 
 @contextlib.contextmanager
