@@ -5532,8 +5532,9 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             stack.callback(drop_keyspace, node=working_node)
 
             with simulate_node_unavailability(self.target_node):
-                # target node stopped by Contextmanger. Wait while its status will be updated
-                wait_for(node_operations.is_node_seen_as_down, timeout=600, throw_exc=True,
+                # target node stopped by Contextmanger. Wait while its status will be updated.
+                # with tablets and multidc it could take more time.
+                wait_for(node_operations.is_node_seen_as_down, timeout=1800, throw_exc=True,
                          down_node=self.target_node, verification_node=working_node, text=f"Wait other nodes see {self.target_node.name} as DOWN...")
                 self.log.debug("Remove node %s : hostid: %s with blocked scylla from cluster",
                                self.target_node.name, target_host_id)
