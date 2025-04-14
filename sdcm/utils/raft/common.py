@@ -20,6 +20,8 @@ from sdcm.cluster import BaseMonitorSet, NodeSetupFailed, BaseScyllaCluster, Bas
 from sdcm.exceptions import RaftTopologyCoordinatorNotFound
 from sdcm.rest.storage_service_client import StorageServiceClient
 from sdcm.utils.decorators import retrying
+from sdcm.utils.version_utils import ComparableScyllaVersion
+
 
 LOGGER = logging.getLogger(__name__)
 UUID_REGEX = re.compile(r"([0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12})")
@@ -221,7 +223,8 @@ class NodeBootstrapAbortManager:
         self.bootstrap_node.stop_scylla_server(ignore_status=True, timeout=600)
         # Clean garbage from group 0 and scylla data and restart setup
         if self.verification_node.raft.get_diff_group0_token_ring_members() or \
-                self.verification_node.raft.get_group0_non_voters():
+                (ComparableScyllaVersion(self.verification_node.scylla_version) <= "2025.1"
+                 and self.verification_node.raft.get_group0_non_voters()):
             self.verification_node.raft.clean_group0_garbage(raise_exception=True)
         if not self.is_bootstrapped_successfully():
             LOGGER.debug("Clean old scylla data and restart scylla service")

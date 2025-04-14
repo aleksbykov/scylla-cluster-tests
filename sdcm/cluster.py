@@ -5078,7 +5078,7 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
 
         missing_host_ids = verification_node.raft.get_diff_group0_token_ring_members()
 
-        if not missing_host_ids:
+        if not missing_host_ids and ComparableScyllaVersion(verification_node.scylla_version) <= "2025.1":
             self.log.debug("Node %s returned to tokenring, but stay non-voter. Add its host-id for remove")
             missing_host_ids = verification_node.raft.get_group0_non_voters()
 

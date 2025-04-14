@@ -14,7 +14,7 @@ from sdcm.utils.features import is_consistent_topology_changes_feature_enabled, 
 from sdcm.utils.health_checker import HealthEventsGenerator
 from sdcm.wait import wait_for
 from sdcm.rest.raft_api import RaftApi
-
+from sdcm.utils.version_utils import ComparableScyllaVersion
 
 LOGGER = logging.getLogger(__name__)
 RAFT_DEFAULT_SCYLLA_VERSION = "5.5.0-dev"
@@ -235,7 +235,7 @@ class RaftFeature(RaftFeatureOperations):
 
         LOGGER.debug("Clean group0 non-voter's members")
         host_ids = self.get_diff_group0_token_ring_members()
-        if not host_ids:
+        if not host_ids and ComparableScyllaVersion(self._node.scylla_version) <= "2025.1":
             LOGGER.debug("Node could return to token ring but not yet bootstrap")
             host_ids = self.get_group0_non_voters()
         attempt = 3
@@ -261,7 +261,9 @@ class RaftFeature(RaftFeatureOperations):
             if not host_ids or attempt < 1:
                 break
 
-        missing_host_ids = self.get_diff_group0_token_ring_members() or self.get_group0_non_voters()
+        missing_host_ids = self.get_diff_group0_token_ring_members()
+        if not missing_host_ids and ComparableScyllaVersion(self._node.scylla_version) <= "2025.1":
+            missing_host_ids = self.get_group0_non_voters()
         if missing_host_ids:
             token_ring_members = self._node.get_token_ring_members()
             group0_members = self.get_group0_members()
@@ -329,7 +331,9 @@ class RaftFeature(RaftFeatureOperations):
         LOGGER.debug("Difference between group0 and token ring: %s", diff)
         num_of_nodes = len(self._node.parent_cluster.nodes)
         LOGGER.debug("Number of nodes in sct cluster %s", num_of_nodes)
-        non_voters_ids = self.get_group0_non_voters()
+        non_voters_ids = []
+        if ComparableScyllaVersion(self._node.scylla_version) <= "2025.1":
+            non_voters_ids = self.get_group0_non_voters()
 
         return not diff and not non_voters_ids and len(group0_ids) == len(token_ring_ids) == num_of_nodes
 
@@ -340,7 +344,10 @@ class RaftFeature(RaftFeatureOperations):
                      self._node.name, self._node.host_id)
         token_ring_node_ids = [member["host_id"] for member in tokenring_members]
         for member in group0_members:
-            if member["voter"] and member["host_id"] in token_ring_node_ids:
+            if ComparableScyllaVersion(self._node.scylla_version) <= "2025.1":
+                if member["voter"] and member["host_id"] in token_ring_node_ids:
+                    continue
+            elif member["host_id"] in token_ring_node_ids:
                 continue
             error_message = f"Node {self._node.name} has group0 member with host_id {member['host_id']} with " \
                 f"can_vote {member['voter']} and " \
