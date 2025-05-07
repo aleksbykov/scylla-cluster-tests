@@ -771,6 +771,8 @@ class UpgradeTest(FillDatabaseData, loader_utils.LoaderUtilsMixin):
                                                               step=step)
         InfoEvent(message='Step5.1 - run raft topology upgrade procedure').publish()
         self.run_raft_topology_upgrade_procedure()
+        InfoEvent(message="Step5.2 - check limited voters feature").publish()
+        self.validate_limited_voters_feature_enabled()
 
         InfoEvent(message='Step6 - Verify stress results after upgrade ').publish()
         InfoEvent(message='Waiting for stress threads to complete after upgrade').publish()
@@ -1004,6 +1006,7 @@ class UpgradeTest(FillDatabaseData, loader_utils.LoaderUtilsMixin):
 
         InfoEvent(message='Run raft topology upgrade procedure').publish()
         self.run_raft_topology_upgrade_procedure()
+        self.validate_limited_voters_feature_enabled()
 
         InfoEvent(message="Waiting for stress_during_entire_upgrade to finish").publish()
         for stress_thread_pool in stress_thread_pools:
@@ -1438,6 +1441,38 @@ class UpgradeTest(FillDatabaseData, loader_utils.LoaderUtilsMixin):
                 self.log.warning("Couldn't extract version from %s", new_version)
         except Exception as exc:  # pylint: disable=broad-except
             self.log.exception("Failed to save upgraded Scylla version in Argus", exc_info=exc)
+
+    def validate_limited_voters_feature_enabled(self):
+        InfoEvent(message="Check that limited voters feature enabled after upgrade for all nodes")
+        max_voter_number = 5
+        feature_state_per_node = []
+        for node in self.db_cluster.nodes:
+            result = wait_for(func=self.db_cluster.is_features_enabled_on_node,
+                              timeout=60,
+                              step=1,
+                              text=f"Check feature enabled on node {node.name}",
+                              throw_exc=False,
+                              feature_list=["GROUP0_LIMITED_VOTERS"],
+                              node=node)
+            feature_state_per_node.append(result)
+        if all(not enabled for enabled in feature_state_per_node):
+            InfoEvent(message="Limited voters feature is not supported or enabled on all nodes").publish()
+            return
+        elif all(feature_state_per_node):
+            InfoEvent(message="Limited voters feature enabled on all nodes").publish()
+            num_of_nodes = len(self.db_cluster.nodes)
+            num_of_non_voters = len(self.db_cluster.nodes[0].raft.get_group0_non_voters())
+            if num_of_nodes <= max_voter_number and num_of_non_voters > 0:
+                InfoEvent(message=f'Number of voters: {num_of_nodes - num_of_non_voters} are less than expected: {max_voter_number}',
+                          severity=Severity.ERROR).publish()
+            elif num_of_nodes > max_voter_number and num_of_non_voters == 0:
+                InfoEvent(message=f'Number of voters: {num_of_nodes - num_of_non_voters} is higher than expected: {max_voter_number}',
+                          severity=Severity.ERROR).publish()
+            else:
+                InfoEvent(message="Feature limited voters is enabled correctly")
+            return
+        else:
+            InfoEvent(message="Limited voters feature not enabled on all nodes", severity=Severity.ERROR).publish()
 
 
 class UpgradeCustomTest(UpgradeTest):
