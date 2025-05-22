@@ -5395,11 +5395,8 @@ class Nemesis:
                             "Query from banned node was executed succesful with Consistency.QUORUM")
                     except (NoHostAvailable, OperationTimedOut, Unavailable) as exc:
                         self.log.debug("Query failed with error: %s as expected", exc)
-            self.log.debug("Remove banned node %s from cluster node lsit", self.target_node.name)
-            # need to remove it before create cluster connection, so banned node was not in ip list
-            self.cluster.nodes.remove(self.target_node)
-
-            with self.cluster.cql_connection_patient(working_node) as session:
+            alive_cluster_nodes = [node for node in self.cluster.nodes if node != self.target_node]
+            with self.cluster.cql_connection_patient(working_node, nodes=alive_cluster_nodes) as session:
                 LOGGER.debug("Check keyspace %s.%s is empty", keyspace_name, table_name)
                 stmt = SimpleStatement(f"SELECT * from {keyspace_name}.{table_name}",
                                        consistency_level=ConsistencyLevel.QUORUM)
