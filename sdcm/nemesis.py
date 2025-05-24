@@ -3642,7 +3642,7 @@ class Nemesis:
                         host_id), ignore_status=True, verbose=True, long_running=True, retry=0)
                 if res.failed and re.match(removenode_reject_msg, res.stdout + res.stderr):
                     raise Exception(f"Removenode was rejected {res.stdout}\n{res.stderr}")
-
+            self.log.debug(">>>>>>Nodetool removenode status: Output: %s, Stderr: %s", res.stdout, res.stderr)
             return res.exit_status
 
         # full cluster repair
@@ -3658,35 +3658,40 @@ class Nemesis:
                     self.log.error(f"failed to execute repair command "
                                    f"on node {node} due to the following error: {str(details)}")
 
-        exit_status = remove_node()
-        # if remove node command failed by any reason,
-        # we will remove the terminated node from
-        # dead_nodes_list, so the health validator terminate the job
-        if exit_status != 0:
-            self.log.error(f"nodetool removenode command exited with status {exit_status}")
-            # check difference between group0 and token ring,
-            garbage_host_ids = verification_node.raft.get_diff_group0_token_ring_members()
-            self.log.debug("Difference between token ring and group0 is %s", garbage_host_ids)
-            if garbage_host_ids:
-                # if difference found, clean garbage and continue
-                verification_node.raft.clean_group0_garbage()
-            else:
-                # group0 and token ring are consistent. Removenode failed by meanigfull reason.
-                # remove node from dead_nodes list to raise critical issue by HealthValidator
-                self.log.debug(
-                    f"Remove failed node {node_to_remove} from dead node list {self.cluster.dead_nodes_list}")
-                node = next((n for n in self.cluster.dead_nodes_list if n.ip_address ==
-                            node_to_remove.ip_address), None)
-                if node:
-                    self.cluster.dead_nodes_list.remove(node)
-                else:
-                    self.log.debug(f"Node {node.name} with ip {node.ip_address} was not found in dead_nodes_list")
-
-        # verify node is removed by nodetool status
+        # verify that node is in cluster
         removed_node_status = self.cluster.get_node_status_dictionary(
             ip_address=node_to_remove.ip_address, verification_node=verification_node)
-        assert removed_node_status is None, \
-            "Node was not removed properly (Node status:{})".format(removed_node_status)
+
+        if removed_node_status is not None:
+            exit_status = remove_node()
+            # if remove node command failed by any reason,
+            # we will remove the terminated node from
+            # dead_nodes_list, so the health validator terminate the job
+            if exit_status != 0:
+                self.log.error(f"nodetool removenode command exited with status {exit_status}")
+                # check difference between group0 and token ring,
+                garbage_host_ids = verification_node.raft.get_diff_group0_token_ring_members()
+                self.log.debug("Difference between token ring and group0 is %s", garbage_host_ids)
+                if garbage_host_ids:
+                    # if difference found, clean garbage and continue
+                    verification_node.raft.clean_group0_garbage()
+                else:
+                    # group0 and token ring are consistent. Removenode failed by meanigfull reason.
+                    # remove node from dead_nodes list to raise critical issue by HealthValidator
+                    self.log.debug(
+                        f"Remove failed node {node_to_remove} from dead node list {self.cluster.dead_nodes_list}")
+                    node = next((n for n in self.cluster.dead_nodes_list if n.ip_address ==
+                                node_to_remove.ip_address), None)
+                    if node:
+                        self.cluster.dead_nodes_list.remove(node)
+                    else:
+                        self.log.debug(f"Node {node.name} with ip {node.ip_address} was not found in dead_nodes_list")
+
+            # verify node is removed by nodetool status
+            removed_node_status = self.cluster.get_node_status_dictionary(
+                ip_address=node_to_remove.ip_address, verification_node=verification_node)
+            assert removed_node_status is None, \
+                "Node was not removed properly (Node status:{})".format(removed_node_status)
 
         # add new node with same type (data node / zero token node)
         new_node_args = {"count": 1, "rack": self.target_node.rack}
@@ -5375,7 +5380,8 @@ class Nemesis:
                          down_node=self.target_node, verification_node=working_node, text=f"Wait other nodes see {self.target_node.name} as DOWN...")
                 self.log.debug("Remove node %s : hostid: %s with blocked scylla from cluster",
                                self.target_node.name, target_host_id)
-                working_node.run_nodetool(f"removenode {target_host_id}", retry=2, long_running=False)
+                result = working_node.run_nodetool(f"removenode {target_host_id}", retry=0, long_running=True)
+                self.log.debug(">>>>> Result of remove node: Output: %s, Stderr: %s", result.stdout, result.stderr)
                 assert node_operations.is_node_removed_from_cluster(removed_node=self.target_node, verification_node=working_node), \
                     f"Node {self.target_node.name} with host id {target_host_id} was not removed. See log errors"
 
