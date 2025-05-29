@@ -53,9 +53,9 @@ def run_long_running_cmd(remoter: RemoteCmdRunnerBase,
 
         remoter.run(f'while [ -e /proc/{pid.strip()} ]; do sleep 0.1; done', timeout=timeout, retry=10, verbose=False)
 
-        stdout = str(remoter.run(f'cat {cmd_stdout_log}', verbose=False).stdout)
-        stderr = str(remoter.run(f'cat {cmd_stderr_log}', verbose=False).stdout)
-        exit_code = int(remoter.run(f'cat {cmd_exit_log}', verbose=False).stdout)
+        stdout = str(remoter.run(f'cat {cmd_stdout_log}', verbose=True).stdout)
+        stderr = str(remoter.run(f'cat {cmd_stderr_log}', verbose=True).stdout)
+        exit_code = int(remoter.run(f'cat {cmd_exit_log}', verbose=True).stdout)
         result = Result(command=cmd, stdout=stdout,
                         stderr=stderr, exited=exit_code,
                         hide=('stderr', 'stdout'), pty=False)

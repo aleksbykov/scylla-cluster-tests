@@ -3653,7 +3653,7 @@ class Nemesis:
                             line="failed to repair"):
             for node in up_normal_nodes:
                 try:
-                    self.repair_nodetool_repair(node=node, publish_event=False)
+                    self.repair_nodetool_repair(node=node, publish_event=True)
                 except Exception as details:  # noqa: BLE001
                     self.log.error(f"failed to execute repair command "
                                    f"on node {node} due to the following error: {str(details)}")
