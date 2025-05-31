@@ -306,7 +306,7 @@ class LongevityTest(ClusterTester, loader_utils.LoaderUtilsMixin):
             for _ in range(add_node_cnt):
                 new_nodes = self.db_cluster.add_nodes(count=1, enable_auto_bootstrap=True)
                 self.monitors.reconfigure_scylla_monitoring()
-                self.db_cluster.wait_for_init(node_list=new_nodes)
+                self.db_cluster.wait_for_init(node_list=new_nodes, timeout=10800)
 
         self.db_cluster.start_nemesis()
 
