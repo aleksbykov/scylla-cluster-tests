@@ -14,7 +14,7 @@ simulated_racks: 3
 
 instance_type_db: 'i4i.2xlarge'
 
-nemesis_class_name: 'IsolateNodeWithIptableRuleNemesis'
+nemesis_class_name: 'IsolateNodeWithProcessSignalNemesis'
 nemesis_seed: '032'
 
 user_prefix: 'longevity-100gb-4h'
