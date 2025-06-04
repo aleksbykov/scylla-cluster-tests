@@ -5375,7 +5375,11 @@ class Nemesis:
                          down_node=self.target_node, verification_node=working_node, text=f"Wait other nodes see {self.target_node.name} as DOWN...")
                 self.log.debug("Remove node %s : hostid: %s with blocked scylla from cluster",
                                self.target_node.name, target_host_id)
-                working_node.run_nodetool(f"removenode {target_host_id}", retry=0, long_running=True)
+                if simulate_node_unavailability == node_operations.pause_scylla_with_sigstop:
+                    with node_operations.block_scylla_ports(self.target_node):
+                        working_node.run_nodetool(f"removenode {target_host_id}", retry=0, long_running=True)
+                else:
+                    working_node.run_nodetool(f"removenode {target_host_id}", retry=0, long_running=True)
                 assert node_operations.is_node_removed_from_cluster(removed_node=self.target_node, verification_node=working_node), \
                     f"Node {self.target_node.name} with host id {target_host_id} was not removed. See log errors"
 
