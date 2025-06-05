@@ -16,11 +16,12 @@ from sdcm.wait import wait_for
 from sdcm.sct_events.group_common_events import decorate_with_context, \
     ignore_ycsb_connection_refused
 from sdcm.utils.parallel_object import ParallelObject
-from sdcm.utils.raft import get_node_status_from_system_by
+from sdcm.utils.raft import get_node_status_from_system_by, NodeState
 from sdcm.cluster import BaseMonitorSet, NodeSetupFailed, BaseScyllaCluster, BaseNode
 from sdcm.exceptions import RaftTopologyCoordinatorNotFound
 from sdcm.rest.storage_service_client import StorageServiceClient
 from sdcm.utils.decorators import retrying
+from sdcm.utils.features import is_group0_limited_voters_enabled
 
 
 LOGGER = logging.getLogger(__name__)
