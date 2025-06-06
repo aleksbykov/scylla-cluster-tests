@@ -247,9 +247,9 @@ class RaftFeature(RaftFeatureOperations):
     def get_diff_group0_token_ring_members(self) -> list[str]:
         LOGGER.debug("Get diff group0 from token ring")
         group0_members = self.get_group0_members()
-        group0_members_ids = {member["host_id"] for member in group0_members}
+        group0_members_ids = {member.host_id for member in group0_members}
         token_ring_members = self._node.get_token_ring_members()
-        token_ring_member_ids = {member["host_id"] for member in token_ring_members}
+        token_ring_member_ids = {member.host_id for member in token_ring_members}
         LOGGER.debug("Token rings members ids: %s", token_ring_member_ids)
         LOGGER.debug("Group0 members ids: %s", group0_members_ids)
 
@@ -357,9 +357,9 @@ class RaftFeature(RaftFeatureOperations):
         )
 
     def is_cluster_topology_consistent(self) -> bool:
-        group0_ids = [member["host_id"] for member in self.get_group0_members()]
+        group0_ids = [member.host_id for member in self.get_group0_members()]
         LOGGER.debug("Group0 member ids %s", group0_ids)
-        token_ring_ids = [member["host_id"] for member in self._node.get_token_ring_members()]
+        token_ring_ids = [member.host_id for member in self._node.get_token_ring_members()]
         LOGGER.debug("Token ring member ids: %s", token_ring_ids)
         diff = set(group0_ids) - set(token_ring_ids) or set(token_ring_ids) - set(group0_ids)
         LOGGER.debug("Difference between group0 and token ring: %s", diff)
