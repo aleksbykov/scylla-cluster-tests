@@ -4389,7 +4389,7 @@ class Nemesis:
                 write_cmd = (
                     "scylla-bench -mode=write -workload=sequential -consistency-level=all -replication-factor=3"
                     " -partition-count=50 -clustering-row-count=100 -clustering-row-size=uniform:75..125"
-                    f" -keyspace {keyspace_name} -table {table_name} -timeout=120s -validate-data")
+                    f" -keyspace '{keyspace_name}' -table {table_name} -timeout=120s -validate-data")
                 run_write_scylla_bench_load(write_cmd)
                 upgrade_sstables(self.cluster.data_nodes)
 
@@ -4397,7 +4397,7 @@ class Nemesis:
                 read_cmd = (
                     "scylla-bench -mode=read -workload=sequential -consistency-level=all -replication-factor=3"
                     " -partition-count=50 -clustering-row-count=100 -clustering-row-size=uniform:75..125"
-                    f" -keyspace {keyspace_name} -table {table_name} -timeout=120s -validate-data"
+                    f" -keyspace '{keyspace_name}' -table {table_name} -timeout=120s -validate-data"
                     " -iterations=1 -concurrency=10 -connection-count=10 -rows-per-request=10")
                 read_thread = self.tester.run_stress_thread(stress_cmd=read_cmd, stop_test_on_failure=False)
                 self.tester.verify_stress_thread(read_thread, error_handler=self._nemesis_stress_failure_handler)
