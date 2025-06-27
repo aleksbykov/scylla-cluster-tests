@@ -3034,6 +3034,8 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):
             self.log.error("Didn't find any live node for saving the schema.")
 
     def tearDown(self):
+        if self.db_cluster and hasattr(self.db_cluster, "nodeup_stats"):
+            InfoEvent(f"Nodes startup stats: {getattr(self.db_cluster, 'nodeup_stats', {})}").publish()
         self.teardown_started = True
         with silence(parent=self, name='Sending test end event'):
             InfoEvent(message="TEST_END").publish()
