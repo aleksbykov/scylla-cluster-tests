@@ -102,7 +102,7 @@ class LoaderUtilsMixin:
 
     def _run_all_stress_cmds(self, stress_queue, params):
         stress_cmds = params['stress_cmd']
-        delay_between_cmds = params.get('delay_between_cmds', 30)
+        delay_between_cmds = params.pop('delay_between_cmds', 30)
         if not isinstance(stress_cmds, list):
             stress_cmds = [stress_cmds]
         # In some cases we want the same stress_cmd to run several times (can be used with round_robin or not).
