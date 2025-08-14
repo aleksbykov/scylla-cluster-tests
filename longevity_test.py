@@ -151,7 +151,7 @@ class LongevityTest(ClusterTester, loader_utils.LoaderUtilsMixin):
         if tombstone_gc_verification_params := self._get_tombstone_gc_verification_params():
             self.run_tombstone_gc_verification_thread(**tombstone_gc_verification_params)
 
-        self.run_prepare_write_cmd()
+        self.run_prepare_write_cmd(delay_between_cmds=120)
 
         # Grow cluster to target size if requested
         if cluster_target_size := self.params.get('cluster_target_size'):
