@@ -102,6 +102,7 @@ class LoaderUtilsMixin:
 
     def _run_all_stress_cmds(self, stress_queue, params):
         stress_cmds = params['stress_cmd']
+        delay_between_cmds = params.get('delay_between_cmds', 30)
         if not isinstance(stress_cmds, list):
             stress_cmds = [stress_cmds]
         # In some cases we want the same stress_cmd to run several times (can be used with round_robin or not).
@@ -139,7 +140,7 @@ class LoaderUtilsMixin:
             else:
                 stress_queue.append(self.run_stress_thread(**stress_params))
 
-            time.sleep(30)
+            time.sleep(delay_between_cmds)
 
         return stress_queue
 
@@ -239,7 +240,7 @@ class LoaderUtilsMixin:
             self.log.debug("Execute post prepare queries: %s", post_prepare_cql_cmds)
             self._run_cql_commands(post_prepare_cql_cmds)
 
-    def run_prepare_write_cmd(self):
+    def run_prepare_write_cmd(self, delay_between_cmds: int = 30):
         # In some cases (like many keyspaces), we want to create the schema (all keyspaces & tables) before the load
         # starts - due to the heavy load, the schema propogation can take long time and c-s fails.
         prepare_write_cmd = self.params.get('prepare_write_cmd')
@@ -266,6 +267,7 @@ class LoaderUtilsMixin:
                                 'duration': self.params.get('prepare_stress_duration'),
                                 'keyspace_name': keyspace_name,
                                 'round_robin': True,
+                                'delay_between_cmds': delay_between_cmds
                             },
                         )
                 # Not using round_robin and all keyspaces will run on all loaders
@@ -277,6 +279,7 @@ class LoaderUtilsMixin:
                             'duration': self.params.get('prepare_stress_duration'),
                             'keyspace_num': keyspace_num,
                             'round_robin': self.params.get('round_robin'),
+                            'delay_between_cmds': delay_between_cmds
                         },
                     )
 
