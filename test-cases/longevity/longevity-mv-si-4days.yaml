@@ -27,3 +27,5 @@ user_prefix: 'longevity-mv-si-4d'
 space_node_threshold: 644245
 
 use_preinstalled_scylla: true
+logs_transport: 'vector'
+round_robin: true
