@@ -72,9 +72,9 @@ def get_random_column_name(session, ks, cf, filter_out_collections: bool = False
     return None
 
 
-def create_index(session, ks, cf, column) -> str:
+def create_index(session, ks, cf, column, index_name=None) -> str:
     InfoEvent(message=f"Starting creating index: {ks}.{cf}({column})").publish()
-    index_name = f"{cf}_{column}_nemesis".lower()
+    index_name = index_name or f"{cf}_{column}_nemesis".lower()
     session.execute(f'CREATE INDEX {index_name} ON {ks}.{cf}("{column}")', timeout=600)
     return index_name
 
@@ -162,7 +162,7 @@ def create_materialized_view(session, ks_name, base_table_name, mv_name, mv_part
     cl_clause = ', '.join(mv_clustering_key)
 
     query = f"CREATE MATERIALIZED VIEW {ks_name}.{mv_name} AS SELECT {select_clause} FROM {ks_name}.{base_table_name} " \
-            f"WHERE {where_clause} PRIMARY KEY ({pk_clause}, {cl_clause}) WITH comment='test MV'"
+        f"WHERE {where_clause} PRIMARY KEY ({pk_clause}, {cl_clause}) WITH comment='test MV'"
     if compression is not None:
         query += f" AND compression = {{ 'sstable_compression': '{compression}Compressor' }}"
     if read_repair is not None:
@@ -198,6 +198,16 @@ def create_mv_for_table(session, keyspace_name, base_table_name, view_name):
         create_materialized_view(session, keyspace_name, base_table_name, view_name, [column],
                                  primary_key_columns,
                                  mv_columns=[column] + primary_key_columns)
+
+
+def create_index_for_table(session, keyspace_name, base_table_name, index_name=None):
+    column = get_random_column_name(session, keyspace_name, base_table_name, filter_out_static_columns=True,
+                                    filter_out_column_types=['counter'])
+    if not column:
+        raise UnsupportedNemesis("No column found to create index on")
+    index_name = create_index(session, keyspace_name, base_table_name, column, index_name=index_name)
+
+    return index_name
 
 
 def wait_mv_building_tasks_started(session, ks_name, view_name, timeout=600):
