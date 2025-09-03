@@ -105,9 +105,5 @@ def is_group0_limited_voters_enabled(session: Session) -> bool:
 
 
 def is_views_with_tablets_enabled(session: Session) -> bool:
-<<<<<<< HEAD
     """ Check whether feature view with tablets is enabled"""
-=======
-    """ Check whether feature group0 limited voters is enabled"""
->>>>>>> d376049a5 (feature(nemesis): kill mv building coordinator during mv building)
     return VIEWS_WITH_TABLETS in get_enabled_features(session)
