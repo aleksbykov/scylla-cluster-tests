@@ -2,13 +2,13 @@ keyspace: cdc_test
 
 keyspace_definition: |
 
-  CREATE KEYSPACE IF NOT EXISTS cdc_test WITH replication = {'class': 'NetworkTopologyStrategy', 'replication_factor': '3'}  AND durable_writes = true;
+  CREATE KEYSPACE IF NOT EXISTS cdc_test WITH replication = {'class': 'NetworkTopologyStrategy', 'replication_factor': '3'}  AND durable_writes = true AND tablets = {'enabled': true};
 
 table: test_table
 
 table_definition: |
 
-  CREATE TABLE cdc_test.test_table (
+  CREATE TABLE IF NOT EXISTS cdc_test.test_table (
     pkid text PRIMARY KEY,
     name text,
     number int,

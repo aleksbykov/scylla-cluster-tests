@@ -1,14 +1,14 @@
-keyspace: cdc_test
+keyspace: cdc_test_no_tablets
 
 keyspace_definition: |
 
-  CREATE KEYSPACE IF NOT EXISTS cdc_test WITH replication = {'class': 'NetworkTopologyStrategy', 'replication_factor': '3'}  AND durable_writes = true  AND tablets = {'enabled': true};
+  CREATE KEYSPACE IF NOT EXISTS cdc_test_no_tablets WITH replication = {'class': 'NetworkTopologyStrategy', 'replication_factor': '3'}  AND durable_writes = true AND tablets = {'enabled': false};
 
 table: test_table_postimage
 
 table_definition: |
 
-  CREATE TABLE IF NOT EXISTS cdc_test.test_table_postimage (
+  CREATE TABLE IF NOT EXISTS cdc_test_no_tablets.test_table_postimage (
     pkid text PRIMARY KEY,
     name text,
     number int,
