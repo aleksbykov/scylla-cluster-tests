@@ -14,7 +14,8 @@ n_loaders: 2
 instance_type_db: 'i4i.4xlarge'
 
 nemesis_class_name: 'SisyphusMonkey'
-nemesis_seed: '015'
+nemesis_selector: "disruptive"
+# nemesis_seed: '015'
 
 user_prefix: 'longevity-cdc-100gb-4h'
 space_node_threshold: 64424
