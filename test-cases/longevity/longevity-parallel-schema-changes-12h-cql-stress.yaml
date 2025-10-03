@@ -1,22 +1,22 @@
 test_duration: 800
 
 prepare_write_cmd:  [
-                     "cql-stress-cassandra-stress write cl=QUORUM n=20971520 -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3) compaction(strategy=SizeTieredCompactionStrategy)' -mode cql3 native -rate threads=80  -pop seq=1..20971520 -col 'n=FIXED(10) size=FIXED(128)' -log interval=10",
-                     "scylla-bench -workload=sequential -mode=write -replication-factor=3 -partition-count=250 -clustering-row-count=1000 -clustering-row-size=uniform:1024..4096 -concurrency=10 -connection-count=10 -consistency-level=quorum -rows-per-request=5 -timeout=60s -retry-number=30 -retry-interval=500ms,1s",
+                    #  "cql-stress-cassandra-stress write cl=QUORUM n=20971520 -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3) compaction(strategy=SizeTieredCompactionStrategy)' -mode cql3 native -rate threads=80  -pop seq=1..20971520 -col 'n=FIXED(10) size=FIXED(128)' -log interval=10",
+                    #  "scylla-bench -workload=sequential -mode=write -replication-factor=3 -partition-count=250 -clustering-row-count=1000 -clustering-row-size=uniform:1024..4096 -concurrency=10 -connection-count=10 -consistency-level=quorum -rows-per-request=5 -timeout=60s -retry-number=30 -retry-interval=500ms,1s",
                      "cassandra-stress user profile=/tmp/cs_multidc_si_lcs.yaml ops'(insert=1)' cl=LOCAL_QUORUM n=3000000 -mode cql3 native -rate threads=40 -log interval=5",
                     ]
 
 stress_cmd: [
-             "cql-stress-cassandra-stress write cl=QUORUM duration=720m -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3) compaction(strategy=SizeTieredCompactionStrategy)' -mode cql3 native -rate 'threads=40 throttle=15000/s' -pop 'dist=uniform(1..20971520)' -col 'n=FIXED(10) size=FIXED(128)' -log interval=10",
-             "cql-stress-cassandra-stress read  cl=QUORUM duration=720m -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3) compaction(strategy=SizeTieredCompactionStrategy)' -mode cql3 native -rate 'threads=40 throttle=15000/s' -pop 'dist=uniform(1..20971520)' -col 'n=FIXED(10) size=FIXED(128)' -log interval=10",
-             "scylla-bench -workload=sequential -mode=write -replication-factor=3 -partition-count=50 -clustering-row-count=1000 -partition-offset=11 -clustering-row-size=uniform:1024..4096  -concurrency=20  -connection-count=20  -consistency-level=quorum -rows-per-request=50 -timeout=60s -retry-number=30 -retry-interval=500ms,1s -iterations 0 -duration=700m -max-rate 1000",
-             "scylla-bench -workload=sequential -mode=read  -replication-factor=3 -partition-count=50 -clustering-row-count=1000 -partition-offset=41 -clustering-row-size=uniform:1024..4096   -concurrency=20 -connection-count=20  -consistency-level=quorum -rows-per-request=50 -timeout=60s -retry-number=30 -retry-interval=500ms,1s -iterations 0 -duration=700m -max-rate 1000",
+            #  "cql-stress-cassandra-stress write cl=QUORUM duration=720m -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3) compaction(strategy=SizeTieredCompactionStrategy)' -mode cql3 native -rate 'threads=40 throttle=15000/s' -pop 'dist=uniform(1..20971520)' -col 'n=FIXED(10) size=FIXED(128)' -log interval=10",
+            #  "cql-stress-cassandra-stress read  cl=QUORUM duration=720m -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3) compaction(strategy=SizeTieredCompactionStrategy)' -mode cql3 native -rate 'threads=40 throttle=15000/s' -pop 'dist=uniform(1..20971520)' -col 'n=FIXED(10) size=FIXED(128)' -log interval=10",
+            #  "scylla-bench -workload=sequential -mode=write -replication-factor=3 -partition-count=50 -clustering-row-count=1000 -partition-offset=11 -clustering-row-size=uniform:1024..4096  -concurrency=20  -connection-count=20  -consistency-level=quorum -rows-per-request=50 -timeout=60s -retry-number=30 -retry-interval=500ms,1s -iterations 0 -duration=700m -max-rate 1000",
+            #  "scylla-bench -workload=sequential -mode=read  -replication-factor=3 -partition-count=50 -clustering-row-count=1000 -partition-offset=41 -clustering-row-size=uniform:1024..4096   -concurrency=20 -connection-count=20  -consistency-level=quorum -rows-per-request=50 -timeout=60s -retry-number=30 -retry-interval=500ms,1s -iterations 0 -duration=700m -max-rate 1000",
              "cassandra-stress user profile=/tmp/cs_multidc_si_lcs.yaml ops'(insert=1,read=1,si_read1=1,si_read2=1)' cl=LOCAL_QUORUM duration=700m -mode cql3 native -rate threads=40 -log interval=5",
              ]
 
 n_db_nodes: 12
 n_loaders: 2
-simulated_racks: 3
+# simulated_racks: 3
 
 instance_type_db: 'i4i.2xlarge'
 
