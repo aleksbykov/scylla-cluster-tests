@@ -3,6 +3,7 @@ test_duration: 800
 prepare_write_cmd:  [
                      "cql-stress-cassandra-stress write cl=QUORUM n=20971520 -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3) compaction(strategy=SizeTieredCompactionStrategy)' -mode cql3 native -rate threads=80  -pop seq=1..20971520 -col 'n=FIXED(10) size=FIXED(128)' -log interval=10",
                      "scylla-bench -workload=sequential -mode=write -replication-factor=3 -partition-count=250 -clustering-row-count=1000 -clustering-row-size=uniform:1024..4096 -concurrency=10 -connection-count=10 -consistency-level=quorum -rows-per-request=5 -timeout=60s -retry-number=30 -retry-interval=500ms,1s",
+                     "cassandra-stress user profile=/tmp/cs_multidc_si_lcs.yaml ops'(insert=1)' cl=LOCAL_QUORUM n=3000000 -mode cql3 native -rate threads=40 -log interval=5",
                     ]
 
 stress_cmd: [
@@ -12,7 +13,7 @@ stress_cmd: [
              "scylla-bench -workload=sequential -mode=read  -replication-factor=3 -partition-count=50 -clustering-row-count=1000 -partition-offset=41 -clustering-row-size=uniform:1024..4096   -concurrency=20 -connection-count=20  -consistency-level=quorum -rows-per-request=50 -timeout=60s -retry-number=30 -retry-interval=500ms,1s -iterations 0 -duration=700m -max-rate 1000"
              ]
 
-n_db_nodes: 6
+n_db_nodes: 12
 n_loaders: 2
 simulated_racks: 3
 
@@ -32,3 +33,8 @@ seeds_num: 3
 teardown_validators:
   scrub:
     enabled: true
+
+append_scylla_args: "--logger-log-level load_balancer=debug:storage_service=debug:raft_topology=debug:view_building_coordinator=debug:view_building_worker=debug:group0_client=debug"
+
+experimental_features:
+  - views-with-tablets
