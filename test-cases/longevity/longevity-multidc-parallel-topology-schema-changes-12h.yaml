@@ -36,7 +36,7 @@ user_prefix: 'parallel-topology-schema-changes-multidc-12h'
 
 # enable vector.dev logging for all tier1
 # TODO: remove this when vector.dev logging is enabled by default
-logs_transport: 'vector'
+# logs_transport: 'vector'
 append_scylla_args: "--logger-log-level load_balancer=debug:storage_service=debug:raft_topology=debug:view_building_coordinator=debug:view_building_worker=debug:group0_client=debug"
 
 experimental_features:
