@@ -30,7 +30,7 @@ seeds_num: 3
 round_robin: true
 
 server_encrypt: true
-internode_encryption: 'dc'
+# internode_encryption: 'dc'
 
 user_prefix: 'parallel-topology-schema-changes-multidc-12h'
 
