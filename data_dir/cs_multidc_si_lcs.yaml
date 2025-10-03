@@ -19,8 +19,11 @@ table_definition: |
     )  WITH compaction = {'class': 'LeveledCompactionStrategy'};
 
 extra_definitions:
+  - CREATE INDEX IF NOT EXISTS sec_ind_c0 ON keyspace1.standard2 (c0)
+  - CREATE INDEX IF NOT EXISTS sec_ind_c1 ON keyspace1.standard2 (c1)
   - CREATE INDEX IF NOT EXISTS sec_ind_c2 ON keyspace1.standard2 (c2)
   - CREATE INDEX IF NOT EXISTS sec_ind_c3 ON keyspace1.standard2 (c3)
+  - CREATE INDEX IF NOT EXISTS sec_ind_c4 ON keyspace1.standard2 (c4)
 
 ### Column Distribution Specifications ###
 columnspec:
