@@ -859,6 +859,8 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):
 
         # Add kms_host with the dynamically created alias to the 'append_scylla_yaml'
         append_scylla_yaml = self.params.get("append_scylla_yaml") or {}
+        if isinstance(append_scylla_yaml, str):
+            append_scylla_yaml = yaml.safe_load(append_scylla_yaml) or {}
         if "kms_hosts" not in append_scylla_yaml:
             append_scylla_yaml["kms_hosts"] = {}
         append_scylla_yaml["kms_hosts"][kms_host] = {

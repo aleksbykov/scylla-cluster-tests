@@ -37,5 +37,5 @@ teardown_validators:
 
 append_scylla_args: "--logger-log-level load_balancer=debug:storage_service=debug:raft_topology=debug:view_building_coordinator=debug:view_building_worker=debug:group0_client=debug"
 
-experimental_features:
-  - views-with-tablets
+append_scylla_yaml:
+  rf_rack_valid_keyspaces: true
