@@ -1,6 +1,6 @@
 import contextlib
 import logging
-import random
+# import random
 
 from enum import Enum, StrEnum
 from abc import ABC, abstractmethod
@@ -20,6 +20,8 @@ if TYPE_CHECKING:
     from sdcm.cluster import BaseNode  # noqa: F401
     from sdcm.cluster import TokenRingMember  # noqa: F401
 
+
+from itertools import cycle
 
 LOGGER = logging.getLogger(__name__)
 RAFT_DEFAULT_SCYLLA_VERSION = "5.5.0-dev"
@@ -110,6 +112,7 @@ ABORT_BOOTSTRAP_LOG_PATTERNS: Iterable[MessagePosition] = [
 class RaftFeatureOperations(ABC):
     _node: "BaseNode"
     TOPOLOGY_OPERATION_LOG_PATTERNS: dict[TopologyOperations, Iterable[MessagePosition]]
+    msg_iter = None
 
     @property
     @abstractmethod
@@ -160,10 +163,12 @@ class RaftFeatureOperations(ABC):
                               BACKEND_TIMEOUTS[backend][message_position.position])
 
     def get_random_log_message(self, operation: TopologyOperations, seed: int | None = None):
-        random.seed(seed)
+        # random.seed(seed)
         log_patterns = self.TOPOLOGY_OPERATION_LOG_PATTERNS.get(operation)
-        log_pattern = random.choice(log_patterns)
-        return self.get_message_waiting_timeout(log_pattern)
+        # log_pattern = random.choice(log_patterns)
+        if RaftFeatureOperations.msg_iter is None:
+            RaftFeatureOperations.msg_iter = cycle(log_patterns)
+        return self.get_message_waiting_timeout(next(RaftFeatureOperations.msg_iter))
 
     def get_all_messages_timeouts(self, operation: TopologyOperations):
         log_patterns = self.TOPOLOGY_OPERATION_LOG_PATTERNS.get(operation)
