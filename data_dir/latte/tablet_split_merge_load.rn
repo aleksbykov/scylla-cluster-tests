@@ -42,7 +42,7 @@ pub async fn schema(db) {
             text text,
             PRIMARY KEY (pk, ck))
          WITH compaction = { 'class' : '${COMPACTION_STRATEGY}' }
-         AND cdc = { 'enabled' : ${ENABLE_CDC}, 'ttl' : 3600 }
+         AND cdc = { 'enabled' : ${ENABLE_CDC}, 'ttl' : 900 }
          AND tablets = {'min_tablet_count': 2, 'expected_data_size_in_gb': 1}
     `).await?;
 
@@ -226,17 +226,22 @@ pub async fn update_or_delete_by_cycle(db, i) {
     let cycle_number = i / TOTAL_ROWS;
     let total_cycles = UPDATE_CYCLES + READ_CYCLES + DELETE_CYCLES + READ_CYCLES;
     let cycles_position = cycle_number % total_cycles;
+    //println!("Cycle_number {c}, total_cycles {t}, cycles_position {p}", c=cycle_number, t=total_cycles, p=cycles_position);
 
     if cycles_position < UPDATE_CYCLES {
+      //  println!("Update {idx} - {pk}", idx = partition.idx, pk = pk);
         let a = hash_range(i, 1_000_000_000);
         let ck = hash(i);
         db.execute_prepared("update_table", [pad(i), pad(i), pk, ck]).await?;
     } else if cycles_position < UPDATE_CYCLES + READ_CYCLES {
+        //println!("Read 1 {idx} - {pk}", idx = partition.idx, pk = pk);
         let ck = hash(i % TOTAL_ROWS);
         db.execute_prepared("read_from_table", [pk, ck]).await?;
     } else if cycles_position < UPDATE_CYCLES + READ_CYCLES + DELETE_CYCLES {
+        //println!("Delete {idx} - {pk}", idx = partition.idx, pk = pk);
         db.execute_prepared("delete_partition", [pk]).await?;
     } else {
+        //println!("Read 2 {idx} - {pk}", idx = partition.idx, pk = pk);
         let ck = hash(i % TOTAL_ROWS);
         db.execute_prepared("read_from_table", [pk, ck]).await?;
     }
