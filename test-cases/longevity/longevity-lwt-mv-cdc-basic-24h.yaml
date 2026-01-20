@@ -108,7 +108,7 @@ oracle_scylla_version: '2025.4.0'
 
 nemesis_class_name: 'MajorCompactionMonkey:1 SisyphusMonkey:1'
 nemesis_selector: ["", "topology_changes"]
-nemesis_interval: [30, 15]
+nemesis_interval: "30 15"
 
 nemesis_seed: '021'
 nemesis_during_prepare: false

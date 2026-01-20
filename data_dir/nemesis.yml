@@ -1466,7 +1466,6 @@ disrupt_trigger_split_merge_tablets_with_alter:
   limited: false
   manager_operation: false
   networking: false
-  run_with_gemini: true
   schema_changes: true
   sla: false
   supports_high_disk_utilization: true
