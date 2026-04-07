@@ -1226,3 +1226,56 @@ def test_keystore_env_is_exported_before_init_resolves_xcloud_version(monkeypatc
     sct_config.SCTConfiguration()
 
     assert seen == ["s3"], f"KeyStore built during __init__ saw {seen}, config file asked for s3"
+
+
+def test_docker_simulated_racks_sets_gossiping_snitch(monkeypatch):
+    """Test that GossipingPropertyFileSnitch is auto-set for Docker with multiple racks.
+
+    When simulated_racks > 1 on the Docker backend, the endpoint_snitch
+    should be automatically resolved to GossipingPropertyFileSnitch.
+    """
+    monkeypatch.setenv("SCT_CLUSTER_BACKEND", "docker")
+    monkeypatch.setenv("SCT_SIMULATED_RACKS", "2")
+    monkeypatch.setenv("SCT_N_DB_NODES", "3")
+    monkeypatch.setenv("SCT_USE_MGMT", "false")
+
+    conf = sct_config.SCTConfiguration()
+    conf.verify_configuration()
+
+    assert conf.get("endpoint_snitch") == "org.apache.cassandra.locator.GossipingPropertyFileSnitch"
+
+
+def test_docker_single_rack_no_snitch_override(monkeypatch):
+    """Test that endpoint_snitch is not auto-set for Docker with a single rack.
+
+    When simulated_racks is 1 (default), no snitch override should occur
+    and endpoint_snitch should remain None.
+    """
+    monkeypatch.setenv("SCT_CLUSTER_BACKEND", "docker")
+    monkeypatch.setenv("SCT_SIMULATED_RACKS", "1")
+    monkeypatch.setenv("SCT_N_DB_NODES", "3")
+    monkeypatch.setenv("SCT_USE_MGMT", "false")
+
+    conf = sct_config.SCTConfiguration()
+    conf.verify_configuration()
+
+    assert conf.get("endpoint_snitch") is None
+
+
+def test_docker_defaults_to_single_rack(monkeypatch):
+    """Docker must not inherit the global `simulated_racks: 3` default.
+
+    Simulated racks on Docker need the --rack/--dc entrypoint args (Scylla >=
+    2026.1), so `defaults/docker_config.yaml` pins simulated_racks to 1.  Without
+    that, every multi-node Docker test would silently opt into racks and fail on
+    older images.  A test-case still opts in by setting simulated_racks itself.
+    """
+    monkeypatch.setenv("SCT_CLUSTER_BACKEND", "docker")
+    monkeypatch.setenv("SCT_N_DB_NODES", "3")
+    monkeypatch.setenv("SCT_USE_MGMT", "false")
+
+    conf = sct_config.SCTConfiguration()
+    conf.verify_configuration()
+
+    assert conf.get("simulated_racks") == 1
+    assert conf.get("endpoint_snitch") is None

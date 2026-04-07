@@ -4650,6 +4650,9 @@ Forces GossipingPropertyFileSnitch (regardless `endpoint_snitch`) to simulate ra
 
 **type:** int
 
+**backend overrides:**
+- `1`: docker
+
 
 ## **rack_aware_loader** / SCT_RACK_AWARE_LOADER
 
