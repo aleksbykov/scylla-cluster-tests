@@ -6,3 +6,4 @@ n_monitor_nodes: 0
 nemesis_class_name: 'NoOpMonkey'
 test_duration: 60
 user_prefix: 'artifacts-docker'
+simulated_racks: 3
