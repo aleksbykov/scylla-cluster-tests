@@ -41,6 +41,12 @@ latte_schema_parameters:
   table_name: 'main_table'
   mv_name: 'mv_for_main_table'
 
+adaptive_timeout_feature_multipliers:
+  lwt: 2
+  cdc: 2
+  mv: 4
+
+
 prepare_write_cmd:
   - >-
     latte run -f write_to_table -P rows=5000000 -P rows_per_partition=1
