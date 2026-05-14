@@ -20,7 +20,14 @@ import pytest
 from invoke import Result
 
 from sdcm.remote import RemoteCmdRunnerBase
-from sdcm.sct_config import SCTConfiguration
+from sdcm.sct_config import SCTConfiguration, AdaptiveTimeoutOperationMultipliers
+from sdcm.utils.adaptive_timeouts import (
+    _STREAMING_OVERHEAD,
+    _get_operation_timeout_factor,
+    Operations,
+    adaptive_timeout,
+    TABLETS_HARD_TIMEOUT,
+)
 from sdcm.utils.adaptive_timeouts.load_info_store import (
     AdaptiveTimeoutStore,
     NodeLoadInfoService,
@@ -28,7 +35,6 @@ from sdcm.utils.adaptive_timeouts.load_info_store import (
     _I4I_LARGE_BASELINE_THROUGHPUT_MB_PER_SEC,
     _I4I_LARGE_SHARD_COUNT,
 )
-from sdcm.utils.adaptive_timeouts import _STREAMING_OVERHEAD, Operations, adaptive_timeout, TABLETS_HARD_TIMEOUT
 from unit_tests.lib.fake_cluster import DummyDbCluster
 
 LOGGER = logging.getLogger(__name__)
@@ -332,3 +338,158 @@ def test_expected_throughput_falls_back_to_estimate_when_zero(fake_node):
     """When stream_io_throughput_mb_per_sec is explicitly 0, fall back to the estimate."""
     service = _make_service(fake_node, "stream_io_throughput_mb_per_sec: 0\n")
     assert service.expected_throughput == _I4I_LARGE_BASELINE_THROUGHPUT_MB_PER_SEC / _I4I_LARGE_SHARD_COUNT * 3
+
+
+# --- _get_operation_timeout_factor tests ---
+
+
+@pytest.mark.parametrize(
+    ("operation", "config_value", "expected"),
+    [
+        pytest.param(Operations.DECOMMISSION, {"decommission": 4}, 4, id="decommission"),
+        pytest.param(Operations.REMOVE_NODE, {"removenode": 3}, 3, id="removenode"),
+        pytest.param(Operations.NEW_NODE, {"new_node": 2}, 2, id="new_node"),
+        pytest.param(Operations.NEW_NODE, {"decommission": 4}, 1, id="missing-new_node"),
+        pytest.param(Operations.SOFT_TIMEOUT, {"decommission": 4}, 1, id="unmapped-operation"),
+        pytest.param(Operations.REMOVE_NODE, None, 1, id="no-config"),
+    ],
+)
+def test_get_operation_timeout_factor(operation, config_value, expected):
+    params = SCTConfiguration()
+    params["adaptive_timeout_operation_multipliers"] = config_value
+    assert _get_operation_timeout_factor(params, operation) == expected
+
+
+@mock.patch("sdcm.sct_events.base.SctEvent.publish_or_dump")
+def test_new_node_multiplier_scales_timeout(
+    publish_or_dump, fake_node, adaptive_timeout_store
+):
+    fake_node.parent_cluster.params["adaptive_timeout_operation_multipliers"] = {"new_node": 3}
+
+    with adaptive_timeout(
+        operation=Operations.NEW_NODE,
+        node=fake_node,
+        timeout=600,
+        stats_storage=adaptive_timeout_store,
+    ) as timeout:
+        assert timeout == 1800
+
+
+@mock.patch("sdcm.sct_events.base.SctEvent.publish_or_dump")
+def test_missing_operation_key_keeps_timeout_unscaled(
+    publish_or_dump, fake_node, adaptive_timeout_store
+):
+    fake_node.parent_cluster.params["adaptive_timeout_operation_multipliers"] = {"decommission": 4}
+
+    with adaptive_timeout(
+        operation=Operations.REMOVE_NODE,
+        node=fake_node,
+        timeout=600,
+        stats_storage=adaptive_timeout_store,
+    ) as timeout:
+        assert timeout == 600
+
+
+@mock.patch("sdcm.sct_events.base.SctEvent.publish_or_dump")
+def test_null_config_preserves_base_timeout(
+    publish_or_dump, fake_node, adaptive_timeout_store
+):
+    fake_node.parent_cluster.params["adaptive_timeout_operation_multipliers"] = None
+
+    with adaptive_timeout(
+        operation=Operations.DECOMMISSION,
+        node=fake_node,
+        stats_storage=adaptive_timeout_store,
+    ) as timeout:
+        assert timeout == 7200  # base decommission timeout unchanged
+
+
+@mock.patch("sdcm.sct_events.system.SoftTimeoutEvent.publish_or_dump")
+@mock.patch("sdcm.sct_events.system.HardTimeoutEvent.publish_or_dump")
+def test_decommission_multiplier_scales_hard_timeout_for_tablets(
+    hard_timeout_mock, soft_timeout_mock, fake_node, adaptive_timeout_store, mock_tablets_feature
+):
+    mock_tablets_feature.return_value = True
+
+    # Get base timeout without multiplier
+    fake_node.parent_cluster.params["adaptive_timeout_operation_multipliers"] = None
+    with adaptive_timeout(
+        operation=Operations.DECOMMISSION, node=fake_node, stats_storage=adaptive_timeout_store
+    ) as base_timeout:
+        pass
+
+    # Apply multiplier and verify scaling
+    fake_node.parent_cluster.params["adaptive_timeout_operation_multipliers"] = {"decommission": 2}
+    with adaptive_timeout(
+        operation=Operations.DECOMMISSION, node=fake_node, stats_storage=adaptive_timeout_store
+    ) as scaled_timeout:
+        assert scaled_timeout == base_timeout * 2
+
+
+# --- AdaptiveTimeoutOperationMultipliers model validation tests ---
+
+
+@pytest.mark.parametrize("input_val,match_pattern", [
+    pytest.param({"cdc": 2}, "Extra inputs are not permitted", id="legacy-cdc-key"),
+    pytest.param({"mv": 2}, "Extra inputs are not permitted", id="legacy-mv-key"),
+    pytest.param({"unknown": 2}, "Extra inputs are not permitted", id="unknown-key"),
+    pytest.param({"decommission": -1}, "Input should be greater than 0", id="negative-value"),
+    pytest.param({"decommission": 0}, "Input should be greater than 0", id="zero-value"),
+])
+def test_operation_multiplier_model_rejects_invalid_input(input_val, match_pattern):
+    with pytest.raises(ValueError, match=match_pattern):
+        AdaptiveTimeoutOperationMultipliers.model_validate(input_val)
+
+
+@pytest.mark.parametrize("input_val,expected_key,expected_val", [
+    pytest.param({"decommission": 4, "removenode": 2}, "decommission", 4, id="dict-input"),
+    pytest.param("{'new_node': 3}", "new_node", 3, id="python-string"),
+    pytest.param('{"decommission": 5}', "decommission", 5, id="json-string"),
+])
+def test_operation_multiplier_model_validates_input(input_val, expected_key, expected_val):
+    model = AdaptiveTimeoutOperationMultipliers.model_validate(input_val)
+    assert getattr(model, expected_key) == expected_val
+
+
+def test_operation_multiplier_get_multiplier_returns_1_for_missing_key():
+    model = AdaptiveTimeoutOperationMultipliers(decommission=4)
+    assert model.get_multiplier("decommission") == 4
+    assert model.get_multiplier("removenode") == 1
+    assert model.get_multiplier("new_node") == 1
+    assert model.get_multiplier("nonexistent") == 1
+
+
+# --- SCTConfiguration env var / string loading tests ---
+
+
+@pytest.mark.parametrize("env_value,expected_field,expected_val", [
+    pytest.param("{'decommission': 4, 'new_node': 3}", "decommission", 4, id="python-dict-string"),
+    pytest.param('{"removenode": 5}', "removenode", 5, id="json-string"),
+])
+def test_operation_multipliers_env_var_loaded_by_sct_config(monkeypatch, env_value, expected_field, expected_val):
+    """SCT_ADAPTIVE_TIMEOUT_OPERATION_MULTIPLIERS env var is parsed into the model."""
+    monkeypatch.setenv("SCT_ADAPTIVE_TIMEOUT_OPERATION_MULTIPLIERS", env_value)
+    config = SCTConfiguration()
+    multipliers = config.get("adaptive_timeout_operation_multipliers")
+    assert multipliers is not None
+    assert getattr(multipliers, expected_field) == expected_val
+
+
+def test_operation_multipliers_env_var_null_preserves_default(monkeypatch):
+    """When env var is not set, default from test_default.yaml (null) is preserved."""
+    monkeypatch.delenv("SCT_ADAPTIVE_TIMEOUT_OPERATION_MULTIPLIERS", raising=False)
+    config = SCTConfiguration()
+    assert config.get("adaptive_timeout_operation_multipliers") is None
+
+
+@pytest.mark.parametrize("input_val,expected_key,expected_val", [
+    pytest.param({"decommission": 2, "removenode": 3}, "decommission", 2, id="raw-dict"),
+    pytest.param("{'new_node': 6}", "new_node", 6, id="string"),
+])
+def test_operation_multipliers_config_assignment_coerces(input_val, expected_key, expected_val):
+    """Assigning raw dict or string to SCTConfiguration field coerces it into the model via validate_assignment."""
+    config = SCTConfiguration()
+    config["adaptive_timeout_operation_multipliers"] = input_val
+    multipliers = config.get("adaptive_timeout_operation_multipliers")
+    assert isinstance(multipliers, AdaptiveTimeoutOperationMultipliers)
+    assert getattr(multipliers, expected_key) == expected_val

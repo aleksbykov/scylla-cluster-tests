@@ -2041,6 +2041,15 @@ Store adaptive timeout metrics in Argus. Disabled for performance tests only.
 **type:** bool
 
 
+## **adaptive_timeout_operation_multipliers** / SCT_ADAPTIVE_TIMEOUT_OPERATION_MULTIPLIERS
+
+Optional dict of adaptive-timeout multipliers keyed by operation. Supported keys: decommission, removenode, new_node. If the current operation key is absent, multiplier 1 is used. Example: {decommission: 4, new_node: 2}.
+
+**default:** N/A
+
+**type:** dict
+
+
 ## **gce_n_local_ssd_disk_monitor** / SCT_GCE_N_LOCAL_SSD_DISK_MONITOR
 
 Number of local SSD disks for monitor nodes in Google Compute Engine

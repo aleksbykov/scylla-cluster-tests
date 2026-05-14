@@ -16,6 +16,25 @@ from sdcm.utils.features import is_tablets_feature_enabled
 
 LOGGER = logging.getLogger(__name__)
 
+
+def _get_operation_timeout_factor(params, operation: "Operations") -> int | float:
+    """Return timeout multiplier for the current operation.
+
+    Missing config, missing operation mapping, or missing key all return 1.
+    Operations not listed in _OPERATION_TIMEOUT_KEYS (e.g. TABLET_MIGRATION,
+    SOFT_TIMEOUT) intentionally remain unscaled.
+    """
+    multipliers = params.get("adaptive_timeout_operation_multipliers")
+    if multipliers is None:
+        return 1
+
+    operation_key = _OPERATION_TIMEOUT_KEYS.get(operation)
+    if operation_key is None:
+        return 1
+
+    return multipliers.get_multiplier(operation_key)
+
+
 TABLETS_SOFT_TIMEOUT = 1 * 60 * 60
 TABLETS_HARD_TIMEOUT = 3 * 60 * 60
 _STREAMING_OVERHEAD = 600  # add 10 minutes overhead for operations other than streaming
@@ -162,6 +181,13 @@ class Operations(Enum):
     SSH_CONNECTIVITY = ("ssh_connectivity", _get_soft_timeout_no_node_info, ("timeout",))
 
 
+_OPERATION_TIMEOUT_KEYS: dict["Operations", str] = {
+    Operations.DECOMMISSION: "decommission",
+    Operations.REMOVE_NODE: "removenode",
+    Operations.NEW_NODE: "new_node",
+}
+
+
 class TestInfoServices:
     @staticmethod
     def get(node: "BaseNode") -> dict:  # noqa: F821
@@ -260,6 +286,11 @@ def adaptive_timeout(  # noqa: PLR0914
         hard_timeout = None
     if store_metrics:
         load_metrics.update(TestInfoServices.get(node))
+
+    # Apply operation-based timeout scaling (opt-in via config)
+    operation_factor = _get_operation_timeout_factor(node.parent_cluster.params, operation)
+    soft_timeout = soft_timeout * operation_factor if soft_timeout else soft_timeout
+    hard_timeout = hard_timeout * operation_factor if hard_timeout else hard_timeout
 
     start_time = time.monotonic()
     timeout_occurred = False
