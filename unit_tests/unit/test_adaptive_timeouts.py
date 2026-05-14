@@ -20,7 +20,14 @@ import pytest
 from invoke import Result
 
 from sdcm.remote import RemoteCmdRunnerBase
-from sdcm.sct_config import SCTConfiguration
+from sdcm.sct_config import SCTConfiguration, AdaptiveTimeoutFeatureMultipliers
+from sdcm.utils.adaptive_timeouts import (
+    _STREAMING_OVERHEAD,
+    _get_feature_timeout_factor,
+    Operations,
+    adaptive_timeout,
+    TABLETS_HARD_TIMEOUT,
+)
 from sdcm.utils.adaptive_timeouts.load_info_store import (
     AdaptiveTimeoutStore,
     NodeLoadInfoService,
@@ -28,7 +35,6 @@ from sdcm.utils.adaptive_timeouts.load_info_store import (
     _I4I_LARGE_BASELINE_THROUGHPUT_MB_PER_SEC,
     _I4I_LARGE_SHARD_COUNT,
 )
-from sdcm.utils.adaptive_timeouts import _STREAMING_OVERHEAD, Operations, adaptive_timeout, TABLETS_HARD_TIMEOUT
 from unit_tests.lib.fake_cluster import DummyDbCluster
 
 LOGGER = logging.getLogger(__name__)
@@ -332,3 +338,147 @@ def test_expected_throughput_falls_back_to_estimate_when_zero(fake_node):
     """When stream_io_throughput_mb_per_sec is explicitly 0, fall back to the estimate."""
     service = _make_service(fake_node, "stream_io_throughput_mb_per_sec: 0\n")
     assert service.expected_throughput == _I4I_LARGE_BASELINE_THROUGHPUT_MB_PER_SEC / _I4I_LARGE_SHARD_COUNT * 3
+
+
+# --- _get_feature_timeout_factor tests ---
+
+
+@pytest.mark.parametrize("multipliers,expected", [
+    pytest.param(None, 1, id="none-returns-1"),
+    pytest.param(AdaptiveTimeoutFeatureMultipliers(), 1, id="empty-model-returns-1"),
+    pytest.param(AdaptiveTimeoutFeatureMultipliers(cdc=4), 4, id="single-feature"),
+    pytest.param(AdaptiveTimeoutFeatureMultipliers(cdc=4, mv=4), 8, id="multiple-features"),
+    pytest.param(AdaptiveTimeoutFeatureMultipliers(cdc=1, lwt=2, mv=3, si=4), 10, id="all-keys"),
+    pytest.param(AdaptiveTimeoutFeatureMultipliers(cdc=1.5, mv=2.5), 4.0, id="float-values"),
+])
+def test_get_feature_timeout_factor(multipliers, expected):
+    params = mock.MagicMock()
+    params.get.return_value = multipliers
+    assert _get_feature_timeout_factor(params) == expected
+
+
+@pytest.mark.parametrize("config_value,expected_timeout", [
+    pytest.param({"cdc": 4}, 2400, id="single-feature-factor-4"),
+    pytest.param({"cdc": 4, "mv": 4}, 4800, id="multi-feature-factor-8"),
+    pytest.param(None, 600, id="null-preserves-base"),
+    pytest.param({}, 600, id="empty-dict-preserves-base"),
+])
+@mock.patch("sdcm.sct_events.base.SctEvent.publish_or_dump")
+def test_feature_multiplier_scales_adaptive_timeout(
+    publish_or_dump, config_value, expected_timeout, fake_node, adaptive_timeout_store
+):
+    fake_node.parent_cluster.params["adaptive_timeout_feature_multipliers"] = config_value
+    with adaptive_timeout(
+        operation=Operations.SOFT_TIMEOUT, node=fake_node, timeout=600, stats_storage=adaptive_timeout_store
+    ) as timeout:
+        assert timeout == expected_timeout
+
+
+@mock.patch("sdcm.sct_events.system.SoftTimeoutEvent.publish_or_dump")
+@mock.patch("sdcm.sct_events.system.HardTimeoutEvent.publish_or_dump")
+def test_feature_multiplier_scales_hard_timeout_for_tablets(
+    hard_timeout_mock, soft_timeout_mock, fake_node, adaptive_timeout_store, mock_tablets_feature
+):
+    """Verify hard_timeout is also scaled for tablet-sensitive operations (DECOMMISSION with tablets)."""
+    mock_tablets_feature.return_value = True
+    fake_node.parent_cluster.params["adaptive_timeout_feature_multipliers"] = {"cdc": 2}
+    with adaptive_timeout(
+        operation=Operations.DECOMMISSION, node=fake_node, stats_storage=adaptive_timeout_store
+    ) as timeout:
+        # Base calculation: node_data_size_mb=102400, throughput=103.5
+        # estimated = int(102400/103.5) = 989, soft = 989*2+600=2578, hard = 989*4+600=4556
+        # After feature factor (2): hard = 4556*2 = 9112
+        throughput = _I4I_LARGE_BASELINE_THROUGHPUT_MB_PER_SEC / _I4I_LARGE_SHARD_COUNT * 3
+        estimated = int(102400 / throughput)
+        expected_hard = (estimated * 4 + _STREAMING_OVERHEAD) * 2
+        assert timeout == expected_hard
+
+
+# --- AdaptiveTimeoutFeatureMultipliers model validation tests ---
+
+
+def test_feature_multipliers_model_none_field_default():
+    """Constructing with no args yields all-None fields and factor=1."""
+    model = AdaptiveTimeoutFeatureMultipliers()
+    assert model.cdc is None
+    assert model.factor == 1
+
+
+@pytest.mark.parametrize("input_val,expected_cdc,expected_factor", [
+    pytest.param({"cdc": 4, "mv": 2}, 4, 6, id="dict-input"),
+    pytest.param("{'cdc': 4}", 4, 4, id="python-string-single"),
+    pytest.param("{'cdc': 4, 'mv': 3}", 4, 7, id="python-string-multi"),
+    pytest.param('{"cdc": 4, "si": 2}', 4, 6, id="json-string"),
+    pytest.param({"cdc": "4", "mv": "2.5"}, 4.0, 6.5, id="string-numeric-values-coerced"),
+])
+def test_feature_multipliers_model_validates_input(input_val, expected_cdc, expected_factor):
+    model = AdaptiveTimeoutFeatureMultipliers.model_validate(input_val)
+    assert model.cdc == expected_cdc
+    assert model.factor == expected_factor
+
+
+@pytest.mark.parametrize("input_val,match_pattern", [
+    pytest.param({"unknown": 2}, "Extra inputs are not permitted", id="unsupported-key"),
+    pytest.param({"cdc": -1}, "Input should be greater than 0", id="negative-value"),
+    pytest.param({"cdc": 0}, "Input should be greater than 0", id="zero-value"),
+    pytest.param({"cdc": "high"}, "Input should be a valid number", id="non-numeric-string"),
+])
+def test_feature_multipliers_model_rejects_invalid_input(input_val, match_pattern):
+    with pytest.raises(ValueError, match=match_pattern):
+        AdaptiveTimeoutFeatureMultipliers.model_validate(input_val)
+
+
+def test_feature_multipliers_model_partial_keys_unset_are_none():
+    """Only configured keys are set; others remain None and are excluded from factor."""
+    model = AdaptiveTimeoutFeatureMultipliers(si=5)
+    assert model.cdc is None
+    assert model.lwt is None
+    assert model.mv is None
+    assert model.si == 5
+    assert model.factor == 5
+
+
+def test_feature_multipliers_model_integer_coerced_to_float():
+    """PositiveFloat accepts int values and coerces them."""
+    model = AdaptiveTimeoutFeatureMultipliers(cdc=4)
+    assert isinstance(model.cdc, float)
+    assert model.cdc == 4.0
+
+
+# --- SCTConfiguration env var / string loading tests ---
+
+
+@pytest.mark.parametrize("env_value,expected_field,expected_val,expected_factor", [
+    pytest.param("{'cdc': 4, 'mv': 3}", "cdc", 4, 7, id="python-dict-string"),
+    pytest.param('{"si": 5}', "si", 5, 5, id="json-string"),
+])
+def test_feature_multipliers_env_var_loaded_by_sct_config(monkeypatch, env_value, expected_field, expected_val,
+                                                          expected_factor):
+    """SCT_ADAPTIVE_TIMEOUT_FEATURE_MULTIPLIERS env var is parsed into the model."""
+    monkeypatch.setenv("SCT_ADAPTIVE_TIMEOUT_FEATURE_MULTIPLIERS", env_value)
+    config = SCTConfiguration()
+    multipliers = config.get("adaptive_timeout_feature_multipliers")
+    assert multipliers is not None
+    assert getattr(multipliers, expected_field) == expected_val
+    assert multipliers.factor == expected_factor
+
+
+def test_feature_multipliers_env_var_null_preserves_default(monkeypatch):
+    """When env var is not set, default from test_default.yaml (null) is preserved."""
+    monkeypatch.delenv("SCT_ADAPTIVE_TIMEOUT_FEATURE_MULTIPLIERS", raising=False)
+    config = SCTConfiguration()
+    assert config.get("adaptive_timeout_feature_multipliers") is None
+
+
+@pytest.mark.parametrize("input_val,expected_cdc,expected_factor", [
+    pytest.param({"cdc": 2, "lwt": 3}, 2, 5, id="raw-dict"),
+    pytest.param("{'cdc': 6}", 6, 6, id="string"),
+])
+def test_feature_multipliers_config_assignment_coerces(input_val, expected_cdc, expected_factor):
+    """Assigning raw dict or string to SCTConfiguration field coerces it into the model via validate_assignment."""
+    config = SCTConfiguration()
+    config["adaptive_timeout_feature_multipliers"] = input_val
+    multipliers = config.get("adaptive_timeout_feature_multipliers")
+    assert isinstance(multipliers, AdaptiveTimeoutFeatureMultipliers)
+    assert multipliers.cdc == expected_cdc
+    assert multipliers.factor == expected_factor

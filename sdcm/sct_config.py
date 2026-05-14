@@ -35,7 +35,7 @@ from distutils.util import strtobool
 import anyconfig
 from argus.client.sct.types import Package
 from packaging import version
-from pydantic import BaseModel, Field, ConfigDict, fields as pydantic_fields
+from pydantic import BaseModel, Field, ConfigDict, PositiveFloat, fields as pydantic_fields, model_validator
 from typing_extensions import Annotated
 from pydantic.functional_validators import BeforeValidator
 from pydantic.fields import FieldInfo
@@ -262,6 +262,35 @@ def dict_or_str(value: dict | str | None) -> dict | None:
 
 
 DictOrStr = Annotated[dict | str, BeforeValidator(dict_or_str)]
+
+
+class AdaptiveTimeoutFeatureMultipliers(BaseModel):
+    """Feature multipliers for adaptive timeouts.
+
+    When configured, all adaptive timeout values (soft and hard) are multiplied
+    by the sum of the declared multiplier values.
+    Supported keys: cdc, lwt, mv, si.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    cdc: PositiveFloat | None = None
+    lwt: PositiveFloat | None = None
+    mv: PositiveFloat | None = None
+    si: PositiveFloat | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _parse_str_input(cls, value):
+        if isinstance(value, str):
+            return dict_or_str(value)
+        return value
+
+    @property
+    def factor(self) -> int | float:
+        """Return the sum of all configured multipliers, or 1 if none set."""
+        vals = [v for v in (self.cdc, self.lwt, self.mv, self.si) if v is not None]
+        return sum(vals) if vals else 1
 
 
 def dict_or_str_or_pydantic(value: dict | str | BaseModel | None) -> dict | BaseModel | None:
@@ -1262,6 +1291,12 @@ class SCTConfiguration(BaseModel):
     )
     adaptive_timeout_store_metrics: Boolean = SctField(
         description="Store adaptive timeout metrics in Argus. Disabled for performance tests only.",
+    )
+    adaptive_timeout_feature_multipliers: AdaptiveTimeoutFeatureMultipliers | None = SctField(
+        description="Optional dict of feature multipliers for adaptive timeouts. "
+        "When configured, all adaptive timeout values are multiplied by the sum of the declared multiplier values. "
+        "Supported keys: cdc, lwt, mv, si. Values must be positive numbers. "
+        "Example: {cdc: 4, mv: 4} produces factor=8. Default: null (no scaling).",
     )
 
     # Google Compute Engine options

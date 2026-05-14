@@ -2041,6 +2041,15 @@ Store adaptive timeout metrics in Argus. Disabled for performance tests only.
 **type:** bool
 
 
+## **adaptive_timeout_feature_multipliers** / SCT_ADAPTIVE_TIMEOUT_FEATURE_MULTIPLIERS
+
+Optional dict of feature multipliers for adaptive timeouts. When configured, all adaptive timeout values are multiplied by the sum of the declared multiplier values. Supported keys: cdc, lwt, mv, si. Values must be positive numbers. Example: {cdc: 4, mv: 4} produces factor=8. Default: null (no scaling).
+
+**default:** N/A
+
+**type:** dict
+
+
 ## **gce_n_local_ssd_disk_monitor** / SCT_GCE_N_LOCAL_SSD_DISK_MONITOR
 
 Number of local SSD disks for monitor nodes in Google Compute Engine
