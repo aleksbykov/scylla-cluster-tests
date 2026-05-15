@@ -2047,7 +2047,7 @@ Optional dict of adaptive-timeout multipliers keyed by operation. Supported keys
 
 **default:** N/A
 
-**type:** dict
+**type:** sdcm.sct_config.AdaptiveTimeoutOperationMultipliers
 
 
 ## **gce_n_local_ssd_disk_monitor** / SCT_GCE_N_LOCAL_SSD_DISK_MONITOR

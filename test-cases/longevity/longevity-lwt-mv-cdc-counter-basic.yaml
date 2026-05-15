@@ -13,7 +13,7 @@ gce_n_local_ssd_disk_db: 8
 
 n_test_oracle_db_nodes: 3
 instance_type_db_oracle: 'i4i.2xlarge'
-oracle_scylla_version: '2025.4.0'
+# oracle_scylla_version: '2025.4.0'
 
 nemesis_class_name: [SisyphusMonkey, SisyphusMonkey]
 nemesis_selector: ["MajorCompactionMonkey", "topology_changes"]
@@ -43,6 +43,11 @@ latte_schema_parameters:
   ks_name: 'main_keyspace'
   table_name: 'main_table'
   mv_name: 'mv_for_main_table'
+
+adaptive_timeout_operation_multipliers:
+  decommission: 4
+  new_node: 4
+  removenode: 4
 
 prepare_write_cmd:
   - >-

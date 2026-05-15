@@ -361,9 +361,7 @@ def test_get_operation_timeout_factor(operation, config_value, expected):
 
 
 @mock.patch("sdcm.sct_events.base.SctEvent.publish_or_dump")
-def test_new_node_multiplier_scales_timeout(
-    publish_or_dump, fake_node, adaptive_timeout_store
-):
+def test_new_node_multiplier_scales_timeout(publish_or_dump, fake_node, adaptive_timeout_store):
     fake_node.parent_cluster.params["adaptive_timeout_operation_multipliers"] = {"new_node": 3}
 
     with adaptive_timeout(
@@ -376,9 +374,7 @@ def test_new_node_multiplier_scales_timeout(
 
 
 @mock.patch("sdcm.sct_events.base.SctEvent.publish_or_dump")
-def test_missing_operation_key_keeps_timeout_unscaled(
-    publish_or_dump, fake_node, adaptive_timeout_store
-):
+def test_missing_operation_key_keeps_timeout_unscaled(publish_or_dump, fake_node, adaptive_timeout_store):
     fake_node.parent_cluster.params["adaptive_timeout_operation_multipliers"] = {"decommission": 4}
 
     with adaptive_timeout(
@@ -391,9 +387,7 @@ def test_missing_operation_key_keeps_timeout_unscaled(
 
 
 @mock.patch("sdcm.sct_events.base.SctEvent.publish_or_dump")
-def test_null_config_preserves_base_timeout(
-    publish_or_dump, fake_node, adaptive_timeout_store
-):
+def test_null_config_preserves_base_timeout(publish_or_dump, fake_node, adaptive_timeout_store):
     fake_node.parent_cluster.params["adaptive_timeout_operation_multipliers"] = None
 
     with adaptive_timeout(
@@ -429,23 +423,29 @@ def test_decommission_multiplier_scales_hard_timeout_for_tablets(
 # --- AdaptiveTimeoutOperationMultipliers model validation tests ---
 
 
-@pytest.mark.parametrize("input_val,match_pattern", [
-    pytest.param({"cdc": 2}, "Extra inputs are not permitted", id="legacy-cdc-key"),
-    pytest.param({"mv": 2}, "Extra inputs are not permitted", id="legacy-mv-key"),
-    pytest.param({"unknown": 2}, "Extra inputs are not permitted", id="unknown-key"),
-    pytest.param({"decommission": -1}, "Input should be greater than 0", id="negative-value"),
-    pytest.param({"decommission": 0}, "Input should be greater than 0", id="zero-value"),
-])
+@pytest.mark.parametrize(
+    "input_val,match_pattern",
+    [
+        pytest.param({"cdc": 2}, "Extra inputs are not permitted", id="legacy-cdc-key"),
+        pytest.param({"mv": 2}, "Extra inputs are not permitted", id="legacy-mv-key"),
+        pytest.param({"unknown": 2}, "Extra inputs are not permitted", id="unknown-key"),
+        pytest.param({"decommission": -1}, "Input should be greater than 0", id="negative-value"),
+        pytest.param({"decommission": 0}, "Input should be greater than 0", id="zero-value"),
+    ],
+)
 def test_operation_multiplier_model_rejects_invalid_input(input_val, match_pattern):
     with pytest.raises(ValueError, match=match_pattern):
         AdaptiveTimeoutOperationMultipliers.model_validate(input_val)
 
 
-@pytest.mark.parametrize("input_val,expected_key,expected_val", [
-    pytest.param({"decommission": 4, "removenode": 2}, "decommission", 4, id="dict-input"),
-    pytest.param("{'new_node': 3}", "new_node", 3, id="python-string"),
-    pytest.param('{"decommission": 5}', "decommission", 5, id="json-string"),
-])
+@pytest.mark.parametrize(
+    "input_val,expected_key,expected_val",
+    [
+        pytest.param({"decommission": 4, "removenode": 2}, "decommission", 4, id="dict-input"),
+        pytest.param("{'new_node': 3}", "new_node", 3, id="python-string"),
+        pytest.param('{"decommission": 5}', "decommission", 5, id="json-string"),
+    ],
+)
 def test_operation_multiplier_model_validates_input(input_val, expected_key, expected_val):
     model = AdaptiveTimeoutOperationMultipliers.model_validate(input_val)
     assert getattr(model, expected_key) == expected_val
@@ -462,10 +462,13 @@ def test_operation_multiplier_get_multiplier_returns_1_for_missing_key():
 # --- SCTConfiguration env var / string loading tests ---
 
 
-@pytest.mark.parametrize("env_value,expected_field,expected_val", [
-    pytest.param("{'decommission': 4, 'new_node': 3}", "decommission", 4, id="python-dict-string"),
-    pytest.param('{"removenode": 5}', "removenode", 5, id="json-string"),
-])
+@pytest.mark.parametrize(
+    "env_value,expected_field,expected_val",
+    [
+        pytest.param("{'decommission': 4, 'new_node': 3}", "decommission", 4, id="python-dict-string"),
+        pytest.param('{"removenode": 5}', "removenode", 5, id="json-string"),
+    ],
+)
 def test_operation_multipliers_env_var_loaded_by_sct_config(monkeypatch, env_value, expected_field, expected_val):
     """SCT_ADAPTIVE_TIMEOUT_OPERATION_MULTIPLIERS env var is parsed into the model."""
     monkeypatch.setenv("SCT_ADAPTIVE_TIMEOUT_OPERATION_MULTIPLIERS", env_value)
@@ -482,10 +485,13 @@ def test_operation_multipliers_env_var_null_preserves_default(monkeypatch):
     assert config.get("adaptive_timeout_operation_multipliers") is None
 
 
-@pytest.mark.parametrize("input_val,expected_key,expected_val", [
-    pytest.param({"decommission": 2, "removenode": 3}, "decommission", 2, id="raw-dict"),
-    pytest.param("{'new_node': 6}", "new_node", 6, id="string"),
-])
+@pytest.mark.parametrize(
+    "input_val,expected_key,expected_val",
+    [
+        pytest.param({"decommission": 2, "removenode": 3}, "decommission", 2, id="raw-dict"),
+        pytest.param("{'new_node': 6}", "new_node", 6, id="string"),
+    ],
+)
 def test_operation_multipliers_config_assignment_coerces(input_val, expected_key, expected_val):
     """Assigning raw dict or string to SCTConfiguration field coerces it into the model via validate_assignment."""
     config = SCTConfiguration()
