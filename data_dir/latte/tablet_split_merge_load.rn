@@ -213,7 +213,7 @@ pub async fn write_to_table(db, i) {
 
 pub async fn write_to_table_with_counter(db, i) {
     let partition = db.get_partition_info("main", i).await;
-    partition.idx += OFFSET;
+    partition.idx += PARTITION_OFFSET;
     let pk = hash(partition.idx);
     let ck = hash(i);
 
@@ -322,7 +322,7 @@ pub async fn update_or_delete_by_cycle(db, i) {
 /// READ_CYCLE cycles READ, repeat
 pub async fn update_or_delete_by_cycle_with_counter(db, i) {
     let partition = db.get_partition_info("counter", i).await;
-    partition.idx += OFFSET;
+    partition.idx += PARTITION_OFFSET;
 
     let pk = hash(partition.idx);
     let cycle_number = i / TOTAL_ROWS;
