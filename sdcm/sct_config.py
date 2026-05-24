@@ -35,7 +35,8 @@ from distutils.util import strtobool
 import anyconfig
 from argus.client.sct.types import Package
 from packaging import version
-from pydantic import BaseModel, Field, ConfigDict, fields as pydantic_fields
+from pydantic import BaseModel, Field, ConfigDict, RootModel, fields as pydantic_fields, model_validator
+from pydantic.types import confloat
 from typing_extensions import Annotated
 from pydantic.functional_validators import BeforeValidator
 from pydantic.fields import FieldInfo
@@ -262,6 +263,40 @@ def dict_or_str(value: dict | str | None) -> dict | None:
 
 
 DictOrStr = Annotated[dict | str, BeforeValidator(dict_or_str)]
+
+
+class AdaptiveTimeoutMultipliers(RootModel):
+    """Per-operation multipliers for adaptive timeouts.
+
+    Keys must be valid operation names from Operations enum (operation.value[0]),
+    e.g. decommission, remove_node, new_node, repair, rebuild, etc.
+    Missing keys default to multiplier 1.
+    """
+
+    root: dict[str, confloat(gt=0)] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _validate_operations(cls, value):
+        if isinstance(value, str):
+            value = dict_or_str(value)
+        if not isinstance(value, dict):
+            return value
+
+        # cyclic-import: Operations imports from sct_config indirectly via cluster
+        from sdcm.utils.adaptive_timeouts import Operations  # noqa: PLC0415
+
+        valid_keys = {op.value[0] for op in Operations}
+        for key, val in value.items():
+            if key not in valid_keys:
+                raise ValueError(f"Unknown operation key '{key}'. Valid keys: {sorted(valid_keys)}")
+            if isinstance(val, bool):
+                raise ValueError(f"Multiplier for '{key}' must be a positive number, got {val}")
+        return value
+
+    def get_multiplier(self, operation_key: str) -> float:
+        """Return multiplier for the given operation key, or 1.0 if not configured."""
+        return float(self.root.get(operation_key, 1.0))
 
 
 def dict_or_str_or_pydantic(value: dict | str | BaseModel | None) -> dict | BaseModel | None:
@@ -1262,6 +1297,12 @@ class SCTConfiguration(BaseModel):
     )
     adaptive_timeout_store_metrics: Boolean = SctField(
         description="Store adaptive timeout metrics in Argus. Disabled for performance tests only.",
+    )
+    adaptive_timeout_multipliers: AdaptiveTimeoutMultipliers | None = SctField(
+        description="Optional dict of adaptive-timeout multipliers keyed by operation name "
+        "(from Operations enum value[0], e.g. decommission, remove_node, new_node, repair, etc.). "
+        "If the current operation key is absent, multiplier 1.0 is used. "
+        "Example: {decommission: 4, new_node: 2}.",
     )
 
     # Google Compute Engine options
