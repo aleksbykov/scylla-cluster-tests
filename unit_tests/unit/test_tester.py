@@ -10,6 +10,7 @@
 # See LICENSE for more details.
 #
 # Copyright (c) 2020 ScyllaDB
+import json
 import logging
 import time
 import unittest.mock
@@ -17,6 +18,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from sdcm.sct_config import SCTConfiguration
 from sdcm.sct_events import Severity
 from sdcm.sct_events.base import SctEvent
 from sdcm.sct_events.health import ClusterHealthValidatorEvent
@@ -617,3 +619,75 @@ class TestEmrCleanResources:
         """Test that clean_resources handles None emr_cluster gracefully."""
         tester = self._make_tester(self._make_params("destroy"))
         self._run_clean_resources(tester, critical_events=False)
+
+
+class TestInitArgusRun:
+    """Tests for ClusterTester.init_argus_run() Argus config submission."""
+
+    @pytest.fixture()
+    def tester_with_argus(self, monkeypatch):
+        """Create a minimal ClusterTester-like object with mocked Argus client and real SCTConfiguration."""
+        monkeypatch.setenv("SCT_CLUSTER_BACKEND", "aws")
+        monkeypatch.setenv("SCT_AMI_ID_DB_SCYLLA", "ami-dummy")
+        monkeypatch.setenv("SCT_INSTANCE_TYPE_DB", "i4i.large")
+        monkeypatch.setenv("SCT_CONFIG_FILES", "unit_tests/test_configs/minimal_test_case.yaml")
+        monkeypatch.setenv("SCT_ADAPTIVE_TIMEOUT_MULTIPLIERS", "{'decommission': 5, 'new_node': 5}")
+
+        params = SCTConfiguration()
+
+        mock_argus_client = MagicMock()
+        mock_argus_client.run_id = "test-run-id"
+
+        mock_test_config = MagicMock()
+        mock_test_config.argus_client.return_value = mock_argus_client
+
+        tester = MagicMock()
+        tester.params = params
+        tester.test_config = mock_test_config
+        tester.log = logging.getLogger("test_init_argus_run")
+        tester.init_argus_run = ClusterTester.init_argus_run.__get__(tester)
+
+        return tester, mock_argus_client
+
+    def test_sct_submit_config_receives_valid_json(self, tester_with_argus):
+        """Regression test: sct_submit_config must receive valid JSON string.
+
+        Previously json.dumps(dict(self.params)) raised ValueError: Circular
+        reference detected when AdaptiveTimeoutMultipliers (a Pydantic RootModel)
+        was in the config.
+        """
+        tester, mock_argus_client = tester_with_argus
+
+        tester.init_argus_run()
+
+        # Verify sct_submit_config was called
+        mock_argus_client.sct_submit_config.assert_called_once()
+        call_kwargs = mock_argus_client.sct_submit_config.call_args
+        content = call_kwargs.kwargs.get("content") or call_kwargs[1].get("content") or call_kwargs[0][1]
+
+        # Content must be valid JSON
+        parsed = json.loads(content)
+        assert isinstance(parsed, dict)
+
+        # adaptive_timeout_multipliers must be properly serialized
+        assert parsed["adaptive_timeout_multipliers"] == {"decommission": 5.0, "new_node": 5.0}
+
+    def test_sct_submit_config_contains_expected_fields(self, tester_with_argus):
+        """Verify that model_dump_json() output contains essential config fields."""
+        tester, mock_argus_client = tester_with_argus
+
+        tester.init_argus_run()
+
+        call_kwargs = mock_argus_client.sct_submit_config.call_args
+        content = call_kwargs.kwargs.get("content") or call_kwargs[1].get("content") or call_kwargs[0][1]
+        parsed = json.loads(content)
+
+        # Essential fields that must be present
+        assert "cluster_backend" in parsed
+        assert parsed["cluster_backend"] == "aws"
+        assert "instance_type_db" in parsed
+
+        # Fields with exclude=True should NOT be present
+        assert "multi_region_params" not in parsed
+        assert "regions_data" not in parsed
+        assert "target_db_image_ids" not in parsed

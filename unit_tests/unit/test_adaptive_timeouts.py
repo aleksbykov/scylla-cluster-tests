@@ -10,6 +10,7 @@
 # See LICENSE for more details.
 #
 # Copyright (c) 2023 ScyllaDB
+import json
 import logging
 import time
 import uuid
@@ -506,3 +507,33 @@ def test_multiplier_dot_notation_env_var(monkeypatch, env_vars, expected_multipl
     multipliers = config.get("adaptive_timeout_multipliers")
     for operation, expected in expected_multipliers.items():
         assert multipliers.get_multiplier(operation) == expected
+
+
+def test_sct_config_with_multipliers_is_json_serializable(monkeypatch):
+    """Regression test: SCTConfiguration with adaptive_timeout_multipliers must be
+    JSON-serializable via model_dump_json().
+
+    Previously dict(config) + json.dumps() raised:
+        ValueError: Circular reference detected
+        when serializing method object
+        when serializing sdcm.sct_config.AdaptiveTimeoutMultipliers object
+        when serializing dict item 'adaptive_timeout_multipliers'
+
+    The fix uses model_dump_json() which properly serializes nested Pydantic
+    RootModel instances. See test run efd56534 (TabletSplitMergeTest, Python 3.14).
+    """
+    monkeypatch.setenv("SCT_CLUSTER_BACKEND", "aws")
+    monkeypatch.setenv("SCT_AMI_ID_DB_SCYLLA", "ami-dummy")
+    monkeypatch.setenv("SCT_INSTANCE_TYPE_DB", "i4i.large")
+    monkeypatch.setenv("SCT_CONFIG_FILES", "unit_tests/test_configs/minimal_test_case.yaml")
+    monkeypatch.setenv("SCT_ADAPTIVE_TIMEOUT_MULTIPLIERS", "{'decommission': 5, 'new_node': 5}")
+
+    config = SCTConfiguration()
+
+    # This is what tester.py init_argus_run() now does — must not raise
+    json_str = config.model_dump_json()
+    assert json_str  # non-empty
+
+    # Verify the multipliers are present and correctly serialized in the output
+    parsed = json.loads(json_str)
+    assert parsed["adaptive_timeout_multipliers"] == {"decommission": 5.0, "new_node": 5.0}
