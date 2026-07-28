@@ -77,6 +77,7 @@
 - RepairStreamingErrMonkey
 - RestartThenRepairNodeMonkey
 - RollingRestartConfigChangeInternodeCompression
+- SchemaChangesAddNodeThenSerialRestartCoordinatorNemesis
 - ScyllaKillMonkey
 - SerialRestartOfElectedTopologyCoordinatorNemesis
 - SlaDecreaseSharesDuringLoad

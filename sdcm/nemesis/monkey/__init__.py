@@ -918,3 +918,16 @@ class SplitMergeTabletsWithAlter(NemesisBaseClass):
 
     def disrupt(self):
         self.runner.disrupt_trigger_split_merge_tablets_with_alter()
+
+
+@target_all_nodes
+class SchemaChangesAddNodeThenSerialRestartCoordinatorNemesis(NemesisBaseClass):
+    """Runs schema changes, then adds a node, then serially restarts the elected topology coordinator."""
+
+    disruptive = True
+    topology_changes = True
+    schema_changes = True
+    modify_table = True  # phase 1 runs ModifyTable* ops, which are modify_table nemesis
+
+    def disrupt(self):
+        self.runner.disrupt_schema_changes_add_node_then_serial_restart_coordinator()

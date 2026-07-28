@@ -4292,6 +4292,84 @@ class NemesisRunner:
         self._shrink_cluster(rack=None)
         InfoEvent(message="Finished shrink disruption").publish()
 
+    # Target duration for the schema-changes phase. Clamped at call time against the test's own
+    # duration so short runs (docker / PR-provision) don't overrun.
+    SCHEMA_CHANGES_TARGET_DURATION_SEC = 70 * 60
+
+    def disrupt_schema_changes_add_node_then_serial_restart_coordinator(self):
+        """Composite disruption running three phases in order.
+
+        1. Run schema changes (add/drop column and ``ModifyTable*`` property
+           changes) for a bounded duration, clamped to ``min(70 min,
+           test_duration / 2)`` so short runs do not overrun.
+        2. Add one new node to the cluster.
+        3. Serially restart the elected topology coordinator to trigger a
+           re-election.
+
+        Raises:
+            UnsupportedNemesis: If consistent topology changes are disabled
+                (phase 3 requires the feature), raised up-front so the schema
+                phase is not wasted first.
+        """
+        # Inline import is REQUIRED here: sdcm.nemesis.monkey.modify_table does
+        # `from sdcm.nemesis import NemesisBaseClass`, so importing these classes at module top
+        # in sdcm/nemesis/__init__.py would create a circular import at load time. This is the
+        # only sanctioned inline-import exception (cyclic dependency) per AGENTS.md.
+        from sdcm.nemesis.monkey.modify_table import (  # noqa: PLC0415
+            ModifyTableCommentMonkey,
+            ModifyTableCompactionMonkey,
+            ModifyTableGcGraceTimeMonkey,
+        )
+
+        # Fail fast: phase 3 requires consistent topology changes; do not waste the schema phase first.
+        if not self.target_node.raft.is_consistent_topology_changes_enabled:
+            raise UnsupportedNemesis("Consistent topology changes feature is disabled")
+
+        # Phase 1: run schema changes for a bounded duration, reusing existing building blocks.
+        # `modify_table` is a family of ModifyTable*Monkey classes (there is no disrupt_modify_table
+        # method); instantiate them bound to this runner (self) and call their .disrupt().
+        # Each entry is (label, callable) so skip-logging identifies the actual op.
+        schema_change_ops = [
+            ("add_drop_column", self.disrupt_add_drop_column),
+            ("modify_table_compaction", ModifyTableCompactionMonkey(self).disrupt),
+            ("modify_table_gc_grace", ModifyTableGcGraceTimeMonkey(self).disrupt),
+            ("modify_table_comment", ModifyTableCommentMonkey(self).disrupt),
+        ]
+
+        # Clamp the schema phase against the test's own duration so short runs don't overrun.
+        # Use at most half of the remaining test time, and never more than the 70-min target.
+        test_duration_sec = self.tester.params.get("test_duration") * 60
+        duration_sec = min(self.SCHEMA_CHANGES_TARGET_DURATION_SEC, test_duration_sec // 2)
+
+        InfoEvent(message=f"StartEvent - schema changes for {duration_sec // 60} minutes").publish()
+        deadline = time.time() + duration_sec
+        op_index = 0
+        while time.time() < deadline:
+            label, op = schema_change_ops[op_index % len(schema_change_ops)]
+            try:
+                op()
+            except UnsupportedNemesis as exc:
+                self.log.debug("Skipping schema op %s: %s", label, exc)
+            op_index += 1
+            time.sleep(self.interval)
+        InfoEvent(message="FinishEvent - schema changes finished").publish()
+
+        # Phase 2: add one new node using the defined add-node method.
+        # Mirror _grow_cluster's K8s rack coercion (rack must be 0 on Kubernetes).
+        rack = 0 if self._is_it_on_kubernetes() else None
+        InfoEvent(message="StartEvent - add new node").publish()
+        new_nodes = self.add_new_nodes(
+            count=1,
+            rack=rack,
+            instance_type=self.tester.params.get("nemesis_grow_shrink_instance_type"),
+        )
+        for node in new_nodes:
+            self.node_allocator.unset_running_nemesis(node, self.current_disruption)
+        InfoEvent(message="FinishEvent - new node added").publish()
+
+        # Phase 3: serial restart of the elected topology coordinator.
+        self.disrupt_serial_restart_elected_topology_coordinator()
+
     def _k8s_disrupt_memory_stress(self):
         """Uses chaos-mesh experiment based on https://github.com/chaos-mesh/memStress"""
         if not self.target_node.k8s_cluster.chaos_mesh.initialized:

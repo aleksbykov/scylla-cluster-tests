@@ -1341,6 +1341,23 @@ RollingRestartConfigChangeInternodeCompression:
   topology_changes: false
   xcloud: false
   zero_node_changes: false
+SchemaChangesAddNodeThenSerialRestartCoordinatorNemesis:
+  config_changes: false
+  delete_rows: false
+  disruptive: true
+  enospc: false
+  free_tier_set: false
+  kubernetes: false
+  limited: false
+  manager_operation: false
+  modify_table: true
+  networking: false
+  schema_changes: true
+  sla: false
+  supports_high_disk_utilization: true
+  topology_changes: true
+  xcloud: false
+  zero_node_changes: false
 ScyllaKillMonkey:
   config_changes: false
   delete_rows: false
