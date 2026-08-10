@@ -102,6 +102,8 @@ def test_docker_backend_skips_resolution(monkeypatch):
     monkeypatch.setenv("SCT_CLUSTER_BACKEND", "docker")
     monkeypatch.setenv("SCT_USE_MGMT", "false")
     monkeypatch.setenv("SCT_SCYLLA_VERSION", "2025.1.0")
+    # Racks on Docker need the --dc/--rack entrypoint args (Scylla 2026.1); unrelated here.
+    monkeypatch.setenv("SCT_SIMULATED_RACKS", "1")
     monkeypatch.setenv("SCT_CONFIG_FILES", _MINIMAL_CONFIG)
 
     catalog_loaded = []
@@ -178,6 +180,8 @@ def test_resolve_instance_sizes_method_direct(monkeypatch):
     monkeypatch.setenv("SCT_CLUSTER_BACKEND", "docker")
     monkeypatch.setenv("SCT_USE_MGMT", "false")
     monkeypatch.setenv("SCT_SCYLLA_VERSION", "2025.1.0")
+    # Racks on Docker need the --dc/--rack entrypoint args (Scylla 2026.1); unrelated here.
+    monkeypatch.setenv("SCT_SIMULATED_RACKS", "1")
     monkeypatch.setenv("SCT_CONFIG_FILES", _MINIMAL_CONFIG)
 
     conf = sct_config.SCTConfiguration()

@@ -4,14 +4,3 @@ use_preinstalled_scylla: true
 docker_image: ''
 scylla_linux_distro: 'centos'
 print_kernel_callstack: false
-# Override the global default of 3 (defaults/test_default.yaml): on Docker, simulated racks
-# are injected as --dc/--rack entrypoint arguments at container creation, which only Scylla
-# >= 2026.1 understands. Inheriting 3 here would silently turn racks on for every Docker test
-# with more than one DB node and break each one running an older image, without any test
-# asking for racks.
-#
-# Racks on Docker are therefore opt-in: a test-case that wants them sets simulated_racks > 1
-# explicitly (and must run a 2026.1+ image, otherwise node_setup raises
-# ScyllaDockerRequirementError). The multi-rack path is covered by
-# unit_tests/integration/test_docker_simulated_racks.py.
-simulated_racks: 1

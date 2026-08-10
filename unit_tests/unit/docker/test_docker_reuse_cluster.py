@@ -23,17 +23,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from sdcm.cluster_docker import ScyllaDockerRequirementError
 from unit_tests.lib.fake_docker_cluster import DummyScyllaDockerCluster
 
 
-def _make_mock_node(rack_arg_supported=True):
+def _make_mock_node():
     """Create a mock node with the attributes node_setup reads."""
     node = MagicMock()
     node.rack = 0
     node.node_index = 0
     node.ssl_conf_dir = Path("/tmp/fake_ssl")
-    node.is_docker_rack_arg_supported = rack_arg_supported
     return node
 
 
@@ -145,7 +143,7 @@ def test_normal_setup_when_not_reusing(tmp_path, simulated_racks_value):
         logdir=tmp_path,
         reuse_cluster=False,
     )
-    node = _make_mock_node(rack_arg_supported=True)
+    node = _make_mock_node()
     node.is_scylla_installed.return_value = True
 
     with patch.object(cluster, "_reuse_cluster_setup") as mock_reuse_setup:
@@ -155,23 +153,3 @@ def test_normal_setup_when_not_reusing(tmp_path, simulated_racks_value):
     node.is_scylla_installed.assert_called_once_with(raise_if_not_installed=True)
     node.config_setup.assert_called_once()
     node.restart_scylla.assert_called_once_with(verify_up_before=True)
-
-
-def test_version_guard_raises_for_old_image(tmp_path):
-    """When simulated_racks > 1 and the image does not support --rack,
-    node_setup must raise ScyllaDockerRequirementError before touching
-    config_setup or restart_scylla.
-    """
-    cluster = DummyScyllaDockerCluster(
-        params={"simulated_racks": 2},
-        logdir=tmp_path,
-        reuse_cluster=False,
-    )
-    node = _make_mock_node(rack_arg_supported=False)
-    node.is_scylla_installed.return_value = True
-
-    with pytest.raises(ScyllaDockerRequirementError, match="simulated_racks requires Scylla >= 2026.1"):
-        cluster.node_setup(node)
-
-    node.config_setup.assert_not_called()
-    node.restart_scylla.assert_not_called()

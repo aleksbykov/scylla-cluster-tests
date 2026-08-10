@@ -28,6 +28,7 @@ from sdcm.provision.helpers.certificate import (
 )
 from sdcm.remote import LOCALRUNNER
 from sdcm.remote.docker_cmd_runner import DockerCmdRunner
+from sdcm.sct_config import simulated_racks_enabled
 from sdcm.sct_events.database import DatabaseLogEvent
 from sdcm.sct_events.filters import DbEventsFilter
 from sdcm.utils.docker_utils import get_docker_bridge_gateway, Container, ContainerManager, DockerException
@@ -78,7 +79,7 @@ class NodeContainerMixin:
         command_parts = []
         if seed_ip:
             command_parts.append(f'--seeds="{seed_ip}"')
-        if self.node_type == "db" and (self.parent_cluster.params.get("simulated_racks") or 0) > 1:
+        if self.node_type == "db" and simulated_racks_enabled(self.parent_cluster.params):
             command_parts.extend(["--dc=datacenter1", f"--rack=RACK{self.rack}"])
 
         return dict(
@@ -178,21 +179,6 @@ class DockerNode(cluster.BaseNode, NodeContainerMixin):
 
     def is_running(self):
         return ContainerManager.is_running(self, "node")
-
-    @cached_property
-    def is_docker_rack_arg_supported(self) -> bool:
-        """Check if the Scylla image supports --rack/--dc entrypoint args.
-
-        The --rack and --dc arguments were added in Scylla 2026.1.  On older
-        images the arguments are forwarded verbatim to the Scylla binary,
-        which does not accept them and exits immediately.  We detect support
-        by grepping /commandlineparser.py inside the running container.
-
-        The container image is fixed for the node's lifetime, so the probe
-        result is invariant and cached (``cached_property``).
-        """
-        result = self.remoter.run("grep -q -- '--rack' /commandlineparser.py", ignore_status=True)
-        return result.ok
 
     def restart(self):
         ContainerManager.get_container(self, "node").restart()
@@ -510,13 +496,6 @@ class ScyllaDockerCluster(cluster.BaseScyllaCluster, DockerCluster):
         if any([self.params.get("server_encrypt"), self.params.get("client_encrypt")]):
             self._generate_db_node_certs(node)
             install_client_certificate(node.remoter, node.ip_address, force=True)
-
-        simulated_racks = (self.params.get("simulated_racks") or 0) > 1
-        if simulated_racks and not node.is_docker_rack_arg_supported:
-            raise ScyllaDockerRequirementError(
-                f"{node}: simulated_racks requires Scylla >= 2026.1 on Docker backend. "
-                f"The --rack entrypoint argument is absent in older images."
-            )
 
         node.config_setup(append_scylla_args=self.get_scylla_args())
         node.restart_scylla(verify_up_before=True)

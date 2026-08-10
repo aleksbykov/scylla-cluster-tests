@@ -172,6 +172,8 @@ def test_list_of_stress_tools_with_scalar_gemini_cmd(monkeypatch):
     monkeypatch.setenv("SCT_CLUSTER_BACKEND", "docker")
     monkeypatch.setenv("SCT_USE_MGMT", "false")
     monkeypatch.setenv("SCT_SCYLLA_VERSION", "2025.1.0")
+    # Racks on Docker need the --dc/--rack entrypoint args (Scylla 2026.1); unrelated here.
+    monkeypatch.setenv("SCT_SIMULATED_RACKS", "1")
     monkeypatch.setenv("SCT_CONFIG_FILES", "unit_tests/test_configs/minimal_test_case.yaml")
     monkeypatch.setenv("SCT_GEMINI_CMD", "gemini --duration 10m")
 
@@ -188,6 +190,8 @@ def test_list_of_stress_tools_with_list_stress_cmd(monkeypatch):
     monkeypatch.setenv("SCT_CLUSTER_BACKEND", "docker")
     monkeypatch.setenv("SCT_USE_MGMT", "false")
     monkeypatch.setenv("SCT_SCYLLA_VERSION", "2025.1.0")
+    # Racks on Docker need the --dc/--rack entrypoint args (Scylla 2026.1); unrelated here.
+    monkeypatch.setenv("SCT_SIMULATED_RACKS", "1")
     monkeypatch.setenv("SCT_CONFIG_FILES", "unit_tests/test_configs/minimal_test_case.yaml")
     monkeypatch.setenv("SCT_STRESS_CMD", "cassandra-stress write n=1000000")
 

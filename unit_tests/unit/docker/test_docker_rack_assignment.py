@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from sdcm.cluster_docker import DockerNode, NodeContainerMixin
+from sdcm.cluster_docker import NodeContainerMixin
 from unit_tests.lib.fake_docker_cluster import DummyScyllaDockerCluster
 
 
@@ -79,7 +79,7 @@ def test_get_nodes_re_derives_racks(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def _make_mixin_node(rack=0, node_type="db", simulated_racks=0, seed_ip=None):
+def _make_mixin_node(rack=0, node_type="db", simulated_racks=0, seed_ip=None, n_db_nodes=None):
     """Return a minimal NodeContainerMixin instance with stubbed attributes."""
     node = object.__new__(NodeContainerMixin)
     node.rack = rack
@@ -89,6 +89,7 @@ def _make_mixin_node(rack=0, node_type="db", simulated_racks=0, seed_ip=None):
     node.parent_cluster = SimpleNamespace(
         params={
             "simulated_racks": simulated_racks,
+            "n_db_nodes": n_db_nodes if n_db_nodes is not None else [3],
             "docker_network": "bridge",
             "append_scylla_args": "--smp 1",
         }
@@ -159,31 +160,24 @@ def test_non_db_node_with_no_seed_and_no_racks():
     assert result["command"] is None
 
 
-# ---------------------------------------------------------------------------
-# is_docker_rack_arg_supported tests
-# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("n_db_nodes", [[1], [1, 0]], ids=["single-dc", "multi-dc"])
+def test_no_rack_args_for_single_node_cluster(n_db_nodes):
+    """A one-node cluster gets no rack args, whatever simulated_racks says.
 
-
-@pytest.mark.parametrize("probe_ok, expected", [(True, True), (False, False)])
-def test_rack_arg_support_reflects_probe_result(probe_ok, expected):
-    """The probe result (grep on /commandlineparser.py) drives the returned value."""
-    node = object.__new__(DockerNode)
-    node.remoter = MagicMock()
-    node.remoter.run.return_value = SimpleNamespace(ok=probe_ok)
-
-    assert DockerNode.is_docker_rack_arg_supported.func(node) is expected
-
-
-def test_rack_arg_support_is_cached():
-    """The container image is fixed per node, so the probe must run only once
-    even when the property is accessed repeatedly (cached_property).
+    It cannot span racks, and the snitch auto-resolution leaves `endpoint_snitch` alone, so
+    the rack would never be read -- while the argument itself is fatal on a pre-2026.1 image.
     """
-    node = object.__new__(DockerNode)
-    node.remoter = MagicMock()
-    node.remoter.run.return_value = SimpleNamespace(ok=True)
+    node = _make_mixin_node(rack=0, simulated_racks=3, n_db_nodes=n_db_nodes)
+    result = node.node_container_run_args(seed_ip=None)
+    assert result["command"] is None
 
-    assert node.is_docker_rack_arg_supported is True
-    assert node.is_docker_rack_arg_supported is True
-    assert node.is_docker_rack_arg_supported is True
 
-    node.remoter.run.assert_called_once()
+def test_rack_args_survive_growing_past_the_configured_racks():
+    """A node added by a nemesis keeps getting rack args: `n_db_nodes` is the configured topology.
+
+    `_create_nodes` hands out `node_index % racks_count`, so the fourth node of a 3-node,
+    3-rack cluster lands back on RACK0.
+    """
+    node = _make_mixin_node(rack=0, simulated_racks=3, n_db_nodes=[3])
+    result = node.node_container_run_args(seed_ip="10.0.0.1")
+    assert "--rack=RACK0" in result["command"]

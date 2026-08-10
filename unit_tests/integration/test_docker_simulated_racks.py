@@ -23,10 +23,10 @@ pytestmark = [
 ]
 
 
-# Scylla >= 2026.1 image that supports --rack/--dc entrypoint arguments.
-# Pinned to a released 2026.1.x tag (not :latest) so a future release cannot
-# silently change the image under this test.
-_RACK_CAPABLE_IMAGE = "docker.io/scylladb/scylla:2026.1.9"
+# Rolling tag of the 2026.1 branch -- the first release whose Docker entrypoint
+# accepts --rack/--dc.  The patch level is irrelevant to what this test asserts,
+# so track the branch instead of pinning a single release.
+_RACK_CAPABLE_IMAGE = "docker.io/scylladb/scylla:2026.1"
 
 
 @pytest.fixture(scope="function")
