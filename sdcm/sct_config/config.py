@@ -185,6 +185,8 @@ _AMD64_ONLY_STRESS_TOOLS: dict[str, tuple[str, ...]] = {
     "kcl": ("hydra-kcl",),
     "ndbench": ("ndbench",),
     "nosqlbench": ("nosqlbench",),
+    # amd64 only until an arm64 sc-verify image is pushed
+    "cql-stress-sc-verify": ("cql-stress-sc-verify",),
 }
 
 _YCSB_COMMAND_MARKER = "bin/ycsb"
