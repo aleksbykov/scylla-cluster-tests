@@ -1,0 +1,77 @@
+# Strong consistency verified load (SCYLLADB-4519): a copy of test-cases/longevity/longevity-100gb-4h-cql-stress.yaml
+# where only the strong-consistency parts change. The tool and its rules: data_dir/sc_verify/, sdcm/stress/sc_verify_thread.py.
+test_duration: 330  # minutes: preload (~30) + 240 load + 10 checker drain + read-back + setup
+argus_use_ssh_tunnel: true
+test_metadata:
+  description: >-
+    4-hour longevity on strongly consistent tables: 100GB preloaded, then checked
+    linearizability plus bulk mixed load on a 6-node, 3-rack cluster with curated
+    topology nemesis.
+  test_type: longevity
+  tier: tier2
+  duration_class: short
+  supported_backends:
+    - aws
+  stress_tools:
+    - cql-stress-sc-verify
+  workload: mixed
+  features:
+    - tablets
+    - strong-consistency
+  team_ownership: core-qa
+
+# One replica per rack (RF 3), so a quorum survives any single node down, and topology nemesis
+# still leave a node in each rack.
+n_db_nodes: 6
+simulated_racks: 3
+n_loaders: 2
+seeds_num: 3
+sizing_db:
+  vcpu: 8
+  memory: '>=64'
+root_disk_size_loader: 100  # room for the histories and expected.jsonl
+user_prefix: 'longevity-sc-verify-100gb-4h'
+space_node_threshold: 64424
+
+experimental_features:
+  - strongly-consistent-tables
+append_scylla_yaml:
+  tablets_mode_for_new_keyspaces: enabled
+
+server_encrypt: true
+client_encrypt: false  # the thread does not pass TLS options yet
+
+# Two copies of the tool on the same rows report false violations, so each entry runs on one loader
+# (round_robin), there is exactly one stress_cmd entry per loader, and the --pop and --bulk-pop ranges
+# don't overlap. The thread checks these rules before it starts.
+round_robin: true
+
+# 2 x 10,485,760 rows of ~5 KB = ~100 GB
+prepare_write_cmd:
+  - >-
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode bulk --bulk-op write -n 10485760
+    --bulk-pop seq=1099511627776..1099522113535 --bulk-threads 80
+  - >-
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode bulk --bulk-op write -n 10485760
+    --bulk-pop seq=1099522113536..1099532599295 --bulk-threads 80
+
+# --bulk-rate is left at the tool's default (0, unthrottled) until the calibration run sets it.
+stress_cmd:
+  - >-
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode both --pop seq=0..2047 --slots 32
+    --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099511627776..1099522113535 --bulk-threads 80
+    --duration 240m
+  - >-
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode both --pop seq=2048..4095 --slots 32
+    --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099522113536..1099532599295 --bulk-threads 80
+    --duration 240m
+
+# Every nemesis class name is also a flag, so a plain `or` of names selects exactly this list.
+nemesis_class_name: 'SisyphusMonkey'
+nemesis_selector: >-
+  ScyllaKillMonkey or SerialRestartOfElectedTopologyCoordinatorNemesis or NodeRestartWithResharding
+  or DecommissionMonkey or NodeTerminateAndReplace or GrowShrinkClusterNemesis
+  or BlockNetworkMonkey or RejectInterNodeNetworkMonkey
+nemesis_seed: 32
+nemesis_interval: 10  # minutes; leaves room for quiet rows between disruptions
+nemesis_during_prepare: false  # the preload must run on a stable cluster
