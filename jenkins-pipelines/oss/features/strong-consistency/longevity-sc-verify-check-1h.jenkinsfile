@@ -12,5 +12,5 @@ longevityPipeline(
     scylla_version: 'master:latest',
     test_name: 'longevity_test.LongevityTest.test_custom_time',
     test_config: '''["test-cases/features/strong-consistency/longevity-sc-verify-100gb-4h.yaml", "configurations/sc_verify/check-run-1h.yaml"]''',
-    instance_provision_fallback_on_demand: true
+    provision_type: 'on_demand'  // run #3 lost its spot loader 51 minutes into the load
 )
