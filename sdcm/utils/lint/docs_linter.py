@@ -130,6 +130,7 @@ def cross_reference_config(config_path: Path) -> LintResult:
         "scylla-bench": r"scylla-bench",
         "ycsb": r"ycsb",
         "latte": r"latte",
+        "cql-stress-sc-verify": r"cql-stress-sc-verify",
         "gemini": r"gemini",
         "ndbench": r"ndbench",
         "nosqlbench": r"nosqlbench",

@@ -1,0 +1,9 @@
+# cql-stress-sc-verify profile (spec §15.1): small rows, bulk on its own pk range of the checked table.
+keyspace: sc_verify
+replication_factor: 3
+tablets_initial: 32               # the table's min_tablet_count, fixed for the run
+table: reg
+cells: [bigint, text, blob]       # 1 to 8 of: int, bigint, text, blob
+text_size: 32                     # total length of each text cell value, in bytes
+blob_size: 64                     # total length of each blob cell value, in bytes
+bulk_table: null                  # null: bulk uses `table` on its own pk range; a name: a separate table

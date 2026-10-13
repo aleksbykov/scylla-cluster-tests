@@ -62,6 +62,7 @@ stress_tools:
   values:
     - cassandra-stress
     - cql-stress-cassandra-stress
+    - cql-stress-sc-verify
     - scylla-bench
     - ycsb
     - latte
@@ -105,6 +106,7 @@ features:
     - zero-token-nodes
     - alternator-streams
     - elasticity
+    - strong-consistency
 
 team_ownership:
   description: "QA team, or the GitHub team (scylladb/<team>) that owns the feature, responsible for maintaining this test"

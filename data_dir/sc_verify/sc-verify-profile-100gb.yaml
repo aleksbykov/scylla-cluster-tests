@@ -1,0 +1,9 @@
+# cql-stress-sc-verify profile (spec §15.1) for longevity-sc-verify-100gb-4h: ~5 KB rows, ~100 GB preloaded.
+keyspace: sc_verify
+replication_factor: 3
+tablets_initial: 128              # the table's min_tablet_count, fixed for the run; sized for the whole run's data
+table: reg
+cells: [bigint, text, blob]       # 1 to 8 of: int, bigint, text, blob
+text_size: 64                     # total length of each text cell value, in bytes
+blob_size: 5000                   # total length of each blob cell value, in bytes
+bulk_table: null                  # null: bulk uses `table` on its own pk range; a name: a separate table
