@@ -1,0 +1,29 @@
+# Shrinks test-cases/features/strong-consistency/longevity-sc-verify-100gb-4h.yaml to a 1-hour check run of the
+# cql-stress-sc-verify thread on AWS. Layer it after the test case; the job is
+# jenkins-pipelines/oss/features/strong-consistency/longevity-sc-verify-check-1h.jenkinsfile.
+#
+# What survives: the thread end to end - profile upload, the setup guard, preload, the checked stream with the
+# checker and read-back, the history copied back, and the event's severity. Not the 100 GB data set or the nemesis.
+
+# 6 nodes in the test case's 3 racks: 2 per rack, as in the full job. One loader means exactly one stress_cmd entry
+# (the guard checks it).
+n_db_nodes: 6
+n_loaders: 1
+instance_type_db: 'i4i.4xlarge'
+instance_type_loader: 'c6i.2xlarge'  # x86_64: the sc-verify image is amd64 only
+test_duration: 120  # minutes: setup and preload (~15) + 60 load + up to 10 checker drain + read-back + log collection
+space_node_threshold: 0
+user_prefix: 'sc-verify-check-1h'
+
+# The default profile: 32 tablets and small rows.
+prepare_write_cmd:
+  - >-
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-default.yaml --mode bulk --bulk-op write -n 100000
+    --bulk-pop seq=1099511627776..1099511727775 --bulk-threads 8
+stress_cmd:
+  - >-
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-default.yaml --mode both --pop seq=0..1023 --slots 8
+    --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099511627776..1099511727775 --bulk-threads 8 --bulk-rate 500
+    --duration 60m
+
+nemesis_class_name: 'NoOpMonkey'
