@@ -207,6 +207,7 @@ from sdcm.ycsb_thread import YcsbStressThread
 from sdcm.ndbench_thread import NdBenchStressThread
 from sdcm.kcl_thread import KclStressThread, CompareTablesSizesThread
 from sdcm.stress.latte_thread import LatteStressThread
+from sdcm.stress.sc_verify_thread import ScVerifyThread
 from sdcm.cdclog_reader_thread import CDCLogReaderThread
 from sdcm.logcollector import (
     CassandraLogCollector,
@@ -3051,7 +3052,9 @@ class ClusterTester(unittest.TestCase):
             use_single_loader=use_single_loader,
             node_list=node_list,
         )
-        if "cql-stress-cassandra-stress" in stress_cmd:
+        if stress_cmd.strip().startswith("cql-stress-sc-verify"):
+            return self.run_sc_verify_thread(**params)
+        elif "cql-stress-cassandra-stress" in stress_cmd:
             params["stop_test_on_failure"] = stop_test_on_failure
             params["compaction_strategy"] = compaction_strategy
             return self.run_cql_stress_cassandra_thread(**params)
@@ -3277,6 +3280,18 @@ class ClusterTester(unittest.TestCase):
             node_list=node_list or self.db_cluster.nodes,
             round_robin=round_robin,
             stop_test_on_failure=stop_test_on_failure,
+            params=self.params,
+        ).run()
+
+    def run_sc_verify_thread(self, stress_cmd, duration=None, round_robin=False, node_list=None, **_):
+        # One copy per loader: two copies on the same rows report false violations, so stress_num is not passed.
+        # A failure is always CRITICAL, so stop_test_on_failure is not passed either.
+        return ScVerifyThread(
+            loader_set=self.loaders,
+            stress_cmd=stress_cmd,
+            timeout=get_timeout_from_stress_cmd(stress_cmd) or self.get_duration(duration),
+            node_list=node_list or self.db_cluster.nodes,
+            round_robin=round_robin,
             params=self.params,
         ).run()
 

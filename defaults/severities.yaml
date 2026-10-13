@@ -124,6 +124,7 @@ ScyllaBenchEvent: CRITICAL
 CassandraStressEvent: CRITICAL
 CqlStressCassandraStressEvent: CRITICAL
 LatteStressEvent: CRITICAL
+ScVerifyStressEvent: CRITICAL
 GeminiStressEvent: CRITICAL
 YcsbStressEvent: CRITICAL
 CassandraHarryEvent: CRITICAL

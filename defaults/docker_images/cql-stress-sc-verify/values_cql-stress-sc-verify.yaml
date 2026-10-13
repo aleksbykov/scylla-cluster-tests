@@ -1,0 +1,2 @@
+cql-stress-sc-verify:
+  image: aleksbykov/cql-stress:sc-verify-m2-878c344
