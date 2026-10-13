@@ -15,17 +15,19 @@ test_duration: 120  # minutes: setup and preload (~15) + 60 load + up to 10 chec
 space_node_threshold: 0
 user_prefix: 'sc-verify-check-1h'
 
-# The default profile: 32 tablets and small rows.
+# The 4h job's profile: 128 tablets spread the Raft leaders over all shards (the default profile's 32 left 4-10 of
+# 14 shards per node busy), and ~5 KB rows cost more CPU and IO per op. 100,000 rows = ~500 MB.
 prepare_write_cmd:
   - >-
-    cql-stress-sc-verify --profile /tmp/sc-verify-profile-default.yaml --mode bulk --bulk-op write -n 100000
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode bulk --bulk-op write -n 100000
     --bulk-pop seq=1099511627776..1099511727775 --bulk-threads 8
-# Checked ops/s = --slots x --burst-ops per 1 s burst: 256 x 40 = ~10,240, the per-loader load of step S3 of the
-# 2026-10-08 saturation ramp (clean). 40 divides the 200-op row, so no burst is wasted. Bulk: 10,000 ops/s.
+# Checked ops/s = --slots x --burst-ops per 1 s burst: 512 x 40 = ~20,480, the per-loader load of step S4 of the
+# 2026-10-08 saturation ramp (clean). 40 divides the 200-op row, so no burst is wasted. Bulk is unthrottled
+# (--bulk-rate 0): 256 threads as fast as the cluster answers.
 stress_cmd:
   - >-
-    cql-stress-sc-verify --profile /tmp/sc-verify-profile-default.yaml --mode both --pop seq=0..1023 --slots 256
-    --burst-ops 40 --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099511627776..1099511727775 --bulk-threads 32
-    --bulk-rate 10000 --duration 60m
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode both --pop seq=0..1023 --slots 512
+    --burst-ops 40 --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099511627776..1099511727775 --bulk-threads 256
+    --bulk-rate 0 --duration 60m
 
 nemesis_class_name: 'NoOpMonkey'
