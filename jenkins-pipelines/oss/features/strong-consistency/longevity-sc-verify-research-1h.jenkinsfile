@@ -1,0 +1,16 @@
+#!groovy
+
+// trick from https://github.com/jenkinsci/workflow-cps-global-lib-plugin/pull/43
+def lib = library identifier: 'sct@snapshot', retriever: legacySCM(scm)
+
+// A 1-hour research run of the cql-stress-sc-verify checked stream: the check job's cluster with 4 loaders,
+// each changing one axis (clients per row, ops per row, burst window, checker budget); see research-1h.yaml.
+longevityPipeline(
+    backend: 'aws',
+    region: 'eu-west-1',
+    availability_zone: 'c',
+    scylla_version: 'master:latest',
+    test_name: 'longevity_test.LongevityTest.test_custom_time',
+    test_config: '''["test-cases/features/strong-consistency/longevity-sc-verify-100gb-4h.yaml", "configurations/sc_verify/check-run-1h.yaml", "configurations/sc_verify/research-1h.yaml"]''',
+    provision_type: 'on_demand'
+)
