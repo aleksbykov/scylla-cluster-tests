@@ -1,0 +1,39 @@
+# A research run of the checked stream: four loaders, each a different mix of clients per row, ops per row, burst
+# window and checker, compared on unknown rows, canaries and checker drain. Layer it after check-run-1h.yaml
+# (same 6 nodes, 50 GB preload by loaders 1-2, 60 min load, no nemesis); the job is
+# jenkins-pipelines/oss/features/strong-consistency/longevity-sc-verify-research-1h.jenkinsfile.
+#
+# The reference: the tool's defaults - 8 clients per row, 200 ops per row, 16 ops per 1 s burst (~13 s rows),
+# checker 10 s per row, 50 rows per file, 2 workers - clean in runs f2c00c14 and 2026-10-09.
+# Checked ops/s = --slots x --burst-ops / --burst-interval, and a new row waits for the next burst. No bulk stream:
+# it would load the cluster differently per loader; set one entry back to --mode both to add it.
+n_loaders: 4
+# 32 vCPU and 64 GB each: the checker gets up to 8 workers x 4 GB.
+instance_type_loader: 'c6i.8xlarge'
+user_prefix: 'sc-verify-research-1h'
+
+stress_cmd:
+  # Loader 1, clients: 1000 per row, 2000 ops per 1 s burst (2 per client), 20,000 ops per row (~10 s), 2 slots.
+  # Porcupine can't check past ~24 ops in flight on one row, and at 32 clients it already missed its canary
+  # (2026-10-09), which exits 1 and stops the whole test. So --checker off: only the streaming invariants check
+  # reads; the check files are written for offline use.
+  - >-
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode verify --pop seq=0..1023 --slots 2
+    --clients-per-row 1000 --burst-ops 2000 --ops-per-gen 20000 --checker off --duration 60m
+  # Loader 2, long rows: 16 clients (1 op each per burst), 1000 ops per row, so a row lives ~63 s;
+  # --max-gen-duration 120s lets it finish. Default checker.
+  - >-
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode verify --pop seq=1024..2047 --slots 256
+    --clients-per-row 16 --ops-per-gen 1000 --max-gen-duration 120s --duration 60m
+  # Loader 3, overlap window: 32 clients, 50 ops per 2 s burst, 100 ops per row, so a row is 2 bursts (~4 s), quiet
+  # for 2 s between them; ~6,400 ops/s. Default checker, which missed its canary at 32 clients on 2026-10-09.
+  - >-
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode verify --pop seq=2048..3071 --slots 256
+    --clients-per-row 32 --ops-per-gen 100 --burst-ops 50 --burst-interval 2s --duration 60m
+  # Loader 4, checker budget: 48 clients per row, 50 ops per row, so a row is one burst with all 48 in flight; the
+  # burst budget of 100 is never used up, and ~6,400 ops/s, ~128 rows/s. The checker gets 60 s per row, 10 rows per
+  # file (10 x 60 s fits the 600 s --checker-timeout) and 8 workers. A missed canary still exits 1 at the end.
+  - >-
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode verify --pop seq=3072..4095 --slots 128
+    --clients-per-row 48 --burst-ops 100 --ops-per-gen 50 --key-timeout 60s --check-rows 10 --checker-workers 8
+    --duration 60m
