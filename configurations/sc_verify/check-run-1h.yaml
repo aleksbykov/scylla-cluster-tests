@@ -31,7 +31,8 @@ prepare_write_cmd:
 # load of step S4 of the 2026-10-08 saturation ramp (clean), with 8 clients and 200 ops per row (5 s). Bulk mixed is
 # unthrottled (--bulk-rate 0, 256 threads) over the whole 50 GB, both loaders' prepared halves.
 # Loader 2, long crowded rows, checked only: 16 clients per row (8 is clean; 16 left 5 of 1183 rows unknown on
-# 2026-10-09), 1000 ops per row at 16 per burst = ~62 s per row, 32 x 16 = ~512 ops/s. The checker gets more room:
+# 2026-10-09), 1000 ops per row at 16 per burst = ~62 s per row, 256 x 16 = ~4,096 ops/s
+# (~15k rows; run e696eb91 had 32 slots, 1,856 rows and an idle checker). The checker gets more room:
 # --key-timeout 60s, --check-rows 10 (10 x 60 s fits the default 600 s --checker-timeout) and 6 workers (6 x the
 # default 4G --checker-mem fits the c6i.4xlarge's 32 GB).
 stress_cmd:
@@ -40,7 +41,7 @@ stress_cmd:
     --burst-ops 40 --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099511627776..1099522113535 --bulk-threads 256
     --bulk-rate 0 --duration 60m
   - >-
-    cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode verify --pop seq=1024..2047 --slots 32
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode verify --pop seq=1024..2047 --slots 256
     --clients-per-row 16 --burst-ops 16 --ops-per-gen 1000 --max-gen-duration 120s --key-timeout 60s --check-rows 10
     --checker-workers 6 --duration 60m
 
