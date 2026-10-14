@@ -19,7 +19,7 @@ user_prefix: 'sc-verify-check-1h'
 
 # The 4h job's profile: 128 tablets spread the Raft leaders over all shards (the default profile's 32 left 4-10 of
 # 14 shards per node busy), and ~5 KB rows cost more CPU and IO per op. 2 x 5,242,880 rows of ~5 KB = ~50 GB, the 4h
-# job's first loader range split in two; each loader's bulk mixed then works over its own half.
+# job's first loader range, preloaded in two halves, one per loader.
 prepare_write_cmd:
   - >-
     cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode bulk --bulk-op write -n 5242880
@@ -27,17 +27,21 @@ prepare_write_cmd:
   - >-
     cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode bulk --bulk-op write -n 5242880
     --bulk-pop seq=1099516870656..1099522113535 --bulk-threads 256
-# Checked ops/s per loader = --slots x --burst-ops per 1 s burst: 512 x 40 = ~20,480, the per-loader load of step S4
-# of the 2026-10-08 saturation ramp (clean). 40 divides the 200-op row, so no burst is wasted. Bulk is unthrottled
-# (--bulk-rate 0): 256 threads per loader as fast as the cluster answers.
+# Loader 1, the baseline: checked ops/s = --slots x --burst-ops per 1 s burst = 512 x 40 = ~20,480, the per-loader
+# load of step S4 of the 2026-10-08 saturation ramp (clean), with 8 clients and 200 ops per row (5 s). Bulk mixed is
+# unthrottled (--bulk-rate 0, 256 threads) over the whole 50 GB, both loaders' prepared halves.
+# Loader 2, long crowded rows, checked only: 16 clients per row (8 is clean; 16 left 5 of 1183 rows unknown on
+# 2026-10-09), 1000 ops per row at 16 per burst = ~62 s per row, 32 x 16 = ~512 ops/s. The checker gets more room:
+# --key-timeout 60s, --check-rows 10 (10 x 60 s fits the default 600 s --checker-timeout) and 6 workers (6 x the
+# default 4G --checker-mem fits the c6i.4xlarge's 32 GB).
 stress_cmd:
   - >-
     cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode both --pop seq=0..1023 --slots 512
-    --burst-ops 40 --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099511627776..1099516870655 --bulk-threads 256
+    --burst-ops 40 --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099511627776..1099522113535 --bulk-threads 256
     --bulk-rate 0 --duration 60m
   - >-
-    cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode both --pop seq=1024..2047 --slots 512
-    --burst-ops 40 --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099516870656..1099522113535 --bulk-threads 256
-    --bulk-rate 0 --duration 60m
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode verify --pop seq=1024..2047 --slots 32
+    --clients-per-row 16 --burst-ops 16 --ops-per-gen 1000 --max-gen-duration 120s --key-timeout 60s --check-rows 10
+    --checker-workers 6 --duration 60m
 
 nemesis_class_name: 'NoOpMonkey'
