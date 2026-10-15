@@ -4,7 +4,7 @@
 def lib = library identifier: 'sct@snapshot', retriever: legacySCM(scm)
 
 // A 1-hour research run of the cql-stress-sc-verify checked stream: the check job's cluster with 4 loaders,
-// each changing one axis (clients per row, ops per row, burst window, checker budget); see research-1h.yaml.
+// each running 16 clients per row, the most overlap the checker still proves; see research-1h.yaml.
 longevityPipeline(
     backend: 'aws',
     region: 'eu-west-1',
