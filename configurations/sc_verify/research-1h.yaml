@@ -18,9 +18,13 @@ user_prefix: 'sc-verify-research-1h'
 #   the quiet rest of the second gives the checker a cut point.
 # - --ops-per-gen 100: short rows (~7 s), cheap to check, the same overlap per burst.
 # - --read-ratio 0.3: write heavy; much lower and the checker sees too few reads to catch a violation.
-# - --check-rows 5 x --key-timeout 60s = 300 s, well under the 600 s --checker-timeout (c2594c71's 10 x 60 s = 600 s
-#   got 30 of 56 files killed).
-# - --canary-every 10: a canary every 10 files, so the run shows the checker still rejects a bad 16-client row.
+# - --key-timeout 120s: run 9a5bbae0 (2026-10-16) had one canary in 371 run past 60 s. When a row's first burst has
+#   no read (0.7^16, ~1 in 300), the canary's corrupted read lands in the second burst and the search costs ~40x the
+#   median (27-44 s in a local replay of 339 canaries). No checked row hit 60 s (0 unknown of ~92k).
+# - --check-rows 5 x --key-timeout 120s = 600 s, under the 900 s --checker-timeout (c2594c71's 10 x 60 s = 600 s at
+#   the 600 s default got 30 of 56 files killed).
+# - --canary-every 100 (the default): ~130 canaries per loader per hour, fewer when the queue is full, enough to show
+#   the checker still rejects a bad 16-client row.
 # - --connections-per-shard 16: the driver keeps 16 connections to every shard, so a row's 16 ops spread over them
 #   instead of sharing one. 84 shards x 16 = 1,344 connections per loader (+1 control), ~5,400 for the run, well
 #   inside the 16,384 local ports of the default range (cql-stress spec §15.4, SCYLLADB-5406). The start line records
@@ -29,21 +33,21 @@ user_prefix: 'sc-verify-research-1h'
 stress_cmd:
   - >-
     cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode verify --pop seq=0..1023 --slots 128
-    --clients-per-row 16 --burst-ops 16 --burst-interval 1s --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
-    --key-timeout 60s --check-rows 5 --checker-workers 16 --checker-mem 3G --canary-every 10
-    --connections-per-shard 16 --duration 60m
+    --clients-per-row 16 --burst-ops 16 --burst-interval 500ms --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
+    --key-timeout 120s --check-rows 5 --checker-workers 16 --checker-mem 3G --canary-every 100
+    --connections-per-shard 16 --checker-timeout 900s --duration 60m
   - >-
     cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode verify --pop seq=1024..2047 --slots 128
-    --clients-per-row 16 --burst-ops 16 --burst-interval 1s --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
-    --key-timeout 60s --check-rows 5 --checker-workers 16 --checker-mem 3G --canary-every 10
-    --connections-per-shard 16 --duration 60m
+    --clients-per-row 16 --burst-ops 48 --burst-interval 1s --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
+    --key-timeout 120s --check-rows 5 --checker-workers 16 --checker-mem 3G --canary-every 100
+    --connections-per-shard 16 --checker-timeout 900s --duration 60m
   - >-
     cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode verify --pop seq=2048..3071 --slots 128
-    --clients-per-row 16 --burst-ops 16 --burst-interval 1s --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
-    --key-timeout 60s --check-rows 5 --checker-workers 16 --checker-mem 3G --canary-every 10
-    --connections-per-shard 16 --duration 60m
+    --clients-per-row 16 --burst-ops 32 --burst-interval 1s --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
+    --key-timeout 120s --check-rows 5 --checker-workers 16 --checker-mem 3G --canary-every 100
+    --connections-per-shard 16 --checker-timeout 900s --duration 60m
   - >-
     cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode verify --pop seq=3072..4095 --slots 128
-    --clients-per-row 16 --burst-ops 16 --burst-interval 1s --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
-    --key-timeout 60s --check-rows 5 --checker-workers 16 --checker-mem 3G --canary-every 10
-    --connections-per-shard 16 --duration 60m
+    --clients-per-row 16 --burst-ops 16 --burst-interval 100ms --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
+    --key-timeout 120s --check-rows 5 --checker-workers 16 --checker-mem 3G --canary-every 100
+    --connections-per-shard 16 --checker-timeout 900s --duration 60m
