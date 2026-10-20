@@ -44,5 +44,3 @@ stress_cmd:
     cql-stress-sc-verify --profile /tmp/sc-verify-profile-100gb.yaml --mode verify --pop seq=1024..2047 --slots 256
     --clients-per-row 16 --burst-ops 16 --ops-per-gen 1000 --max-gen-duration 120s --key-timeout 60s --check-rows 10
     --checker-workers 6 --duration 60m
-
-nemesis_class_name: 'NoOpMonkey'

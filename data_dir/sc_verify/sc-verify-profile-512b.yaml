@@ -1,0 +1,9 @@
+# cql-stress-sc-verify profile (spec §15.1) for longevity-sc-verify-100gb-4h: 512 B of cells per row.
+keyspace: sc_verify
+replication_factor: 3
+tablets_initial: 128              # the table's min_tablet_count, fixed for the run; spreads the Raft leaders over the shards
+table: reg
+cells: [bigint, text, blob]       # 1 to 8 of: int, bigint, text, blob
+text_size: 64                     # total length of each text cell value, in bytes
+blob_size: 440                    # total length of each blob cell value, in bytes: 8 + 64 + 440 = 512 B of cells
+bulk_table: null                  # null: bulk uses `table` on its own pk range; a name: a separate table
