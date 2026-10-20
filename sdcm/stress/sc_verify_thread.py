@@ -23,6 +23,7 @@ from sdcm.remote.libssh2_client.exceptions import Failure
 from sdcm.sct_events import Severity
 from sdcm.sct_events.loaders import ScVerifyStressEvent
 from sdcm.stress.base import DockerBasedStressThread, format_stress_cmd_error
+from sdcm.test_config import TestConfig
 from sdcm.utils.common import find_file_under_sct_dir
 from sdcm.utils.docker_remote import RemoteDocker
 
@@ -33,6 +34,20 @@ TOOL = "cql-stress-sc-verify"
 DEFAULT_MODE = "both"
 DEFAULT_POP = "seq=0..1023"
 DEFAULT_BULK_POP = "seq=1099511627776..1099522113535"
+# The tool logs and histories have an archive of their own (spec §16.1), uploaded by ScVerifyDataLogCollector.
+DATA_DIR = "sc-verifies-data"
+# Packing and copying a multi-hour history can take minutes; receive_files defaults to 300 s.
+COPY_TIMEOUT = 1800
+
+
+def data_dir(loader) -> str:
+    """Where a loader's tool logs and history tarballs go on the runner.
+
+    Outside `loader.logdir`, so the loader-set archive never holds them.
+    """
+    path = os.path.join(TestConfig.logdir(), DATA_DIR, loader.name)
+    os.makedirs(path, exist_ok=True)
+    return path
 
 
 def get_flag(stress_cmd: str, flag: str) -> str | None:
@@ -110,9 +125,8 @@ class ScVerifyThread(DockerBasedStressThread):
         return stress_cmd
 
     def _run_stress(self, loader, loader_idx, cpu_idx):
-        os.makedirs(loader.logdir, exist_ok=True)
         log_id = self._build_log_file_id(loader_idx, cpu_idx, "")
-        log_file_name = os.path.join(loader.logdir, f"{TOOL}-{log_id}.log")
+        log_file_name = os.path.join(data_dir(loader), f"{TOOL}-{log_id}.log")
         result = None
         with ScVerifyStressEvent(node=loader, stress_cmd=self.stress_cmd, log_file_name=log_file_name) as event:
             stress_cmds = self.params.get("stress_cmd") or []
@@ -150,7 +164,12 @@ class ScVerifyThread(DockerBasedStressThread):
                     )
                     if illegal := count_illegal(result.stdout):
                         event.severity = Severity.ERROR
-                        event.add_error([f"the checker found {illegal} rows not linearizable; see {history_dir}"])
+                        event.add_error(
+                            [
+                                f"the checker found {illegal} rows not linearizable; see {Path(history_dir).name}.tar.gz "
+                                f"in the {DATA_DIR} archive"
+                            ]
+                        )
                 except Exception as exc:  # noqa: BLE001
                     self.configure_event_on_failure(stress_event=event, exc=exc)
                 finally:
@@ -170,8 +189,15 @@ class ScVerifyThread(DockerBasedStressThread):
 
     @staticmethod
     def copy_history(loader, history_dir: str):
+        """Packs the run's history on the loader into one tarball and copies it into the loader's data dir.
+
+        One file per run instead of thousands of check files (spec §16.3).
+        """
+        parent, name = os.path.split(history_dir)
+        tarball = f"{history_dir}.tar.gz"
         try:
-            loader.remoter.receive_files(src=history_dir, dst=loader.logdir)
+            loader.remoter.run(f"tar -czf {tarball} -C {parent} {name}", verbose=False, timeout=COPY_TIMEOUT)
+            loader.remoter.receive_files(src=tarball, dst=data_dir(loader), timeout=COPY_TIMEOUT)
         except Exception:  # noqa: BLE001
             LOGGER.exception("Failed to copy the %s history %s from %s", TOOL, history_dir, loader.name)
 

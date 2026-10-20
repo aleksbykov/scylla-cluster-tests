@@ -468,6 +468,7 @@ def list_logs_by_test_id(test_id):
         "event",
         "sct",
         "jepsen-data",
+        "sc-verifies-data",
         "siren-manager-set",
         "prometheus",
         "grafana",
