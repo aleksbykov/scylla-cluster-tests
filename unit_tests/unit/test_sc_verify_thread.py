@@ -92,8 +92,9 @@ SCV {"t":"end","exit":0}
 
 
 class FakeEvent:
-    def __init__(self, calls, **_):
+    def __init__(self, calls, log_file_name=None, **_):
         self.calls = calls
+        self.log_file_name = log_file_name
         self.severity = Severity.NORMAL
         self.errors = []
 
@@ -137,11 +138,20 @@ class FakeDocker:
 def make_thread(monkeypatch, tmp_path, calls, exited=0, stdout="", stress_cmds=(LOADER_1,), round_robin=True):
     monkeypatch.setattr(sc_verify_thread, "ScVerifyStressEvent", lambda **kwargs: FakeEvent(calls, **kwargs))
     monkeypatch.setattr(sc_verify_thread, "RemoteDocker", lambda *_, **__: FakeDocker(calls, exited, stdout))
-    remoter = SimpleNamespace(
-        run=lambda cmd, **_: SimpleNamespace(stdout="/home/scyllaadm/sc-verify-l1\n"),
-        receive_files=lambda src, dst: calls.append(f"copy {src}"),
+    monkeypatch.setattr(sc_verify_thread.TestConfig, "logdir", classmethod(lambda cls: str(tmp_path / "testrun")))
+
+    def run(cmd, **_):
+        calls.append(f"loader {cmd}")
+        return SimpleNamespace(stdout="/home/scyllaadm/sc-verify-l1\n")
+
+    def receive_files(src, dst, **_):
+        calls.append(f"copy {src}")
+        calls.append(f"into {dst}")
+
+    remoter = SimpleNamespace(run=run, receive_files=receive_files)
+    loader = SimpleNamespace(
+        name="loader-1", logdir=str(tmp_path / "testrun" / "loader-set-1" / "loader-1"), remoter=remoter
     )
-    loader = SimpleNamespace(name="loader-1", logdir=str(tmp_path), remoter=remoter)
     loader_set = SimpleNamespace(nodes=[loader], get_db_auth=lambda: ("cassandra", "secret"))
     thread = ScVerifyThread(
         loader_set=loader_set,
@@ -174,7 +184,35 @@ def test_exit_code_to_severity(monkeypatch, tmp_path, exited, stdout, severity):
 
     assert event.severity == severity
     # The evidence is on the runner before the event is published: a CRITICAL event stops the test at once.
-    assert calls[-3:] == ["copy /home/scyllaadm/sc-verify-l1", "docker rm", "publish"]
+    assert calls[-4:-2] == [
+        "copy /home/scyllaadm/sc-verify-l1.tar.gz",
+        f"into {tmp_path}/testrun/sc-verifies-data/loader-1",
+    ]
+    assert calls[-2:] == ["docker rm", "publish"]
+
+
+def test_logs_and_history_go_to_sc_verifies_data(monkeypatch, tmp_path):
+    calls = []
+    thread, loader = make_thread(monkeypatch, tmp_path, calls)
+
+    _, _, event = thread._run_stress(loader, loader_idx=1, cpu_idx=0)
+
+    data = tmp_path / "testrun" / "sc-verifies-data" / "loader-1"
+    # The tool log and the history go to their own archive (spec §16.1), never into the loader's log dir.
+    assert event.log_file_name.startswith(f"{data}/cql-stress-sc-verify-")
+    assert any(c.startswith(f"run {LOADER_1}") for c in calls)
+    assert "loader tar -czf /home/scyllaadm/sc-verify-l1.tar.gz -C /home/scyllaadm sc-verify-l1" in calls
+    assert not (tmp_path / "testrun" / "loader-set-1").exists()
+
+    # kill() copies every run's history again; the container kill of the base class is not under test.
+    calls.clear()
+    monkeypatch.setattr(sc_verify_thread.DockerBasedStressThread, "kill", lambda self: None)
+    thread.kill()
+    assert calls == [
+        "loader tar -czf /home/scyllaadm/sc-verify-l1.tar.gz -C /home/scyllaadm sc-verify-l1",
+        "copy /home/scyllaadm/sc-verify-l1.tar.gz",
+        f"into {data}",
+    ]
 
 
 def test_stress_cmd_gets_profile_nodes_and_credentials(monkeypatch, tmp_path):

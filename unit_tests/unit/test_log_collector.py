@@ -11,7 +11,9 @@
 #
 # Copyright (c) 2022 ScyllaDB
 
+import subprocess
 import uuid
+from pathlib import Path
 from unittest.mock import patch, MagicMock, Mock
 
 import pytest
@@ -25,6 +27,9 @@ from sdcm.logcollector import (
     PrometheusSnapshots,
     MonitoringStack,
     GrafanaScreenShot,
+    FileLog,
+    LoaderLogCollector,
+    ScVerifyDataLogCollector,
 )
 from sdcm.provision import provisioner_factory
 from unit_tests.lib.fake_resources import prepare_fake_region
@@ -362,3 +367,56 @@ def test_hydra_watchdog_log_collected_from_result_dir(tmp_path):
 
     assert [p.name for p in local_dst.iterdir()] == ["hydra-watchdog.log"]
     assert (local_dst / "hydra-watchdog.log").read_text().startswith("=== 2026-09-23T17:30:32Z")
+
+
+def make_sc_verifies_data(result_dir):
+    """What ScVerifyThread leaves in the test's log dir for two loaders (spec §16.1)."""
+    for loader in ("sc-loader-node-1", "sc-loader-node-2"):
+        data = result_dir / "sc-verifies-data" / loader
+        data.mkdir(parents=True)
+        (data / "cql-stress-sc-verify-l1-0.log").write_text(f'SCV {{"t":"end","exit":0}} {loader}\n')
+        (data / "sc-verify-l1-0.tar.gz").write_bytes(b"history")
+
+
+def test_sc_verifies_data_is_an_archive_of_its_own(test_id, tmp_path, monkeypatch):
+    result_dir = tmp_path / "20261020-100000-000000"
+    make_sc_verifies_data(result_dir)
+    monkeypatch.chdir(tmp_path)
+    uploaded = {}
+
+    def upload(archive_path, storing_path):
+        uploaded["files"] = subprocess.run(
+            ["tar", "--zstd", "-tf", archive_path], capture_output=True, text=True, check=True
+        ).stdout.split()
+        return f"https://bucket/{storing_path}/{Path(archive_path).name}"
+
+    monkeypatch.setattr("sdcm.logcollector.upload_archive_to_s3", upload)
+    collector = ScVerifyDataLogCollector([], test_id=test_id, storage_dir=str(tmp_path / "storage"), params=None)
+
+    links = collector.collect_logs(local_search_path=str(result_dir))
+
+    name = f"sc-verifies-data-{test_id[:8]}"
+    assert len(links) == 1 and links[0].endswith(f"/{name}.tar.zst")
+    assert {f for f in uploaded["files"] if not f.endswith("/")} == {
+        f"{name}/{loader}/{file}"
+        for loader in ("sc-loader-node-1", "sc-loader-node-2")
+        for file in ("cql-stress-sc-verify-l1-0.log", "sc-verify-l1-0.tar.gz")
+    }
+    assert not (tmp_path / f"{name}.tar.zst").exists()
+
+
+def test_sc_verifies_data_missing_uploads_nothing(test_id, tmp_path, monkeypatch):
+    monkeypatch.setattr("sdcm.logcollector.upload_archive_to_s3", lambda *_: pytest.fail("nothing to upload"))
+    collector = ScVerifyDataLogCollector([], test_id=test_id, storage_dir=str(tmp_path / "storage"), params=None)
+
+    assert collector.collect_logs(local_search_path=str(tmp_path)) == []
+
+
+def test_loader_set_archive_holds_no_sc_verifies_data(tmp_path):
+    result_dir = tmp_path / "20261020-100000-000000"
+    make_sc_verifies_data(result_dir)
+
+    for node in ("sc-loader-node-1", "sc-loader-node-2"):
+        for entity in LoaderLogCollector.log_entities:
+            if isinstance(entity, FileLog) and entity.search_locally:
+                assert FileLog.find_local_files(str(result_dir), f"{node}/{entity.name}") == [], entity.name

@@ -1671,6 +1671,32 @@ class JepsenLogCollector(LogCollector):
         return s3_link
 
 
+class ScVerifyDataLogCollector(LogCollector):
+    """The tool logs and history tarballs of cql-stress-sc-verify, as an archive of their own.
+
+    ScVerifyThread copies them to `sc-verifies-data/<loader>/` in the test's log dir, outside every
+    loader's log dir, so the loader-set archive never holds them. Download them alone with
+    `hydra investigate download-logs <test_id> -t sc-verifies-data`.
+    """
+
+    cluster_log_type = "sc-verifies-data"
+    cluster_dir_prefix = "sc-verifies-data"
+
+    def collect_logs(self, local_search_path: Optional[str] = None) -> list[str]:
+        remove_files(self.local_dir)  # the data is archived where the thread left it, without a copy
+        src = os.path.join(local_search_path or "", self.cluster_log_type)
+        if not local_search_path or not os.path.isdir(src) or not os.listdir(src):
+            return []
+        try:
+            final_archive = self._compress_file(src, os.path.basename(self.local_dir))
+        except Exception as details:  # noqa: BLE001
+            LOGGER.error("Error during archive creation. Details: \n%s", details)
+            return []
+        s3_link = upload_archive_to_s3(final_archive, f"{self.test_id}/{self.current_run}")
+        remove_files(final_archive)
+        return [s3_link]
+
+
 class SSTablesCollector(BaseSCTLogCollector):
     """
     Collect corrupted sstables from db node.
@@ -1831,6 +1857,7 @@ class Collector:
             VectorStoreLogCollector: self.vector_store_set,
             SSTablesCollector: self.db_cluster,
             JepsenLogCollector: self.loader_set,
+            ScVerifyDataLogCollector: self.loader_set,
             DiagnosticsLogCollector: self.sct_set,
         }
         if self.params.get("server_encrypt") or self.params.get("client_encrypt"):
