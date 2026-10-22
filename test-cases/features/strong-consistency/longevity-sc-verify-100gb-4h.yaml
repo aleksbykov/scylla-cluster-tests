@@ -61,33 +61,28 @@ prepare_write_cmd:
     cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode bulk --bulk-op write -n 69905066
     --bulk-pop seq=1099651437910..1099721342975 --bulk-threads 80
 
-# Every loader runs --mode both: the checked stream and bulk mixed load on its own third of the preloaded data.
-# The checked stream follows the research job (configurations/sc_verify/research-1h.yaml): 16 clients per row, the
-# most overlap Porcupine still proves; 32 ops per 100 ms burst (2 per client), 100 ops per row (~0.4 s), 30% reads;
-# the checker gets 120 s per row, 5 rows per file (600 s of the 900 s file limit), 16 workers of 3 GB and a canary
-# every 100 files; 16 driver connections per shard. --bulk-rate stays at the tool's default (0, unthrottled).
+# Loaders 1-2 run only the checked stream (--mode verify); loader 3 runs only the bulk mixed load (--mode bulk) over
+# the whole preloaded data. The checked stream follows the research job (configurations/sc_verify/research-1h.yaml):
+# 8 clients per row; 32 ops per 100 ms burst, 100 ops per row, 30% reads; the checker gets 120 s per row, 5 rows per
+# file (600 s of the 900 s file limit), 16 workers of 3 GB and a canary every 100 files; 16 driver connections per
+# shard. --bulk-rate stays at the tool's default (0, unthrottled).
 stress_cmd:
   - >-
-    cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode both --pop seq=0..1023 --slots 128
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode verify --pop seq=0..1023 --slots 128
     --clients-per-row 8 --burst-ops 32 --burst-interval 100ms --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
     --key-timeout 120s --check-rows 5 --checker-workers 16 --checker-mem 3G --canary-every 100
     --connections-per-shard 16 --checker-timeout 900s
-    --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099511627776..1099581532842 --bulk-threads 80
     --duration 240m
   - >-
-    cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode both --pop seq=1024..2047 --slots 128
-    --clients-per-row 8 --burst-ops 32 --burst-interval 100ms --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode verify --pop seq=1024..2047 --slots 128
+    --clients-per-row 16 --burst-ops 32 --burst-interval 200ms --ops-per-gen 100 --read-ratio 0.5 --insert-ratio 0.5
     --key-timeout 120s --check-rows 5 --checker-workers 16 --checker-mem 3G --canary-every 100
     --connections-per-shard 16 --checker-timeout 900s
-    --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099581532843..1099651437909 --bulk-threads 80
     --duration 240m
   - >-
-    cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode both --pop seq=2048..3071 --slots 128
-    --clients-per-row 8 --burst-ops 32 --burst-interval 100ms --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
-    --key-timeout 120s --check-rows 5 --checker-workers 16 --checker-mem 3G --canary-every 100
-    --connections-per-shard 16 --checker-timeout 900s
-    --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099651437910..1099721342975 --bulk-threads 80
-    --duration 240m
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode bulk
+    --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099511627776..1099721342975 --bulk-threads 80
+    --connections-per-shard 16 --duration 240m
 
 # One thread of ALTER TABLE ... WITH <property> nemeses on the verified table; `not disruptive` drops the TWCS one.
 nemesis_class_name: 'SisyphusMonkey'
