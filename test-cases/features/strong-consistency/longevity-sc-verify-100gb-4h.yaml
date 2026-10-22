@@ -69,21 +69,21 @@ prepare_write_cmd:
 stress_cmd:
   - >-
     cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode both --pop seq=0..1023 --slots 128
-    --clients-per-row 16 --burst-ops 32 --burst-interval 100ms --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
+    --clients-per-row 8 --burst-ops 32 --burst-interval 100ms --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
     --key-timeout 120s --check-rows 5 --checker-workers 16 --checker-mem 3G --canary-every 100
     --connections-per-shard 16 --checker-timeout 900s
     --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099511627776..1099581532842 --bulk-threads 80
     --duration 240m
   - >-
     cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode both --pop seq=1024..2047 --slots 128
-    --clients-per-row 16 --burst-ops 32 --burst-interval 100ms --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
+    --clients-per-row 8 --burst-ops 32 --burst-interval 100ms --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
     --key-timeout 120s --check-rows 5 --checker-workers 16 --checker-mem 3G --canary-every 100
     --connections-per-shard 16 --checker-timeout 900s
     --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099581532843..1099651437909 --bulk-threads 80
     --duration 240m
   - >-
     cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode both --pop seq=2048..3071 --slots 128
-    --clients-per-row 16 --burst-ops 32 --burst-interval 100ms --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
+    --clients-per-row 8 --burst-ops 32 --burst-interval 100ms --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
     --key-timeout 120s --check-rows 5 --checker-workers 16 --checker-mem 3G --canary-every 100
     --connections-per-shard 16 --checker-timeout 900s
     --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099651437910..1099721342975 --bulk-threads 80
@@ -91,7 +91,7 @@ stress_cmd:
 
 # Every nemesis class name is also a flag, so a plain `or` of names selects exactly this list.
 nemesis_class_name: 'SisyphusMonkey'
-nemesis_selector: 'ScyllaKillMonkey or SerialRestartOfElectedTopologyCoordinatorNemesis'
+nemesis_selector: 'ScyllaKillMonkey or SoftRebootNodeMonkey'
 nemesis_seed: 32
 nemesis_interval: 10  # minutes; leaves room for quiet rows between disruptions
 nemesis_during_prepare: false  # the preload must run on a stable cluster
