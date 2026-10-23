@@ -26,7 +26,7 @@ test_metadata:
 n_db_nodes: 6
 simulated_racks: 3
 n_loaders: 3
-# 32 vCPU and 64 GB: each loader runs the bulk stream, the checked stream and 16 checker workers of 3 GB.
+# 64 vCPU and 128 GB: loader 2's 32 checker workers of 3 GB need most of it (run 478276a9: ~1.55 cores per worker).
 instance_type_loader: 'c7i.16xlarge'
 seeds_num: 3
 sizing_db:
@@ -64,20 +64,24 @@ prepare_write_cmd:
 
 # Loaders 1-2 run only the checked stream (--mode verify); loader 3 runs only the bulk mixed load (--mode bulk) over
 # the whole preloaded data. The checked stream follows the research job (configurations/sc_verify/research-1h.yaml):
-# 8 clients per row; 32 ops per 100 ms burst, 100 ops per row, 30% reads; the checker gets 120 s per row, 5 rows per
-# file (600 s of the 900 s file limit), 16 workers of 3 GB and a canary every 100 files; 16 driver connections per
-# shard. --bulk-rate stays at the tool's default (0, unthrottled).
+# 100 ops per row, the checker gets 120 s per row, 5 rows per file (600 s of the 900 s file limit), workers of 3 GB,
+# a canary every 100 files, 16 driver connections per shard. Sized from run 478276a9 for the most checked rows:
+# - L1, 8 clients: a file costs ~0.01 checker core-s, so the cluster is the limit; 256 slots ~ 64.6k ops/s (2x).
+#   Next step, if reactor load stays under 65%: 320-384 slots.
+# - L2, 16 clients: a file costs ~3.7 checker core-s, so the checker is the limit; 32 workers ~ 13.5 files/s, and
+#   56 slots write 14 files/s (slots / 4), just above it, so few files are skipped.
+# --bulk-rate stays at the tool's default (0, unthrottled).
 stress_cmd:
   - >-
-    cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode verify --pop seq=0..1023 --slots 128
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode verify --pop seq=0..1023 --slots 256
     --clients-per-row 8 --burst-ops 32 --burst-interval 100ms --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
     --key-timeout 120s --check-rows 5 --checker-workers 16 --checker-mem 3G --canary-every 100
     --connections-per-shard 16 --checker-timeout 900s
     --duration 240m
   - >-
-    cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode verify --pop seq=1024..2047 --slots 128
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode verify --pop seq=1024..2047 --slots 56
     --clients-per-row 16 --burst-ops 32 --burst-interval 200ms --ops-per-gen 100 --read-ratio 0.5 --insert-ratio 0.5
-    --key-timeout 120s --check-rows 5 --checker-workers 16 --checker-mem 3G --canary-every 100
+    --key-timeout 120s --check-rows 5 --checker-workers 32 --checker-mem 3G --canary-every 100
     --connections-per-shard 16 --checker-timeout 900s
     --duration 240m
   - >-
