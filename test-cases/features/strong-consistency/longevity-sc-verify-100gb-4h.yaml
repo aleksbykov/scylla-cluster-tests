@@ -1,6 +1,7 @@
 # Strong consistency verified load (SCYLLADB-4519): a copy of test-cases/longevity/longevity-100gb-4h-cql-stress.yaml
 # where only the strong-consistency parts change. The tool and its rules: data_dir/sc_verify/, sdcm/stress/sc_verify_thread.py.
 test_duration: 330  # minutes: preload (~30) + 240 load + 10 checker drain + read-back + setup
+root_disk_size_runner: 500  # GB, default 80: history tarballs and DB logs land on the runner (a 1h run left ~10 GB)
 argus_use_ssh_tunnel: true
 test_metadata:
   description: >-
@@ -26,7 +27,7 @@ n_db_nodes: 6
 simulated_racks: 3
 n_loaders: 3
 # 32 vCPU and 64 GB: each loader runs the bulk stream, the checked stream and 16 checker workers of 3 GB.
-instance_type_loader: 'c6i.8xlarge'
+instance_type_loader: 'c7i.16xlarge'
 seeds_num: 3
 sizing_db:
   vcpu: 8
