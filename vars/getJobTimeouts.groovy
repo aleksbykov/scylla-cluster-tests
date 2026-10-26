@@ -36,7 +36,8 @@ List<Integer> call(Map params, String region){
     def testData = sh(script: cmd, returnStdout: true).trim()
     println(testData)
     if (params.stress_duration == "" || params.stress_duration == null) {
-        testData = testData =~ /test_duration: (\d+)/
+        // Anchored: the config is printed sorted, so an unanchored match takes `spot_max_test_duration` first.
+        testData = testData =~ /(?m)^test_duration: (\d+)/
         testDuration = testData[0][1].toInteger()
     } else {
         stressDuration = params.stress_duration.toInteger()
