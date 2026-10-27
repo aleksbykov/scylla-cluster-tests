@@ -1,6 +1,6 @@
 # Strong consistency verified load (SCYLLADB-4519): a copy of test-cases/longevity/longevity-100gb-4h-cql-stress.yaml
 # where only the strong-consistency parts change. The tool and its rules: data_dir/sc_verify/, sdcm/stress/sc_verify_thread.py.
-test_duration: 330  # minutes: preload (~30) + 240 load + 10 checker drain + read-back + setup
+test_duration: 210  # minutes: preload (~30) + 120 load + 10 checker drain + read-back + setup
 root_disk_size_runner: 500  # GB, default 80: history tarballs and DB logs land on the runner (a 1h run left ~10 GB)
 argus_use_ssh_tunnel: true
 test_metadata:
@@ -26,7 +26,8 @@ test_metadata:
 n_db_nodes: 6
 simulated_racks: 3
 n_loaders: 3
-# 64 vCPU and 128 GB: loader 2's 32 checker workers of 3 GB need most of it (run 478276a9: ~1.55 cores per worker).
+# 64 vCPU and 128 GB: loader 2's 40 checker workers need ~1.4 cores each (run affc9575), most of the vCPUs.
+# Their 3 GB is a cap: in run 478276a9, 16 workers and the tool used 4.6 GiB in all.
 instance_type_loader: 'c7i.16xlarge'
 seeds_num: 3
 sizing_db:
@@ -68,26 +69,26 @@ prepare_write_cmd:
 # a canary every 100 files, 16 driver connections per shard. Sized from run 478276a9 for the most checked rows:
 # - L1, 8 clients: a file costs ~0.01 checker core-s, so the cluster is the limit; 256 slots ~ 64.6k ops/s (2x).
 #   Next step, if reactor load stays under 65%: 320-384 slots.
-# - L2, 16 clients: a file costs ~3.7 checker core-s, so the checker is the limit; 32 workers ~ 13.5 files/s, and
-#   56 slots write 14 files/s (slots / 4), just above it, so few files are skipped.
+# - L2, 16 clients: a file costs ~3.5 checker core-s, so the checker is the limit. 56 slots write 14 files/s
+#   (slots / 4); 32 workers checked 13.2 and skipped 5.7% (run c91c2bab), so 40 workers (~16.5 files/s) leave room.
 # --bulk-rate stays at the tool's default (0, unthrottled).
 stress_cmd:
   - >-
-    cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode verify --pop seq=0..1023 --slots 256
-    --clients-per-row 8 --burst-ops 32 --burst-interval 100ms --ops-per-gen 100 --read-ratio 0.3 --insert-ratio 0.5
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode verify --pop seq=0..1023 --slots 396
+    --clients-per-row 8 --burst-ops 32 --burst-interval 100ms --ops-per-gen 200 --read-ratio 0.3 --insert-ratio 0.5
     --key-timeout 120s --check-rows 5 --checker-workers 16 --checker-mem 3G --canary-every 100
     --connections-per-shard 16 --checker-timeout 900s
-    --duration 240m
+    --duration 120m
   - >-
     cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode verify --pop seq=1024..2047 --slots 56
     --clients-per-row 16 --burst-ops 32 --burst-interval 200ms --ops-per-gen 100 --read-ratio 0.5 --insert-ratio 0.5
-    --key-timeout 120s --check-rows 5 --checker-workers 32 --checker-mem 3G --canary-every 100
+    --key-timeout 120s --check-rows 5 --checker-workers 40 --checker-mem 3G --canary-every 100
     --connections-per-shard 16 --checker-timeout 900s
-    --duration 240m
+    --duration 120m
   - >-
     cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode bulk
     --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099511627776..1099721342975 --bulk-threads 80
-    --connections-per-shard 16 --duration 240m
+    --connections-per-shard 16 --duration 120m
 
 # One thread of ALTER TABLE ... WITH <property> nemeses on the verified table; `not disruptive` drops the TWCS one.
 nemesis_class_name: 'SisyphusMonkey'
