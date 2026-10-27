@@ -26,7 +26,7 @@ test_metadata:
 n_db_nodes: 6
 simulated_racks: 3
 n_loaders: 3
-# 64 vCPU and 128 GB: loader 2's 40 checker workers need ~1.4 cores each (run affc9575), most of the vCPUs.
+# 64 vCPU and 128 GB: loader 2's 40 checker workers take ~50 of the vCPUs, 1.25 each (run 32682dc7).
 # Their 3 GB is a cap: in run 478276a9, 16 workers and the tool used 4.6 GiB in all.
 instance_type_loader: 'c7i.16xlarge'
 seeds_num: 3
@@ -67,11 +67,12 @@ prepare_write_cmd:
 # the whole preloaded data. The checked stream follows the research job (configurations/sc_verify/research-1h.yaml):
 # the checker gets 120 s per row, 5 rows per file (600 s of the 900 s file limit), workers of 3 GB, a canary every
 # 100 files, 16 driver connections per shard. Sized from runs 478276a9 and c91c2bab for the most checked rows:
-# - L1, 8 clients: the cluster is the limit, not the checker (~0.01 core-s per file at 100 ops per row). In c91c2bab,
-#   256 slots of 100 ops per row gave 64.6k ops/s and 128 files/s, none skipped. Now 396 slots of 200 ops per row:
-#   ~1.5x the ops and ~99 files/s, if ops/s scales with slots. Keep the hottest shard under ~65%.
-# - L2, 16 clients, 100 ops per row: a file costs ~3.5 checker core-s, so the checker is the limit. 56 slots write
-#   14 files/s (slots / 4); 32 workers checked 13.2 and skipped 5.7% (run c91c2bab), so 40 (~16.5 files/s) leave room.
+# - L1, 8 clients: the cluster is the limit, not the checker (3.8 cores for 113 files/s in run 32682dc7). A row takes
+#   ceil((ops per row + 1) / burst-ops) bursts, so 396 slots of 200 ops per row give 396 x 201 / (7 x 100 ms) = 113.7k
+#   ops/s and 113 files/s (measured: 113.9k, 113). The hottest shard should stay under ~65%; it was 77% in 32682dc7.
+# - L2, 16 clients, 100 ops per row: a file costs ~3.5-4 checker core-s, so the checker is the limit. 56 slots write
+#   14 files/s (slots / 4). 32 workers checked 13.2 (run c91c2bab, 5.7% skipped), 40 checked 12.5 (32682dc7): the
+#   loader's 32 physical cores, not the worker count, hold it near 13 files/s.
 # --bulk-rate stays at the tool's default (0, unthrottled).
 stress_cmd:
   - >-
