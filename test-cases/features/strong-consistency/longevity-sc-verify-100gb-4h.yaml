@@ -5,9 +5,9 @@ root_disk_size_runner: 500  # GB, default 80: history tarballs and DB logs land 
 argus_use_ssh_tunnel: true
 test_metadata:
   description: >-
-    4-hour longevity on strongly consistent tables: 100 GB of 512 B rows preloaded, then checked
-    linearizability plus bulk mixed load on a 6-node, 3-rack cluster with curated
-    topology nemesis.
+    2-hour longevity on strongly consistent tables: 100 GB of 512 B rows preloaded, then checked
+    linearizability plus bulk mixed load on a 6-node, 3-rack cluster with table-property
+    nemeses.
   test_type: longevity
   tier: tier2
   duration_class: short
@@ -65,12 +65,13 @@ prepare_write_cmd:
 
 # Loaders 1-2 run only the checked stream (--mode verify); loader 3 runs only the bulk mixed load (--mode bulk) over
 # the whole preloaded data. The checked stream follows the research job (configurations/sc_verify/research-1h.yaml):
-# 100 ops per row, the checker gets 120 s per row, 5 rows per file (600 s of the 900 s file limit), workers of 3 GB,
-# a canary every 100 files, 16 driver connections per shard. Sized from run 478276a9 for the most checked rows:
-# - L1, 8 clients: a file costs ~0.01 checker core-s, so the cluster is the limit; 256 slots ~ 64.6k ops/s (2x).
-#   Next step, if reactor load stays under 65%: 320-384 slots.
-# - L2, 16 clients: a file costs ~3.5 checker core-s, so the checker is the limit. 56 slots write 14 files/s
-#   (slots / 4); 32 workers checked 13.2 and skipped 5.7% (run c91c2bab), so 40 workers (~16.5 files/s) leave room.
+# the checker gets 120 s per row, 5 rows per file (600 s of the 900 s file limit), workers of 3 GB, a canary every
+# 100 files, 16 driver connections per shard. Sized from runs 478276a9 and c91c2bab for the most checked rows:
+# - L1, 8 clients: the cluster is the limit, not the checker (~0.01 core-s per file at 100 ops per row). In c91c2bab,
+#   256 slots of 100 ops per row gave 64.6k ops/s and 128 files/s, none skipped. Now 396 slots of 200 ops per row:
+#   ~1.5x the ops and ~99 files/s, if ops/s scales with slots. Keep the hottest shard under ~65%.
+# - L2, 16 clients, 100 ops per row: a file costs ~3.5 checker core-s, so the checker is the limit. 56 slots write
+#   14 files/s (slots / 4); 32 workers checked 13.2 and skipped 5.7% (run c91c2bab), so 40 (~16.5 files/s) leave room.
 # --bulk-rate stays at the tool's default (0, unthrottled).
 stress_cmd:
   - >-
