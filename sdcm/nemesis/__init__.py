@@ -65,6 +65,7 @@ from sdcm.exceptions import (
     KillNemesis,
     LdapNotRunning,
     LogContentNotFound,
+    NemesisPassCompleted,
     NoFilesFoundToDestroy,
     NoKeyspaceFound,
     QuotaConfigurationFailure,
@@ -406,6 +407,11 @@ class NemesisRunner:
                 cur_interval = self.interval
                 try:
                     self.call_next_nemesis()
+                except NemesisPassCompleted as exc:
+                    InfoEvent(message=str(exc)).publish()
+                    self.log.info("Nemesis thread [%s] finished its pass: %s", id(self), exc)
+                    cur_interval = 0
+                    break
                 except (UnsupportedNemesis, MethodVersionNotFound) as exc:
                     self.log.warning("Skipping unsupported nemesis: %s", exc)
                     cur_interval = 0
