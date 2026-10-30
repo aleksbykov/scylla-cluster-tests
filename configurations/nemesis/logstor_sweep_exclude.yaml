@@ -1,9 +1,49 @@
 # Nemesis held out of the LogStore per-nemesis sweep (longevity-logstor-nemesis-sweep).
 #
-# Empty for the first run: nothing is known to be blocked on logstor yet. After a run that
-# stopped part-way, add the nemesis it already covered here (one per line, with the verdict as a
-# comment) so the next run resumes where it stopped instead of repeating them. For a one-off
-# rerun without a commit, pass SCT_NEMESIS_EXCLUDE_LIST="['NemesisA', 'NemesisB']" in the job's
-# extra_environment_variables parameter instead.
+# After a run that stopped part-way, add the nemesis it already covered here (one per line, with
+# the verdict as a comment) so the next run resumes where it stopped instead of repeating them.
+# For a one-off rerun without a commit, pass SCT_NEMESIS_EXCLUDE_LIST="['NemesisA', 'NemesisB']"
+# in the job's extra_environment_variables parameter instead.
 
-nemesis_exclude_list: []
+nemesis_exclude_list:
+  # Jenkins build #4, Argus run ed9db42e-d31c-461f-bfdc-46c2e099c81a, 2026.4.0~rc1.
+  # Ran:
+  - AddDropColumnMonkey  # succeeded
+  - SplitMergeTabletsWithAlter  # succeeded, but node-6 crashed 4 times during and after it
+  # Skipped: not supported by this test config.
+  - AddRemoveRackNemesis  # k8s only
+  - BlockNetworkMonkey  # needs extra_network_interface
+  - RandomInterruptionNetworkMonkey  # needs extra_network_interface
+  - StopStartInterfacesNetworkMonkey  # needs extra_network_interface
+  - RejectInterNodeNetworkMonkey  # scylladb#6522
+  - DeleteByPartitionsMonkey  # needs data_validation.max_partitions_in_test_table
+  - DeleteByRowsRangeMonkey  # needs data_validation.max_partitions_in_test_table
+  - DeleteOverlappingRowRangesMonkey  # needs data_validation.max_partitions_in_test_table
+  - GrowShrinkZeroTokenNode  # zero-token support not enabled
+  - RemoveServiceLevelMonkey  # SLA test only
+  - SlaDecreaseSharesDuringLoad  # SLA test only
+  - SlaIncreaseSharesByAttachAnotherSlDuringLoad  # SLA test only
+  - SlaIncreaseSharesDuringLoad  # SLA test only
+  - SlaMaximumAllowedSlsWithMaxSharesDuringLoad  # SLA test only
+  - SlaReplaceUsingDetachDuringLoad  # SLA test only
+  - SlaReplaceUsingDropDuringLoad  # SLA test only
+  - ModifyTableTwcsWindowSizeMonkey  # no TWCS table
+  # Skipped: SCT saw the logstor table as empty (SCT-1380). Not really tested.
+  # Remove these lines after SCT-1380 is fixed.
+  - AddRemoveMvNemesis
+  - CreateIndexNemesis
+  - KillMVBuildingCoordinator
+  - ModifyTableBloomFilterFpChanceMonkey
+  - ModifyTableCachingMonkey
+  - ModifyTableCommentMonkey
+  - ModifyTableCompactionMonkey
+  - ModifyTableCompressionMonkey
+  - ModifyTableCrcCheckChanceMonkey
+  - ModifyTableDclocalReadRepairChanceMonkey
+  - ModifyTableDefaultTimeToLiveMonkey
+  - ModifyTableGcGraceTimeMonkey
+  - ModifyTableMaxIndexIntervalMonkey
+  - ModifyTableMemtableFlushPeriodInMsMonkey
+  - ModifyTableMinIndexIntervalMonkey
+  - ModifyTableReadRepairChanceMonkey
+  - ModifyTableSpeculativeRetryMonkey
