@@ -1,0 +1,22 @@
+#!groovy
+
+// trick from https://github.com/jenkinsci/workflow-cps-global-lib-plugin/pull/43
+def lib = library identifier: 'sct@snapshot', retriever: legacySCM(scm)
+
+/** jobDescription
+    LogStore per-nemesis sweep - a logstor key-value table on tablets under a 4h latte
+    write/read load, while CategorySweepMonkey runs every nemesis once, category by category.
+
+    Manual staging job: not wired into any trigger, run it from Jenkins with "Build with Parameters".
+
+    logstor_sweep_exclude.yaml lists the nemesis to hold out of the next run; add the ones a
+    stopped run already covered to resume the sweep where it stopped.
+*/
+longevityPipeline(
+    backend: 'aws',
+    region: 'eu-west-1',
+    availability_zone: 'c',
+    test_name: 'longevity_test.LongevityTest.test_custom_time',
+    test_config: '''["test-cases/longevity/longevity-logstor-nemesis-sweep.yaml", "configurations/nemesis/logstor_sweep_exclude.yaml"]''',
+    instance_provision_fallback_on_demand: true
+)

@@ -1,0 +1,114 @@
+test_duration: 330
+
+test_metadata:
+  description: >-
+    LogStore per-nemesis sweep: a 6-node tablets cluster with the experimental logstor storage
+    engine, one RF=3 key-value table created with storage_engine = 'logstor' and preloaded with
+    ~20M rows by latte, then a QUORUM write stream and a QUORUM read stream run for 4 hours while
+    CategorySweepMonkey runs every nemesis exactly once, category by category
+    (schema-changes, topology-changes, other-disruptive, rest).
+  test_type: longevity
+  tier: sanity
+  duration_class: short
+  supported_backends:
+    - aws
+  stress_tools:
+    - latte
+  workload: mixed
+  nemesis_labels:
+    - CategorySweepMonkey
+  features:
+    - tablets
+  team_ownership: core-qa
+
+n_db_nodes: 6
+n_loaders: 2
+seeds_num: 3
+
+sizing_db:  # i7i.2xlarge class; its local NVMe hosts the preallocated logstor files
+  vcpu: 8
+  memory: '>=64'
+
+sizing_loader:
+  vcpu: 8
+  memory: '>=16'
+
+# Every nemesis once, category by category, then the nemesis thread stops. Order inside a
+# category is alphabetical, so a sweep is reproducible without nemesis_seed. To resume a sweep
+# that stopped part-way, list the nemesis already covered in nemesis_exclude_list
+# (configurations/nemesis/logstor_sweep_exclude.yaml).
+nemesis_class_name: 'CategorySweepMonkey'
+
+# Keep the preload quiet: the sweep starts against a complete dataset.
+nemesis_during_prepare: false
+
+user_prefix: 'longevity-logstor-sweep'
+
+experimental_features:
+  - logstor
+
+# logstor_disk_size_in_mb defaults to 0 - without it the node has no logstor storage at all.
+# It is per shard: every shard opens its own logstor files of this size. 16GB per shard is ~5x
+# the live data of this dataset (20M rows x ~2KB x RF3 / 6 nodes / 7 shards ~= 3GB), leaving room
+# for overwrite garbage and for the data a decommission moves onto the remaining nodes.
+# logstor_format_on_startup zero-fills the files that are not allocated yet; the first start of a
+# node formats the whole allocation (~110GB), a restart only what is still unformatted.
+# Logstor tablets migrate over file streaming only, so enable_file_stream is pinned on (it is
+# the Scylla default) - without it every tablet migration of the logstor table fails.
+append_scylla_yaml:
+  enable_tablets: true
+  tablets_mode_for_new_keyspaces: 'enabled'
+  enable_file_stream: true
+  logstor_disk_size_in_mb: 16000
+  logstor_format_on_startup: true
+
+# One command per loader: the two preload halves, then the write and the read stream.
+round_robin: true
+
+# 'latte schema' runs once with these parameters before the first 'latte run', and SCT appends
+# them to every latte command. Key-value shape of the logstor perf jobs: 48-byte key,
+# 10 x 200-byte columns, no clustering key (logstor rejects clustering and counter columns).
+latte_schema_parameters:
+  keyspace: 'keyspace1'
+  table: 'standard1'
+  replication_factor: 3
+  column_count: 10
+  column_size: 200
+  key_size: 48
+  storage_engine: 'logstor'
+
+# The preload keeps latte's default retries: with no nemesis during prepare a failed write is
+# a real problem, not chaos.
+prepare_write_cmd:
+  - >-
+    latte run --function write --consistency QUORUM --duration 10485760
+    --threads 8 --concurrency 64 --rate 30000
+    --start-cycle 0 --end-cycle 10485760
+    -P row_count=10485760 -P offset=0
+    data_dir/latte/latte_cs_alike.rn
+  - >-
+    latte run --function write --consistency QUORUM --duration 10485760
+    --threads 8 --concurrency 64 --rate 30000
+    --start-cycle 0 --end-cycle 10485760
+    -P row_count=10485760 -P offset=10485760
+    data_dir/latte/latte_cs_alike.rn
+
+# latte stops at the first request that exhausts its retries, and SCT turns that into a CRITICAL
+# event (stop_test_on_stress_failure). The default (10 retries, 100ms..5s) is shorter than a node
+# restart, so the load would not survive its own nemesis and the first restart would end the run.
+# 50 retries at 1s..60s is the usual longevity setting.
+# Keys are picked uniformly at random over the whole preloaded range, so writes are overwrites -
+# the pattern logstor compaction has to keep up with.
+stress_cmd:
+  - >-
+    latte run --function write --consistency QUORUM --duration 240m
+    --threads 8 --concurrency 64 --rate 10000
+    --retry-number=50 --retry-interval=1s,60s
+    -P row_count=20971520 -P offset=0 -P distribution="\"random\""
+    data_dir/latte/latte_cs_alike.rn
+  - >-
+    latte run --function read --consistency QUORUM --duration 240m
+    --threads 8 --concurrency 64 --rate 20000
+    --retry-number=50 --retry-interval=1s,60s
+    -P row_count=20971520 -P offset=0 -P distribution="\"random\""
+    data_dir/latte/latte_cs_alike.rn

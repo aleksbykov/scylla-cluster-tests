@@ -1,0 +1,9 @@
+# Nemesis held out of the LogStore per-nemesis sweep (longevity-logstor-nemesis-sweep).
+#
+# Empty for the first run: nothing is known to be blocked on logstor yet. After a run that
+# stopped part-way, add the nemesis it already covered here (one per line, with the verdict as a
+# comment) so the next run resumes where it stopped instead of repeating them. For a one-off
+# rerun without a commit, pass SCT_NEMESIS_EXCLUDE_LIST="['NemesisA', 'NemesisB']" in the job's
+# extra_environment_variables parameter instead.
+
+nemesis_exclude_list: []
