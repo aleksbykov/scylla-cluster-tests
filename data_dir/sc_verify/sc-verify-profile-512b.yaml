@@ -1,7 +1,7 @@
 # cql-stress-sc-verify profile (spec §15.1) for longevity-sc-verify-100gb-4h: 512 B of cells per row.
 keyspace: sc_verify
 replication_factor: 3
-tablets_initial: 128              # the table's min_tablet_count, fixed for the run; spreads the Raft leaders over the shards
+tablets_initial: 64               # the table's min_tablet_count, fixed for the run; ScyllaDB rounds it up to a power of 2
 table: reg
 cells: [bigint, text, blob]       # 1 to 8 of: int, bigint, text, blob
 text_size: 64                     # total length of each text cell value, in bytes
