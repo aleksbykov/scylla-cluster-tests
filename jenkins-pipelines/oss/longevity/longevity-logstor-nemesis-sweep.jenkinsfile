@@ -16,6 +16,7 @@ longevityPipeline(
     backend: 'aws',
     region: 'eu-west-1',
     availability_zone: 'c',
+    provision_type: 'on_demand',
     test_name: 'longevity_test.LongevityTest.test_custom_time',
     test_config: '''["test-cases/longevity/longevity-logstor-nemesis-sweep.yaml", "configurations/nemesis/logstor_sweep_exclude.yaml"]''',
     instance_provision_fallback_on_demand: true

@@ -48,19 +48,25 @@ experimental_features:
   - logstor
 
 # logstor_disk_size_in_mb defaults to 0 - without it the node has no logstor storage at all.
-# It is per shard: every shard opens its own logstor files of this size. 16GB per shard is ~5x
-# the live data of this dataset (20M rows x ~2KB x RF3 / 6 nodes / 7 shards ~= 3GB), leaving room
-# for overwrite garbage and for the data a decommission moves onto the remaining nodes.
+# It is per shard: every shard opens its own logstor files of this size. 8GB per shard keeps the
+# space ~38% live (20M rows x ~2KB x RF3 / 6 nodes / 7 shards ~= 3GB), ~45% after a decommission.
+# Logstor compaction only starts once free segments drop below logstor_compaction_trigger_threshold
+# (5%), so the allocation is kept small enough for the overwrites to reach it within about an hour
+# and keep compaction running under most of the sweep - a much larger allocation would leave the
+# first half of the sweep without compaction at all.
 # logstor_format_on_startup zero-fills the files that are not allocated yet; the first start of a
-# node formats the whole allocation (~110GB), a restart only what is still unformatted.
+# node formats the whole allocation (~56GB), a restart only what is still unformatted.
 # Logstor tablets migrate over file streaming only, so enable_file_stream is pinned on (it is
 # the Scylla default) - without it every tablet migration of the logstor table fails.
 append_scylla_yaml:
   enable_tablets: true
   tablets_mode_for_new_keyspaces: 'enabled'
   enable_file_stream: true
-  logstor_disk_size_in_mb: 16000
+  logstor_disk_size_in_mb: 8000
   logstor_format_on_startup: true
+
+# KMS encryption at rest stays on (SCT default; the logstor perf jobs turn it off). Logstor has no
+# encryption code of its own, so the KMS table-encryption nemesis exercise a logstor table on purpose.
 
 # One command per loader: the two preload halves, then the write and the read stream.
 round_robin: true
@@ -77,17 +83,18 @@ latte_schema_parameters:
   key_size: 48
   storage_engine: 'logstor'
 
-# The preload keeps latte's default retries: with no nemesis during prepare a failed write is
-# a real problem, not chaos.
+# The preload writes at CL=ALL, so every replica holds every row before the sweep starts, and
+# keeps latte's default retries: with no nemesis during prepare a failed write is a real problem,
+# not chaos.
 prepare_write_cmd:
   - >-
-    latte run --function write --consistency QUORUM --duration 10485760
+    latte run --function write --consistency ALL --duration 10485760
     --threads 8 --concurrency 64 --rate 30000
     --start-cycle 0 --end-cycle 10485760
     -P row_count=10485760 -P offset=0
     data_dir/latte/latte_cs_alike.rn
   - >-
-    latte run --function write --consistency QUORUM --duration 10485760
+    latte run --function write --consistency ALL --duration 10485760
     --threads 8 --concurrency 64 --rate 30000
     --start-cycle 0 --end-cycle 10485760
     -P row_count=10485760 -P offset=10485760
