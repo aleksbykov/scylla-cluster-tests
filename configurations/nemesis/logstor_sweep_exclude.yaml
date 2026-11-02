@@ -47,3 +47,5 @@ nemesis_exclude_list:
   - ModifyTableMinIndexIntervalMonkey
   - ModifyTableReadRepairChanceMonkey
   - ModifyTableSpeculativeRetryMonkey
+  # Jenkins build #5, Argus run 6b7660d2-e627-45a0-b1f4-29ca1508dc88, 2026.4.0~rc1.
+  - ToggleAuditNemesisSyslog  # failed: node-1 did not start after the restart (SCYLLADB-5866)
