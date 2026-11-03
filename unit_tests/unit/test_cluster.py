@@ -255,6 +255,20 @@ INFO  2022-07-14 09:28:35,102 [shard 1] database - Flushed non-system tables
         assert event["line_number"] == 2
         assert "Reactor stalled for 32 ms on shard 1" in event["line"]
 
+    def test_raft_transfer_snapshot_not_implemented_is_reported_once(self):
+        line = (
+            "2026-11-01T10:00:00.000 db-node-1  !ERR | scylla[9182]  [shard 3: gms] raft - "
+            "[sc-01be54c2-d122-11f1-932e-9f0ffe1c6b6f] Transferring snapshot to "
+            "db9778e7-b231-44bb-ab2e-83a355dd523a failed with: std::runtime_error (transfer_snapshot() not implemented)\n"
+        )
+
+        self._read_and_publish_events(line * 5)
+
+        events = self._events.published_events
+        assert [e["type"] for e in events if "transfer_snapshot" in e.get("line", "")] == [
+            "RAFT_TRANSFER_SNAPSHOT_NOT_IMPLEMENTED"
+        ]
+
     def test_restart_suspends_kernel_panic_checker_around_restart_inner(self):
         """BaseNode.restart() must suspend/resume the kernel panic checker around
         `_restart_inner()`, mirroring `reboot()`'s existing suspend/resume window

@@ -252,8 +252,8 @@ def test_info_level_runtime_error_line_is_suppressed():
     assert event.severity == Severity.SUPPRESS
 
 
-def test_raft_transfer_snapshot_not_implemented_line_is_suppressed():
-    """Real example (SCYLLADB-2565) that flooded a run with RUNTIME_ERROR/ERROR events."""
+def test_raft_transfer_snapshot_not_implemented_line_is_error():
+    """Real example (SCYLLADB-2565): a follower that can't catch up must fail the run."""
     line = (
         "2026-10-26T09:59:48.262 longevity-sc-verify-100gb-4h-sc-ver-db-node-affc9575-2  !ERR | scylla[9182]  "
         "[shard 3: gms] raft - [sc-01be54c2-d122-11f1-932e-9f0ffe1c6b6f] Transferring snapshot to "
@@ -261,7 +261,7 @@ def test_raft_transfer_snapshot_not_implemented_line_is_suppressed():
     )
     event = _classify(line)
     assert event.type == DatabaseLogEvent.RAFT_TRANSFER_SNAPSHOT_NOT_IMPLEMENTED.type
-    assert event.severity == Severity.SUPPRESS
+    assert event.severity == Severity.ERROR
 
 
 def test_error_level_runtime_error_line_still_classified():
