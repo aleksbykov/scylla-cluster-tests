@@ -52,6 +52,9 @@ class DbLogReader(Process):
         "] storage_proxy - Exception when communicating with",
     ]
 
+    # Event types that repeat thousands of times a second: only the first line per node becomes an event
+    REPORT_ONCE_EVENT_TYPES = {"RAFT_TRANSFER_SNAPSHOT_NOT_IMPLEMENTED"}
+
     BUILD_ID_REGEX = re.compile(r"build-id\s(.*?)\sstarting\s\.\.\.")
 
     def __init__(
@@ -84,6 +87,7 @@ class DbLogReader(Process):
         self._remoter = remoter
         self._skipped_end_line = 0
         self._build_id = None
+        self._reported_once: set[str] = set()
         super().__init__(name=self.__class__.__name__, daemon=True)
 
     @cached_property
@@ -189,6 +193,10 @@ class DbLogReader(Process):
                     if event := find_log_event(self._system_event_patterns, line):
                         if event.severity == Severity.SUPPRESS:
                             continue
+                        if event.type in self.REPORT_ONCE_EVENT_TYPES:
+                            if event.type in self._reported_once:
+                                continue
+                            self._reported_once.add(event.type)
                         cloned_event = event.clone().add_info(node=self._node_name, line_number=index, line=line)
                         backtraces.append(dict(event=cloned_event, backtrace=[]))
 

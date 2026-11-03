@@ -188,14 +188,13 @@ DatabaseLogEvent.add_subevent_type(
     regex=r"raft - \[[\w-]*\] Transferring snapshot to [\w-]* "
     r"failed with: seastar::rpc::remote_verb_error \(connection is closed\)",
 )
-# SCYLLADB-2565: the raft groups of strongly consistent tablets cannot transfer a snapshot yet, and a stuck
-# migration retries it in a tight loop, hundreds of thousands of lines an hour. As events they put the event
-# pipeline up to two hours behind and, echoed to the console, fill the Jenkins builder's disk quota, so no event
-# is made.
-# The node's own log keeps the lines.
+# SCYLLADB-2565: the raft groups of strongly consistent tablets cannot transfer a snapshot yet, so a follower that
+# falls behind never catches up and the leader retries in a tight loop, hundreds of thousands of lines an hour.
+# The run must fail on it, but one event per line puts the event pipeline hours behind and fills the Jenkins
+# builder's disk, so DbLogReader publishes it once per node (REPORT_ONCE_EVENT_TYPES).
 DatabaseLogEvent.add_subevent_type(
     "RAFT_TRANSFER_SNAPSHOT_NOT_IMPLEMENTED",
-    severity=Severity.SUPPRESS,
+    severity=Severity.ERROR,
     regex=r"raft - \[[\w-]*\] Transferring snapshot to [\w-]* "
     r"failed with: std::runtime_error \(transfer_snapshot\(\) not implemented\)",
 )
@@ -274,7 +273,6 @@ SYSTEM_ERROR_EVENTS = (
     DatabaseLogEvent.COMPACTION_STOPPED(),
     DatabaseLogEvent.DIRECTORY_NOT_EMPTY(),
     DatabaseLogEvent.RAFT_TRANSFER_SNAPSHOT_ERROR(),
-    DatabaseLogEvent.RAFT_TRANSFER_SNAPSHOT_NOT_IMPLEMENTED(),
     # REACTOR_STALLED must be above BACKTRACE as it has "Backtrace" in its message
     DatabaseLogEvent.REACTOR_STALLED(),
     DatabaseLogEvent.KERNEL_CALLSTACK(),
@@ -285,6 +283,8 @@ SYSTEM_ERROR_EVENTS = (
     # 3. INFO-level
     DatabaseLogEvent.INFO(),
     # 4. ERROR/CRITICAL
+    # above RUNTIME_ERROR, which matches the same line
+    DatabaseLogEvent.RAFT_TRANSFER_SNAPSHOT_NOT_IMPLEMENTED(),
     DatabaseLogEvent.NO_SPACE_ERROR(),
     DatabaseLogEvent.BAD_ALLOC(),
     DatabaseLogEvent.SCHEMA_FAILURE(),
