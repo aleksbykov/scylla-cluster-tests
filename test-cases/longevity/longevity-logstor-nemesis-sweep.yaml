@@ -5,8 +5,8 @@ test_metadata:
     LogStore per-nemesis sweep: a 6-node tablets cluster with the experimental logstor storage
     engine, one RF=3 key-value table created with storage_engine = 'logstor' and preloaded with
     ~20M rows by latte, then a QUORUM write stream and a QUORUM read stream run for 4 hours while
-    CategorySweepMonkey runs every nemesis exactly once, category by category
-    (schema-changes, topology-changes, other-disruptive, rest).
+    CategorySweepMonkey runs every topology nemesis (decommission, bootstrap, replace, removenode)
+    exactly once.
   test_type: longevity
   tier: sanity
   duration_class: short
@@ -38,6 +38,11 @@ sizing_loader:
 # that stopped part-way, list the nemesis already covered in nemesis_exclude_list
 # (configurations/nemesis/logstor_sweep_exclude.yaml).
 nemesis_class_name: 'CategorySweepMonkey'
+
+# Topology only: every logstor tablet moves over file streaming in these nemesis. The other
+# topology_changes nemesis (restarts, isolation, new DC) are held out in logstor_sweep_exclude.yaml.
+# Delete this line and that block to go back to the full sweep.
+nemesis_selector: 'topology_changes'
 
 # Keep the preload quiet: the sweep starts against a complete dataset.
 nemesis_during_prepare: false
