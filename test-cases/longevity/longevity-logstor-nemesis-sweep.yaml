@@ -60,7 +60,8 @@ experimental_features:
 # and keep compaction running under most of the sweep. With the default (5%) every shard fills to
 # ~95% first, and a shard that close to full hits SCYLLADB-5865 (assert in the segment pool) and
 # stops the sweep. 0.3 starts compaction at 70% used, far from full. Go back to the default once the
-# tested version has the fix (scylladb PR 32525), to cover the near-full case again.
+# tested version fixes SCYLLADB-5865, to cover the near-full case again. No PR names it yet; the
+# likely fix is scylladb PR 32775 (compaction no longer waits with queue::pop_eventually()).
 # logstor_format_on_startup zero-fills the files that are not allocated yet; the first start of a
 # node formats the whole allocation (~56GB), a restart only what is still unformatted.
 # Logstor tablets migrate over file streaming only, so enable_file_stream is pinned on (it is

@@ -62,7 +62,8 @@ nemesis_exclude_list:
   - BootstrapStreamingErrorNemesis  # succeeded, also in build #7
   # Decommission is blocked by SCYLLADB-5865: a node aborts while the tablets stream off the
   # leaving node, and the run stops there. Held out so replace and removenode get their turn.
-  # Remove these lines once the tested version has the fix (scylladb PR 32525).
+  # Remove these lines once the tested version fixes SCYLLADB-5865. No PR names it yet; the likely
+  # fix is scylladb PR 32775 (compaction no longer waits with queue::pop_eventually()).
   - DecommissionMonkey  # failed: build #7 hung 3h43m, build #8 node-1 aborted (SCYLLADB-5865)
   - DecommissionSeedNode  # failed in the xtrey sweep build #2 (SCYLLADB-5865)
   - DecommissionStreamingErrMonkey  # not run yet, decommissions
