@@ -53,25 +53,29 @@ experimental_features:
   - logstor
 
 # logstor_disk_size_in_mb defaults to 0 - without it the node has no logstor storage at all.
-# It is per shard: every shard opens its own logstor files of this size. 8GB per shard keeps the
-# space ~38% live (20M rows x ~2KB x RF3 / 6 nodes / 7 shards ~= 3GB), ~45% after a decommission.
-# Logstor compaction only starts once free segments drop below logstor_compaction_trigger_threshold,
-# so the allocation is kept small enough for the overwrites to reach it soon after the load starts
-# and keep compaction running under most of the sweep. With the default (5%) every shard fills to
-# ~95% first, and a shard that close to full hits SCYLLADB-5865 (assert in the segment pool) and
-# stops the sweep. 0.3 starts compaction at 70% used, far from full. Go back to the default once the
-# tested version fixes SCYLLADB-5865, to cover the near-full case again. No PR names it yet; the
-# likely fix is scylladb PR 32775 (compaction no longer waits with queue::pop_eventually()).
+# It is per shard: every shard opens its own logstor files of this size. After the preload a shard
+# holds ~4.6GB live (build #9). Logstor compaction only starts once free segments drop below
+# logstor_compaction_trigger_threshold, and then holds the shard there: 0.5 of 24GB = ~12GB used.
+# RF3 over 3 racks of 2 nodes: a decommission or removenode moves every tablet of the leaving node
+# to the other node of its rack, which adds up to ~5.3GB live per shard (worst shard, build #7).
+# That node ends at ~72% used and ~44% live, below the trigger, so compaction can catch up. 8GB with
+# 0.3 filled it to 98% live and hung the operation (builds #7 and #9, SCYLLADB-6165).
+# The overwrites (~3MB/s per shard) reach 50% used ~40 minutes after the preload. With the default
+# threshold (5%) every shard fills to ~95% first, and a shard that close to full hits SCYLLADB-5865
+# (assert in the segment pool) and stops the sweep. Go back to the default once the tested version
+# fixes SCYLLADB-5865 and SCYLLADB-6165, to cover the near-full case again. No PR names
+# SCYLLADB-5865 yet; the likely fix is scylladb PR 32775 (compaction no longer waits with
+# queue::pop_eventually()).
 # logstor_format_on_startup zero-fills the files that are not allocated yet; the first start of a
-# node formats the whole allocation (~56GB), a restart only what is still unformatted.
+# node formats the whole allocation (~168GB), a restart only what is still unformatted.
 # Logstor tablets migrate over file streaming only, so enable_file_stream is pinned on (it is
 # the Scylla default) - without it every tablet migration of the logstor table fails.
 append_scylla_yaml:
   enable_tablets: true
   tablets_mode_for_new_keyspaces: 'enabled'
   enable_file_stream: true
-  logstor_disk_size_in_mb: 8000
-  logstor_compaction_trigger_threshold: 0.3
+  logstor_disk_size_in_mb: 24000
+  logstor_compaction_trigger_threshold: 0.5
   logstor_format_on_startup: true
 
 # KMS encryption at rest stays on (SCT default; the logstor perf jobs turn it off). Logstor has no
