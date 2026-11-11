@@ -60,11 +60,3 @@ nemesis_exclude_list:
   - SerialRestartOfElectedTopologyCoordinatorNemesis  # restart
   # Jenkins build #8, Argus run d3670c7c-1d08-463a-9c07-f87a94d1ed54, 2027.1.0~dev.
   - BootstrapStreamingErrorNemesis  # succeeded, also in build #7
-  # Decommission is blocked by SCYLLADB-5865: a node aborts while the tablets stream off the
-  # leaving node, and the run stops there. Held out so replace and removenode get their turn.
-  # Remove these lines once the tested version fixes SCYLLADB-5865. No PR names it yet; the likely
-  # fix is scylladb PR 32775 (compaction no longer waits with queue::pop_eventually()).
-  - DecommissionMonkey  # failed: build #7 hung 3h43m, build #8 node-1 aborted (SCYLLADB-5865)
-  - DecommissionSeedNode  # failed in the xtrey sweep build #2 (SCYLLADB-5865)
-  - DecommissionStreamingErrMonkey  # not run yet, decommissions
-  - GrowShrinkClusterNemesis  # not run yet, decommissions

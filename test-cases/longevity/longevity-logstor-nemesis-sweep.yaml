@@ -57,15 +57,14 @@ experimental_features:
 # holds ~4.6GB live (build #9). Logstor compaction only starts once free segments drop below
 # logstor_compaction_trigger_threshold, and then holds the shard there: 0.5 of 24GB = ~12GB used.
 # RF3 over 3 racks of 2 nodes: a decommission or removenode moves every tablet of the leaving node
-# to the other node of its rack, which adds up to ~5.3GB live per shard (worst shard, build #7).
-# That node ends at ~72% used and ~44% live, below the trigger, so compaction can catch up. 8GB with
-# 0.3 filled it to 98% live and hung the operation (builds #7 and #9, SCYLLADB-6165).
-# The overwrites (~3MB/s per shard) reach 50% used ~40 minutes after the preload. With the default
-# threshold (5%) every shard fills to ~95% first, and a shard that close to full hits SCYLLADB-5865
-# (assert in the segment pool) and stops the sweep. Go back to the default once the tested version
-# fixes SCYLLADB-5865 and SCYLLADB-6165, to cover the near-full case again. No PR names
-# SCYLLADB-5865 yet; the likely fix is scylladb PR 32775 (compaction no longer waits with
-# queue::pop_eventually()).
+# to the other node of its rack, so that node holds the whole rack replica: ~7.6GB live per shard
+# (SCYLLADB-6165), up to ~9.3GB on the most loaded shard (build #7). It ends at 63-70% used and
+# 32-39% live, below the trigger, even if compaction frees nothing during the move. 8GB with 0.3
+# filled it to 98% live and hung the operation (builds #7 and #9, SCYLLADB-6165).
+# The overwrites (~3MB/s per shard) reach 50% used ~40 minutes after the preload.
+# Keep the store far from full: logstor has no out-of-space handling yet (SCYLLADB-1988), and the
+# developers asked to hold out-of-space testing until it is in. With the default threshold (5%)
+# every shard fills to ~95%, which also hits SCYLLADB-5865 (assert in the segment pool).
 # logstor_format_on_startup zero-fills the files that are not allocated yet; the first start of a
 # node formats the whole allocation (~168GB), a restart only what is still unformatted.
 # Logstor tablets migrate over file streaming only, so enable_file_stream is pinned on (it is
