@@ -5,58 +5,58 @@
 # For a one-off rerun without a commit, pass SCT_NEMESIS_EXCLUDE_LIST="['NemesisA', 'NemesisB']"
 # in the job's extra_environment_variables parameter instead.
 
-nemesis_exclude_list:
+# nemesis_exclude_list:
   # Jenkins build #4, Argus run ed9db42e-d31c-461f-bfdc-46c2e099c81a, 2026.4.0~rc1.
   # Ran:
-  - AddDropColumnMonkey  # succeeded
-  - SplitMergeTabletsWithAlter  # succeeded, but node-6 crashed 4 times during and after it
-  # Skipped: not supported by this test config.
-  - AddRemoveRackNemesis  # k8s only
-  - BlockNetworkMonkey  # needs extra_network_interface
-  - RandomInterruptionNetworkMonkey  # needs extra_network_interface
-  - StopStartInterfacesNetworkMonkey  # needs extra_network_interface
-  - RejectInterNodeNetworkMonkey  # scylladb#6522
-  - DeleteByPartitionsMonkey  # needs data_validation.max_partitions_in_test_table
-  - DeleteByRowsRangeMonkey  # needs data_validation.max_partitions_in_test_table
-  - DeleteOverlappingRowRangesMonkey  # needs data_validation.max_partitions_in_test_table
-  - GrowShrinkZeroTokenNode  # zero-token support not enabled
-  - RemoveServiceLevelMonkey  # SLA test only
-  - SlaDecreaseSharesDuringLoad  # SLA test only
-  - SlaIncreaseSharesByAttachAnotherSlDuringLoad  # SLA test only
-  - SlaIncreaseSharesDuringLoad  # SLA test only
-  - SlaMaximumAllowedSlsWithMaxSharesDuringLoad  # SLA test only
-  - SlaReplaceUsingDetachDuringLoad  # SLA test only
-  - SlaReplaceUsingDropDuringLoad  # SLA test only
-  - ModifyTableTwcsWindowSizeMonkey  # no TWCS table
-  # Skipped: SCT saw the logstor table as empty (SCT-1380). Not really tested.
-  # Remove these lines after SCT-1380 is fixed.
-  - AddRemoveMvNemesis
-  - CreateIndexNemesis
-  - KillMVBuildingCoordinator
-  - ModifyTableBloomFilterFpChanceMonkey
-  - ModifyTableCachingMonkey
-  - ModifyTableCommentMonkey
-  - ModifyTableCompactionMonkey
-  - ModifyTableCompressionMonkey
-  - ModifyTableCrcCheckChanceMonkey
-  - ModifyTableDclocalReadRepairChanceMonkey
-  - ModifyTableDefaultTimeToLiveMonkey
-  - ModifyTableGcGraceTimeMonkey
-  - ModifyTableMaxIndexIntervalMonkey
-  - ModifyTableMemtableFlushPeriodInMsMonkey
-  - ModifyTableMinIndexIntervalMonkey
-  - ModifyTableReadRepairChanceMonkey
-  - ModifyTableSpeculativeRetryMonkey
-  # Jenkins build #5, Argus run 6b7660d2-e627-45a0-b1f4-29ca1508dc88, 2026.4.0~rc1.
-  - ToggleAuditNemesisSyslog  # failed: node-1 did not start after the restart (SCYLLADB-5866)
-  # Topology-only run (nemesis_selector: topology_changes in the test case): keep decommission,
-  # bootstrap, replace and removenode, hold out the other topology_changes nemesis.
-  # Delete this block together with the selector to go back to the full sweep.
-  - AddRemoveDcNemesis  # bootstraps a new DC, not a node of this one
-  - DrainerMonkey  # drain and restart
-  - IsolateNodeWithIptableRuleNemesis  # network isolation
-  - IsolateNodeWithProcessSignalNemesis  # process isolation
-  - NodeRestartWithResharding  # restart
-  - SerialRestartOfElectedTopologyCoordinatorNemesis  # restart
-  # Jenkins build #8, Argus run d3670c7c-1d08-463a-9c07-f87a94d1ed54, 2027.1.0~dev.
-  - BootstrapStreamingErrorNemesis  # succeeded, also in build #7
+  # - AddDropColumnMonkey  # succeeded
+  # - SplitMergeTabletsWithAlter  # succeeded, but node-6 crashed 4 times during and after it
+  # # Skipped: not supported by this test config.
+  # - AddRemoveRackNemesis  # k8s only
+  # - BlockNetworkMonkey  # needs extra_network_interface
+  # - RandomInterruptionNetworkMonkey  # needs extra_network_interface
+  # - StopStartInterfacesNetworkMonkey  # needs extra_network_interface
+  # - RejectInterNodeNetworkMonkey  # scylladb#6522
+  # - DeleteByPartitionsMonkey  # needs data_validation.max_partitions_in_test_table
+  # - DeleteByRowsRangeMonkey  # needs data_validation.max_partitions_in_test_table
+  # - DeleteOverlappingRowRangesMonkey  # needs data_validation.max_partitions_in_test_table
+  # - GrowShrinkZeroTokenNode  # zero-token support not enabled
+  # - RemoveServiceLevelMonkey  # SLA test only
+  # - SlaDecreaseSharesDuringLoad  # SLA test only
+  # - SlaIncreaseSharesByAttachAnotherSlDuringLoad  # SLA test only
+  # - SlaIncreaseSharesDuringLoad  # SLA test only
+  # - SlaMaximumAllowedSlsWithMaxSharesDuringLoad  # SLA test only
+  # - SlaReplaceUsingDetachDuringLoad  # SLA test only
+  # - SlaReplaceUsingDropDuringLoad  # SLA test only
+  # - ModifyTableTwcsWindowSizeMonkey  # no TWCS table
+  # # Skipped: SCT saw the logstor table as empty (SCT-1380). Not really tested.
+  # # Remove these lines after SCT-1380 is fixed.
+  # - AddRemoveMvNemesis
+  # - CreateIndexNemesis
+  # - KillMVBuildingCoordinator
+  # - ModifyTableBloomFilterFpChanceMonkey
+  # - ModifyTableCachingMonkey
+  # - ModifyTableCommentMonkey
+  # - ModifyTableCompactionMonkey
+  # - ModifyTableCompressionMonkey
+  # - ModifyTableCrcCheckChanceMonkey
+  # - ModifyTableDclocalReadRepairChanceMonkey
+  # - ModifyTableDefaultTimeToLiveMonkey
+  # - ModifyTableGcGraceTimeMonkey
+  # - ModifyTableMaxIndexIntervalMonkey
+  # - ModifyTableMemtableFlushPeriodInMsMonkey
+  # - ModifyTableMinIndexIntervalMonkey
+  # - ModifyTableReadRepairChanceMonkey
+  # - ModifyTableSpeculativeRetryMonkey
+  # # Jenkins build #5, Argus run 6b7660d2-e627-45a0-b1f4-29ca1508dc88, 2026.4.0~rc1.
+  # - ToggleAuditNemesisSyslog  # failed: node-1 did not start after the restart (SCYLLADB-5866)
+  # # Topology-only run (nemesis_selector: topology_changes in the test case): keep decommission,
+  # # bootstrap, replace and removenode, hold out the other topology_changes nemesis.
+  # # Delete this block together with the selector to go back to the full sweep.
+  # - AddRemoveDcNemesis  # bootstraps a new DC, not a node of this one
+  # - DrainerMonkey  # drain and restart
+  # - IsolateNodeWithIptableRuleNemesis  # network isolation
+  # - IsolateNodeWithProcessSignalNemesis  # process isolation
+  # - NodeRestartWithResharding  # restart
+  # - SerialRestartOfElectedTopologyCoordinatorNemesis  # restart
+  # # Jenkins build #8, Argus run d3670c7c-1d08-463a-9c07-f87a94d1ed54, 2027.1.0~dev.
+  # - BootstrapStreamingErrorNemesis  # succeeded, also in build #7
