@@ -16,6 +16,14 @@ test_metadata:
     - vnodes
   team_ownership: core-test-infra
 
+
+pre_create_keyspace: [
+  "CREATE KEYSPACE keyspace1 WITH REPLICATION = {'class' : 'NetworkTopologyStrategy', 'replication_factor': 3 } AND tablets = {'enabled': true};",
+  "CREATE TABLE keyspace1.standard1 (key blob PRIMARY KEY, \"C0\" blob, \"C1\" blob, \"C2\" blob, \"C3\" blob, \"C4\" blob, \"C5\" blob, \"C6\" blob, \"C7\" blob ) WITH storage_engine = 'logstor';"
+]
+
+
+
 test_duration: 840
 prepare_write_cmd: ["cassandra-stress write no-warmup cl=ALL n=162500000 -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3)' -mode cql3 native -rate threads=200 -col 'size=FIXED(128) n=FIXED(8)' -pop seq=1..162500000",
                     "cassandra-stress write no-warmup cl=ALL n=162500000 -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3)' -mode cql3 native -rate threads=200 -col 'size=FIXED(128) n=FIXED(8)' -pop seq=162500000..325000000",
