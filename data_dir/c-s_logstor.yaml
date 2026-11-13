@@ -1,0 +1,57 @@
+keyspace: keyspace1
+
+keyspace_definition: |
+  CREATE KEYSPACE IF NOT EXISTS keyspace1
+  WITH REPLICATION = {'class': 'NetworkTopologyStrategy', 'replication_factor': 3}
+  AND tablets = {'enabled': true};
+
+table: standard1
+
+table_definition: |
+  CREATE TABLE IF NOT EXISTS keyspace1.standard1 (
+    key blob PRIMARY KEY,
+    "C0" blob,
+    "C1" blob,
+    "C2" blob,
+    "C3" blob,
+    "C4" blob,
+    "C5" blob,
+    "C6" blob,
+    "C7" blob
+  ) WITH storage_engine = 'logstor';
+
+columnspec:
+  - name: key
+    size: fixed(10)
+  - name: C0
+    size: fixed(128)
+  - name: C1
+    size: fixed(128)
+  - name: C2
+    size: fixed(128)
+  - name: C3
+    size: fixed(128)
+  - name: C4
+    size: fixed(128)
+  - name: C5
+    size: fixed(128)
+  - name: C6
+    size: fixed(128)
+  - name: C7
+    size: fixed(128)
+
+insert:
+  partitions: fixed(1)
+  select: fixed(1)/1
+  batchtype: UNLOGGED
+
+queries:
+  write_row:
+    cql: >-
+      INSERT INTO keyspace1.standard1
+      (key, "C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7")
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    fields: samerow
+  read_row:
+    cql: SELECT * FROM keyspace1.standard1 WHERE key = ?
+    fields: samerow
