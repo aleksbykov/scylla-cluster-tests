@@ -5,7 +5,22 @@
 # For a one-off rerun without a commit, pass SCT_NEMESIS_EXCLUDE_LIST="['NemesisA', 'NemesisB']"
 # in the job's extra_environment_variables parameter instead.
 
-# nemesis_exclude_list:
+nemesis_exclude_list:
+  # run 11
+  - TerminateAndRemoveNodeMonkey  # succeeded
+  - SerialRestartOfElectedTopologyCoordinatorNemesis  # succeeded
+  - NodeTerminateAndReplace  # succeeded
+  - NodeRestartWithResharding  # skipped
+  - IsolateNodeWithIptableRuleNemesis  # succeeded
+  - IsolateNodeWithProcessSignalNemesis  # succeeded
+  - GrowShrinkClusterNemesis  # succeeded
+  - DrainerMonkey  # succeeded
+  - DecommissionStreamingErrMonkey  # succeeded
+  - DecommissionSeedNode # succeeded
+  - DecommissionMonkey  # succeeded
+  - BootstrapStreamingErrorNemesis  # succeeded
+  - AddRemoveDcNemesis  # succeeded
+  - KillMVBuildingCoordinator  # succeeded
   # Jenkins build #4, Argus run ed9db42e-d31c-461f-bfdc-46c2e099c81a, 2026.4.0~rc1.
   # Ran:
   # - AddDropColumnMonkey  # succeeded
