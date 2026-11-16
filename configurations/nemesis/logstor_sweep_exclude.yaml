@@ -21,6 +21,93 @@ nemesis_exclude_list:
   - BootstrapStreamingErrorNemesis  # succeeded
   - AddRemoveDcNemesis  # succeeded
   - KillMVBuildingCoordinator  # succeeded
+  # Jenkins build #14, Argus run 99e2f4e8-0d9a-40d7-8d96-e325b2adea03, 2027.1.0~dev, every category but
+  # topology. 85 ran; the 13 nemesis of the 'rest' category after NoCorruptRepairMonkey did not start.
+  - AddRemoveRackNemesis  # skipped: Adding new rack is not supported for non-k8s Scylla clusters
+  - BlockNetworkMonkey  # skipped: for this nemesis to work, you need to set `extra_network_interface: True`
+  - DeleteByPartitionsMonkey  # skipped: This nemesis expects "max_partitions_in_test_table" sub-parameter of data_val...
+  - DeleteByRowsRangeMonkey  # skipped: This nemesis expects "max_partitions_in_test_table" sub-parameter of data_val...
+  - DeleteOverlappingRowRangesMonkey  # skipped: This nemesis expects "max_partitions_in_test_table" sub-parameter of data_val...
+  - GrowShrinkZeroTokenNode  # skipped: The zero tokens support is not enabled
+  - RandomInterruptionNetworkMonkey  # skipped: for this nemesis to work, you need to set `extra_network_interface: True`
+  - RejectInterNodeNetworkMonkey  # skipped: scylladb#6522
+  - RemoveServiceLevelMonkey  # skipped: SLA nemesis can be run during SLA test only
+  - SlaDecreaseSharesDuringLoad  # skipped: SLA nemesis can be run during SLA test only
+  - SlaIncreaseSharesByAttachAnotherSlDuringLoad  # skipped: SLA nemesis can be run during SLA test only
+  - SlaIncreaseSharesDuringLoad  # skipped: SLA nemesis can be run during SLA test only
+  - SlaMaximumAllowedSlsWithMaxSharesDuringLoad  # skipped: SLA nemesis can be run during SLA test only
+  - SlaReplaceUsingDetachDuringLoad  # skipped: SLA nemesis can be run during SLA test only
+  - SlaReplaceUsingDropDuringLoad  # skipped: SLA nemesis can be run during SLA test only
+  - StopStartInterfacesNetworkMonkey  # skipped: for this nemesis to work, you need to set `extra_network_interface: True`
+  - AddDropColumnMonkey  # succeeded
+  - AddRemoveMvNemesis  # succeeded
+  - CreateIndexNemesis  # succeeded
+  - ModifyTableBloomFilterFpChanceMonkey  # succeeded
+  - ModifyTableCachingMonkey  # succeeded
+  - ModifyTableCommentMonkey  # succeeded
+  - ModifyTableCompactionMonkey  # succeeded
+  - ModifyTableCompressionMonkey  # succeeded
+  - ModifyTableCrcCheckChanceMonkey  # succeeded
+  - ModifyTableDclocalReadRepairChanceMonkey  # succeeded
+  - ModifyTableDefaultTimeToLiveMonkey  # succeeded
+  - ModifyTableGcGraceTimeMonkey  # succeeded
+  - ModifyTableMaxIndexIntervalMonkey  # succeeded
+  - ModifyTableMemtableFlushPeriodInMsMonkey  # succeeded
+  - ModifyTableMinIndexIntervalMonkey  # succeeded
+  - ModifyTableReadRepairChanceMonkey  # succeeded
+  - ModifyTableSpeculativeRetryMonkey  # succeeded
+  - ModifyTableTwcsWindowSizeMonkey  # succeeded
+  - SplitMergeTabletsWithAlter  # succeeded
+  - ToggleAuditNemesisSyslog  # skipped by design (audit turned off); node-5 crashed in it (tablet_stream_files log SIGSEGV)
+  - ToggleAuditRulesNemesisSyslog  # succeeded; node-1 crashed in it (tablet_stream_files log SIGSEGV)
+  - ToggleCDCMonkey  # skipped: CDC is not enabled on any table. Skipping
+  - ToggleGcModeMonkey  # skipped: Disabled due to scylla-enterprise#4082
+  - ToggleTableIcsMonkey  # skipped: Disabled due to scylla-enterprise#4082
+  - AbortDecommissionMonkey  # succeeded
+  - ClusterRollingRestart  # succeeded
+  - ClusterRollingRestartRandomOrder  # succeeded
+  - CorruptThenRebuildMonkey  # skipped: Rebuild is not supported with tablets. Skipping nemesis (scylladb/scylladb#17...
+  - CorruptThenRepairMonkey  # skipped: All sstables contain tombstones - none is safe to destroy. The nemesis can't ...
+  - DisableBinaryGossipExecuteMajorCompaction  # succeeded
+  - DrainKubernetesNodeThenDecommissionAndAddScyllaNode  # skipped: Supported only on kubernetes
+  - DrainKubernetesNodeThenReplaceScyllaNode  # skipped: Supported only on kubernetes
+  - EnableDisableTableEncryptionAwsKmsProviderWithRotationMonkey  # succeeded
+  - EnableDisableTableEncryptionAwsKmsProviderWithoutRotationMonkey  # succeeded
+  - EndOfQuotaNemesis  # skipped: Disabled due to scylla-enterprise#3736
+  - EnospcAllNodesMonkey  # skipped: Skipped on 2025.4+ while SCYLLADB-481 is open. See SCT-1261
+  - EnospcMonkey  # skipped: Skipped on 2025.4+ while SCYLLADB-481 is open. See SCT-1261
+  - HardRebootNodeMonkey  # succeeded
+  - MemoryStressMonkey  # succeeded
+  - MgmtCorruptThenRepair  # skipped: All sstables contain tombstones - none is safe to destroy. The nemesis can't ...
+  - MgmtRestore  # succeeded
+  - MultipleHardRebootNodeMonkey  # failed: SCT race, nodetool status 404 on the node still in logstor recovery
+  - NemesisSequence  # skipped: AWS capacity, could not add 3 nodes
+  - OperatorNodeReplace  # skipped: OperatorNodeReplace is supported only on kubernetes
+  - OperatorNodetoolFlushAndReshard  # skipped: It is supported only on kubernetes
+  - RebuildStreamingErrMonkey  # skipped: Rebuild is not supported with tablets. Skipping nemesis (scylladb/scylladb#17...
+  - RejectNodeExporterNetworkMonkey  # succeeded
+  - RejectThriftNetworkMonkey  # succeeded
+  - RepairStreamingErrMonkey  # skipped: All sstables contain tombstones - none is safe to destroy. The nemesis can't ...
+  - RestartThenRepairNodeMonkey  # succeeded
+  - RollingRestartConfigChangeInternodeCompression  # succeeded
+  - ScyllaKillMonkey  # succeeded
+  - SoftRebootNodeMonkey  # succeeded
+  - StopStartMonkey  # succeeded
+  - StopWaitStartMonkey  # succeeded
+  - SwitchBetweenPasswordAuthAndSaslauthdAuth  # skipped: SaslauthdAuthenticator can't work without saslauthd environment
+  - TerminateKubernetesHostThenDecommissionAndAddScyllaNode  # skipped: Supported only on kubernetes
+  - TerminateKubernetesHostThenReplaceScyllaNode  # skipped: Supported only on kubernetes
+  - ToggleLdapConfiguration  # skipped: Cluster is not configured to run with LDAP authorization, hence skipping
+  - ValidateHintedHandoffShortDowntime  # skipped: For this nemesis to work, `hinted_handoff` needs to be set to `enabled`
+  - AbortRepairMonkey  # succeeded
+  - CDCStressorMonkey  # skipped: CDC is not enabled on any table. Skipping
+  - CorruptThenScrubMonkey  # succeeded
+  - LoadAndStreamMonkey  # succeeded
+  - MajorCompactionMonkey  # succeeded
+  - MgmtBackup  # succeeded
+  - MgmtBackupSpecificKeyspaces  # succeeded
+  - MgmtRepair  # succeeded
+  - NoCorruptRepairMonkey  # skipped: killed by tearDown when the stress ended
   # Jenkins build #4, Argus run ed9db42e-d31c-461f-bfdc-46c2e099c81a, 2026.4.0~rc1.
   # Ran:
   # - AddDropColumnMonkey  # succeeded
