@@ -2,7 +2,9 @@ experimental_features:
   - logstor
 
 append_scylla_yaml:
-  logstor_disk_size_in_mb: 80000
+  # Per shard. 15 shards x 32000 MB ~ 500 GB per node, so a node that holds a full rack replica
+  # (250M partitions, ~260 GB) stays at ~52% of the store (SCYLLADB-6165: keep it at 50-65%).
+  logstor_disk_size_in_mb: 32000
   logstor_separator_max_memory_in_mb: 256
   logstor_format_on_startup: true
   force_capacity_based_balancing: true

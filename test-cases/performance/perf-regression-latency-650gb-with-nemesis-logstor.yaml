@@ -1,9 +1,10 @@
 test_metadata:
   description: >-
-    Latency-under-operations test with a 650GB dataset on a 3-node i3en.2xlarge
-    cluster: runs fixed-rate cassandra-stress write, read and mixed workloads while
-    SisyphusMonkey runs a NemesisSequence, and measures latency per disruption. The
-    pipelines run both vnodes and tablets variants.
+    Logstor variant of the latency-under-operations test: 250M partitions (~260GB) on
+    3 x i8g.4xlarge, RF=3 over 3 racks, a logstor table from data_dir/c-s_logstor.yaml
+    with the tablet count pinned at 512, so grow and shrink only migrate tablets. Runs
+    fixed-rate cassandra-stress write, read and mixed workloads while SisyphusMonkey runs
+    a NemesisSequence, and measures latency per step.
   test_type: performance
   tier: release
   duration_class: medium
@@ -13,39 +14,21 @@ test_metadata:
     - cassandra-stress
   features:
     - tablets
-    - vnodes
   team_ownership: core-test-infra
-
-
-# pre_create_keyspace: [
-#   "CREATE KEYSPACE keyspace1 WITH REPLICATION = {'class' : 'NetworkTopologyStrategy', 'replication_factor': 3 } AND tablets = {'enabled': true};",
-#   "CREATE TABLE keyspace1.standard1 (key blob PRIMARY KEY, \"C0\" blob, \"C1\" blob, \"C2\" blob, \"C3\" blob, \"C4\" blob, \"C5\" blob, \"C6\" blob, \"C7\" blob ) WITH storage_engine = 'logstor';"
-# ]
 
 test_duration: 840
 
+# 250M partitions: a node that holds a full rack replica keeps the logstor index under half
+# of the shard memory (~170 B per record, SCYLLADB-6331).
 prepare_write_cmd:
-       - "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=162500000 -mode cql3 native -rate threads=200 -pop seq=1..162500000"
-       - "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=162500000 -mode cql3 native -rate threads=200 -pop seq=162500000..325000000"
-       - "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=162500000 -mode cql3 native -rate threads=200 -pop seq=325000000..487500000"
-       - "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=162500000 -mode cql3 native -rate threads=200 -pop seq=487500000..650000000"
+  - "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1)' no-warmup cl=ALL n=62500000 -mode cql3 native -rate threads=200 -pop seq=1..62500000"
+  - "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1)' no-warmup cl=ALL n=62500000 -mode cql3 native -rate threads=200 -pop seq=62500000..125000000"
+  - "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1)' no-warmup cl=ALL n=62500000 -mode cql3 native -rate threads=200 -pop seq=125000000..187500000"
+  - "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1)' no-warmup cl=ALL n=62500000 -mode cql3 native -rate threads=200 -pop seq=187500000..250000000"
 
-stress_cmd_w: "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1)' no-warmup cl=QUORUM duration=240m -mode cql3 native -rate 'threads=250 fixed=20332/s' -pop 'dist=gauss(1..650000000,325000000,9750000)'"
-stress_cmd_r: "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=240m -mode cql3 native -rate 'threads=250 fixed=10310/s' -col 'size=FIXED(128) n=FIXED(8)' -pop 'dist=gauss(1..650000000,325000000,9750000)'"
-stress_cmd_m: "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1,read_row=1)' no-warmup cl=QUORUM duration=240m -mode cql3 native -rate 'threads=250 fixed=8750/s' -pop 'dist=gauss(1..650000000,325000000,6500000)'"
-
-# stress_cmd_r: "cassandra-stress read no-warmup  cl=QUORUM duration=240m -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3)' -mode cql3 native -rate 'threads=250 fixed=10310/s' -col 'size=FIXED(128) n=FIXED(8)' -pop 'dist=gauss(1..650000000,325000000,9750000)' "
-
-
-
-# prepare_write_cmd: ["cassandra-stress write no-warmup cl=QUORUM n=162500000 -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3)' -mode cql3 native -rate threads=200 -col 'size=FIXED(128) n=FIXED(8)' -pop seq=1..162500000",
-#                     "cassandra-stress write no-warmup cl=QUORUM n=162500000 -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3)' -mode cql3 native -rate threads=200 -col 'size=FIXED(128) n=FIXED(8)' -pop seq=162500000..325000000",
-#                     "cassandra-stress write no-warmup cl=QUORUM n=162500000 -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3)' -mode cql3 native -rate threads=200 -col 'size=FIXED(128) n=FIXED(8)' -pop seq=325000000..487500000",
-#                     "cassandra-stress write no-warmup cl=QUORUM n=162500000 -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3)' -mode cql3 native -rate threads=200 -col 'size=FIXED(128) n=FIXED(8)' -pop seq=487500000..650000000"]
-
-# stress_cmd_w: "cassandra-stress write no-warmup cl=QUORUM duration=2850m -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3)' -mode cql3 native -rate 'threads=250 fixed=20332/s' -col 'size=FIXED(128) n=FIXED(8)' -pop 'dist=gauss(1..650000000,325000000,9750000)' "
-# stress_cmd_m: "cassandra-stress mixed no-warmup cl=QUORUM duration=800m -schema 'replication(strategy=NetworkTopologyStrategy,replication_factor=3)' -mode cql3 native -rate 'threads=250 fixed=8750/s' -col 'size=FIXED(128) n=FIXED(8)' -pop 'dist=gauss(1..650000000,325000000,6500000)' "
-
+stress_cmd_w: "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1)' no-warmup cl=QUORUM duration=2850m -mode cql3 native -rate 'threads=250 fixed=20332/s' -pop 'dist=gauss(1..250000000,125000000,3750000)'"
+stress_cmd_r: "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=800m -mode cql3 native -rate 'threads=250 fixed=10310/s' -pop 'dist=gauss(1..250000000,125000000,3750000)'"
+stress_cmd_m: "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1,read_row=1)' no-warmup cl=QUORUM duration=800m -mode cql3 native -rate 'threads=250 fixed=8750/s' -pop 'dist=gauss(1..250000000,125000000,2500000)'"
 
 n_db_nodes: 3
 n_loaders: 4

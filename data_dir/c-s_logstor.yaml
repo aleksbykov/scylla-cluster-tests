@@ -18,7 +18,7 @@ table_definition: |
     "C5" blob,
     "C6" blob,
     "C7" blob
-  ) WITH storage_engine = 'logstor';
+  ) WITH storage_engine = 'logstor' AND tablets = {'min_tablet_count': 512};
 
 columnspec:
   - name: key
