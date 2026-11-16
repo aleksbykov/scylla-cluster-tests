@@ -6,8 +6,8 @@ argus_use_ssh_tunnel: true
 test_metadata:
   description: >-
     2-hour longevity on strongly consistent tables: 100 GB of 512 B rows preloaded, then checked
-    linearizability plus bulk mixed load on a 6-node, 3-rack cluster with table-property
-    nemeses.
+    linearizability on two fast streams and one slow stream plus bulk mixed load on a 6-node,
+    3-rack cluster with table-property nemeses.
   test_type: longevity
   tier: tier2
   duration_class: short
@@ -66,19 +66,23 @@ prepare_write_cmd:
     cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode bulk --bulk-op write -n 69905066
     --bulk-pop seq=1099651437910..1099721342975 --bulk-threads 80
 
-# Loaders 1-2 run only the checked stream (--mode verify); loader 3 runs only the bulk mixed load (--mode bulk) over
-# the whole preloaded data. The checked stream follows the research job (configurations/sc_verify/research-1h.yaml):
-# the checker gets 120 s per row, 5 rows per file (600 s of the 900 s file limit), workers of 3 GB, a canary every
-# 100 files, 16 driver connections per shard. L1 and L2 run the same stream on disjoint pk pools:
-# - 8 clients per row, 512 slots of 200 ops per row. A row takes ceil((ops per row + 1) / burst-ops) bursts, so each
+# Loaders 1-2 run only the fast checked stream (--mode verify); loader 3 runs the bulk mixed load over the whole
+# preloaded data and the slow checked stream in one process (--mode both). The checked streams follow the research job
+# (configurations/sc_verify/research-1h.yaml): the checker gets 120 s per row, 5 rows per file (600 s of the 900 s file
+# limit), workers of 3 GB, a canary every 100 files, 16 driver connections per shard. A row takes
+# ceil((ops per row + 1) / burst-ops) bursts.
+# - L1 and L2 run the same fast stream on disjoint pk pools: 8 clients per row, 512 slots of 200 ops per row, so each
 #   loader offers 512 x 201 / (7 x 100 ms) = 147k ops/s and 146 files/s; 16 checker workers need ~5 cores for that
 #   (~0.035 core-s per file in run a0771885).
-# - The cluster is the limit: the two streams offer ~294k checked ops/s, and run a0771885 served 181k in all with the
-#   hottest shard at 92%. Expect less than the formula and higher latency.
+# - The formula, not the cluster, sets the rate: run 00750b55 served both fast streams in full (304k CQL req/s with
+#   L3), hottest shard 82%, client p99 ~6 ms.
 # - 65,536 pks per pool put ~1,024 on each of the 64 tablets (largest 1.09 x the mean); the old 1,024-pk pool on 128
 #   tablets put 2-19 on each, so a shard's checked load depended on which tablets it led.
-# L3 is capped at 10k ops/s (--bulk-rate): it keeps reads and writes on the preloaded data without adding much to a
-# cluster the checked streams already fill.
+# - L3's slow stream: 4,096 slots, an 8-op burst every 20 s, so a row takes 26 bursts = ~520 s and spans 4-5 memtable
+#   flushes of its tablet (one every ~114 s in run 00750b55), where a fast row lives 0.7 s; ~1.6k ops/s, ~1.6 files/s.
+#   --max-gen-duration 15m lets a row reach its 200 ops. Its reads still come from the row cache.
+# - L3's bulk load is capped at 10k ops/s (--bulk-rate): it keeps reads and writes on the preloaded data without
+#   adding much to the load of the checked streams.
 stress_cmd:
   - >-
     cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode verify --pop seq=0..65535 --slots 512
@@ -93,7 +97,10 @@ stress_cmd:
     --connections-per-shard 16 --checker-timeout 900s
     --duration 120m
   - >-
-    cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode bulk
+    cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode both --pop seq=131072..196607 --slots 4096
+    --clients-per-row 8 --burst-ops 8 --burst-interval 20s --ops-per-gen 200 --max-gen-duration 15m --read-ratio 0.5
+    --insert-ratio 0.5 --key-timeout 120s --check-rows 5 --checker-workers 4 --checker-mem 3G --canary-every 100
+    --checker-timeout 900s
     --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099511627776..1099721342975 --bulk-threads 80
     --bulk-rate 10000 --connections-per-shard 16 --duration 120m
 
