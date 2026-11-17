@@ -1,0 +1,8 @@
+# EC baseline for perf-regression-latency-650gb-with-nemesis-logstor.yaml. Add it after enable_logstor.yaml.
+# It creates keyspace1.standard1 as a regular table with the schema and the tablet count of
+# data_dir/c-s_logstor.yaml. The CREATE ... IF NOT EXISTS of the profile then does nothing, so the
+# storage engine is the only difference from the logstor run.
+pre_create_keyspace: [
+  "CREATE KEYSPACE keyspace1 WITH REPLICATION = {'class': 'NetworkTopologyStrategy', 'replication_factor': 3} AND tablets = {'enabled': true};",
+  "CREATE TABLE keyspace1.standard1 (key blob PRIMARY KEY, \"C0\" blob, \"C1\" blob, \"C2\" blob, \"C3\" blob, \"C4\" blob, \"C5\" blob, \"C6\" blob, \"C7\" blob) WITH tablets = {'min_tablet_count': 512};"
+]
