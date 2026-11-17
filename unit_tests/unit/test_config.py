@@ -769,6 +769,18 @@ def test_35_append_str_options(monkeypatch):
     )
 
 
+def test_35_append_str_options_from_later_config_file(monkeypatch, tmp_path):
+    test_case = tmp_path / "test_case.yaml"
+    test_case.write_text("append_scylla_args: '--blocked-reactor-notify-ms 5'\n")
+    overlay = tmp_path / "overlay.yaml"
+    overlay.write_text("append_scylla_args: '++ --task-quota-ms 0.2'\n")
+    monkeypatch.setenv("SCT_CONFIG_FILES", f'["{test_case}", "{overlay}"]')
+
+    conf = sct_config.SCTConfiguration()
+    conf.verify_configuration()
+    assert conf.append_scylla_args == "--blocked-reactor-notify-ms 5 --task-quota-ms 0.2"
+
+
 def test_35_append_list_options(monkeypatch):
     monkeypatch.setenv("SCT_SCYLLA_D_OVERRIDES_FILES", '["++", "extra_file/scylla.d/io.conf"]')
     conf = sct_config.SCTConfiguration()

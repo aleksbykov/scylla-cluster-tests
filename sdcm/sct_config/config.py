@@ -581,12 +581,15 @@ class SCTConfiguration(*CONFIG_GROUPS):
             for conf_file in list(config_files):
                 if not os.path.exists(conf_file):
                     raise FileNotFoundError(f"Couldn't find config file: {conf_file}")
-            files = anyconfig.load(list(config_files))
-            # Record which keys the user actually set, before the merge makes them indistinguishable from the
-            # `defaults/` values. Only user config files count here - the backend defaults loaded in step 1 are
-            # not an explicit choice.
-            user_config_keys = set(files.keys())
-            merge_dicts_append_strings(self, files, SCTConfiguration)
+            # Merge one file at a time, so a `++` value appends to the value of the earlier config files
+            # and not only to the defaults.
+            for conf_file in config_files:
+                file_config = anyconfig.load(conf_file) or {}
+                # Record which keys the user actually set, before the merge makes them indistinguishable from the
+                # `defaults/` values. Only user config files count here - the backend defaults loaded in step 1
+                # are not an explicit choice.
+                user_config_keys |= set(file_config.keys())
+                merge_dicts_append_strings(self, file_config, SCTConfiguration)
         # `env` is the SCT_* environment (Jenkins job params and the `hydra`/`sct.py` CLI both land here)
         self._explicitly_set_params = user_config_keys | set(env.keys())
 
