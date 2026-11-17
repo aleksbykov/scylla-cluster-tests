@@ -1,0 +1,5 @@
+# Mixed 1:1 at the highest rate for perf-regression-latency-650gb-with-nemesis-logstor.yaml during the
+# operations. Add it after the test yaml. 200k op/s (4 loaders x 50k) is the top of the estimate from run #7
+# (Argus 71b34d8b), not a measured maximum: ~0.29% reactor per 1k op/s gives ~58% at the steady state and
+# ~75-80% on the busiest node while it streams. Only the rate differs from the 35k of the test yaml.
+stress_cmd_m: "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1,read_row=1)' no-warmup cl=QUORUM duration=800m -mode cql3 native -rate 'threads=250 fixed=50000/s' -pop 'dist=gauss(1..250000000,125000000,2500000)'"
