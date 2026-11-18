@@ -78,9 +78,11 @@ prepare_write_cmd:
 #   L3), hottest shard 82%, client p99 ~6 ms.
 # - 65,536 pks per pool put ~1,024 on each of the 64 tablets (largest 1.09 x the mean); the old 1,024-pk pool on 128
 #   tablets put 2-19 on each, so a shard's checked load depended on which tablets it led.
-# - L3's slow stream: 4,096 slots, an 8-op burst every 20 s, so a row takes 26 bursts = ~520 s and spans 4-5 memtable
-#   flushes of its tablet (one every ~114 s in run 00750b55), where a fast row lives 0.7 s; ~1.6k ops/s, ~1.6 files/s.
-#   --max-gen-duration 15m lets a row reach its 200 ops. Its reads still come from the row cache.
+# - L3's slow stream: 4,096 slots, an 8-op burst every 20 s, so a row takes 26 bursts = 500 s and spans ~3 memtable
+#   flushes of its tablet replica (~7 while memtable_flush_period_in_ms is 68,687; run 5f134d59), where a fast row
+#   lives 0.7 s; ~1.6k ops/s, ~1.6 files/s. --max-gen-duration 15m lets a row reach its 200 ops. Cached reads never
+#   reach the row's sstables, so half its reads use BYPASS CACHE (--bypass-cache-ratio 0.5): the leader reads the
+#   row from its memtable and sstables while the row is written, flushed and compacted.
 # - L3's bulk load is capped at 10k ops/s (--bulk-rate): it keeps reads and writes on the preloaded data without
 #   adding much to the load of the checked streams.
 stress_cmd:
@@ -99,8 +101,8 @@ stress_cmd:
   - >-
     cql-stress-sc-verify --profile /tmp/sc-verify-profile-512b.yaml --mode both --pop seq=131072..196607 --slots 4096
     --clients-per-row 8 --burst-ops 8 --burst-interval 20s --ops-per-gen 200 --max-gen-duration 15m --read-ratio 0.5
-    --insert-ratio 0.5 --key-timeout 120s --check-rows 5 --checker-workers 4 --checker-mem 3G --canary-every 100
-    --checker-timeout 900s
+    --insert-ratio 0.5 --bypass-cache-ratio 0.5 --key-timeout 120s --check-rows 5 --checker-workers 4
+    --checker-mem 3G --canary-every 100 --checker-timeout 900s
     --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099511627776..1099721342975 --bulk-threads 80
     --bulk-rate 10000 --connections-per-shard 16 --duration 120m
 

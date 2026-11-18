@@ -1,2 +1,2 @@
 cql-stress-sc-verify:
-  image: aleksbykov/cql-stress:sc-verify-m2-d744aa8
+  image: aleksbykov/cql-stress:sc-verify-m2-59c36db
