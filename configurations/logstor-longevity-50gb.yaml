@@ -1,0 +1,61 @@
+# Logstor variant of the 50GB 3-day longevity. Put it last in the config list, after
+# test-cases/longevity/longevity-50GB-3days-authorization-and-tls-ssl.yaml and its overlays.
+# It moves the whole load to one logstor table (data_dir/c-s_logstor_50gb.yaml) and takes the
+# logstor settings and load rates of the per-nemesis sweep (longevity-logstor-nemesis-sweep.yaml),
+# which kept the nodes clear of the known logstor crashes.
+
+user_prefix: 'longevity-logstor-50gb-3d'
+
+experimental_features:
+  - logstor
+
+# Merged with the rpc-compression and auth keys of the other overlays.
+# logstor_disk_size_in_mb is per shard. It is sized for the sweep's fill, not copied: the rows here
+# are ~190 B, not 2 KB. Estimates for i7i.4xlarge (~15 shards): 100M rows with RF3 on 6 nodes are
+# ~9.5 GB live per node, ~0.65 GB per shard (~16% of 4000 MB); the node that takes a full rack
+# replica after a decommission (SCYLLADB-6165) holds ~32% live, the sweep's 32-39%. At 10k writes/s
+# the overwrites reach the 50% trigger ~6 h into the load, so compaction runs for most of the 3 days
+# (with 24000 MB it would wait ~43 h). New nodes format ~60 GB at first start, not ~360 GB.
+# Compaction at 50% used keeps the store far from full: logstor has no out-of-space handling yet
+# (SCYLLADB-1988), and a nearly full pool hits SCYLLADB-5865.
+# Logstor tablets migrate over file streaming only, so enable_file_stream stays on.
+append_scylla_yaml:
+  enable_tablets: true
+  tablets_mode_for_new_keyspaces: 'enabled'
+  enable_file_stream: true
+  logstor_disk_size_in_mb: 4000
+  logstor_compaction_trigger_threshold: 0.5
+  logstor_format_on_startup: true
+
+# The preload writes at CL=ALL, so keep the nemesis out of it.
+nemesis_during_prepare: false
+
+# One command per loader: the three preload thirds, then the mixed and the read stream.
+round_robin: true
+
+# Same 100M keys as the base job, one third per loader, at the sweep's preload rate.
+prepare_write_cmd:
+  - "cassandra-stress user profile=/tmp/c-s_logstor_50gb.yaml 'ops(write_row=1)' cl=ALL n=33333334 -mode cql3 native -rate 'threads=100 fixed=20000/s' -pop seq=1..33333334"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_50gb.yaml 'ops(write_row=1)' cl=ALL n=33333334 -mode cql3 native -rate 'threads=100 fixed=20000/s' -pop seq=33333335..66666668"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_50gb.yaml 'ops(write_row=1)' cl=ALL n=33333332 -mode cql3 native -rate 'threads=100 fixed=20000/s' -pop seq=66666669..100000000"
+
+# The sweep's rates: 10k writes/s and 20k reads/s in total, uniform over the preloaded keys, so
+# writes are overwrites. Replaces both base commands: the MV profile is dropped, because views on a
+# logstor table do not see its data (SCYLLADB-3512).
+stress_cmd:
+  - "cassandra-stress user profile=/tmp/c-s_logstor_50gb.yaml 'ops(write_row=1,read_row=1)' cl=QUORUM duration=4320m -mode cql3 native -rate 'threads=100 fixed=20000/s' -pop 'dist=uniform(1..100000000)' -log interval=5"
+
+stress_read_cmd:
+  - "cassandra-stress user profile=/tmp/c-s_logstor_50gb.yaml 'ops(read_row=1)' cl=QUORUM duration=4320m -mode cql3 native -rate 'threads=50 fixed=10000/s' -pop 'dist=uniform(1..100000000)' -log interval=5"
+
+# The sweep never ran full scans on logstor; drop this line to turn them back on.
+run_fullscan: []
+
+# SisyphusMonkey ignores nemesis_exclude_list, so the selector holds these out:
+# - SplitMergeTabletsWithAlter: sets min_tablet_count to 2 or 256, which drops the 512 pin and
+#   splits or merges the logstor table (SCYLLADB-6330; split/merge is on hold for logstor).
+# - ToggleAuditNemesisSyslog, ToggleAuditRulesNemesisSyslog: node crashes in sweep builds #5
+#   (SCYLLADB-5866) and #14 (SIGSEGV logging the tablet_stream_files list, no Jira).
+# - MultipleHardRebootNodeMonkey: SCT runs nodetool status while logstor recovery (~95 s) still
+#   answers 404 (sweep build #14, no Jira).
+nemesis_selector: 'not SplitMergeTabletsWithAlter and not ToggleAuditNemesisSyslog and not ToggleAuditRulesNemesisSyslog and not MultipleHardRebootNodeMonkey'

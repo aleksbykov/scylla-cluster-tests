@@ -1,0 +1,21 @@
+#!groovy
+
+// trick from https://github.com/jenkinsci/workflow-cps-global-lib-plugin/pull/43
+def lib = library identifier: 'sct@snapshot', retriever: legacySCM(scm)
+
+/** jobDescription
+    Logstor variant of the 50GB 3-day longevity: the tier1 job's config with the whole load moved to
+    one logstor table (data_dir/c-s_logstor_50gb.yaml, tablet count pinned at 512) and SisyphusMonkey
+    running random nemesis, minus the ones tied to known logstor crashes.
+
+    The logstor settings follow the per-nemesis sweep (longevity-logstor-nemesis-sweep);
+    configurations/logstor-longevity-50gb.yaml explains the sizing and the held-out nemesis.
+
+    Manual staging job: not wired into any trigger.
+*/
+longevityPipeline(
+    backend: 'aws',
+    region: 'eu-west-1',
+    test_name: 'longevity_test.LongevityTest.test_custom_time',
+    test_config: '''["test-cases/longevity/longevity-50GB-3days-authorization-and-tls-ssl.yaml", "configurations/network_config/two_interfaces.yaml", "configurations/advanced-rpc-compression.yaml", "configurations/auth_cassandra.yaml", "configurations/logstor-longevity-50gb.yaml"]'''
+)
