@@ -1,0 +1,36 @@
+# Mixed 1:1 predefined-throughput-steps for logstor. Add it after enable_logstor.yaml to
+# test-cases/performance/perf-regression-predefined-throughput-steps.yaml.
+# The dataset and the profile are the ones of perf-regression-latency-650gb-with-nemesis-logstor.yaml:
+# 250M partitions in a logstor table with 512 tablets (data_dir/c-s_logstor.yaml). With RF=3 on 3 nodes a node
+# keeps a full replica at ~50% of the logstor store (Argus 71b34d8b).
+
+prepare_write_cmd:
+  - "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1)' no-warmup cl=ALL n=62500000 -mode cql3 native -rate threads=200 -pop seq=1..62500000"
+  - "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1)' no-warmup cl=ALL n=62500000 -mode cql3 native -rate threads=200 -pop seq=62500000..125000000"
+  - "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1)' no-warmup cl=ALL n=62500000 -mode cql3 native -rate threads=200 -pop seq=125000000..187500000"
+  - "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1)' no-warmup cl=ALL n=62500000 -mode cql3 native -rate threads=200 -pop seq=187500000..250000000"
+
+# The warmup of the base yaml reads the default cassandra-stress schema, not the profile.
+stress_cmd_cache_warmup: []
+
+# One command per loader. The step rate is divided between the 4 loaders.
+stress_cmd_m:
+  - "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1,read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$threads $throttle' -pop 'dist=gauss(1..250000000,125000000,2500000)'"
+  - "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1,read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$threads $throttle' -pop 'dist=gauss(1..250000000,125000000,2500000)'"
+  - "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1,read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$threads $throttle' -pop 'dist=gauss(1..250000000,125000000,2500000)'"
+  - "cassandra-stress user profile=/tmp/c-s_logstor.yaml 'ops(write_row=1,read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$threads $throttle' -pop 'dist=gauss(1..250000000,125000000,2500000)'"
+
+# First guesses from run #7: the CPU limit of mixed 1:1 is ~300k op/s. 35000 is the rate of the
+# perf-with-nemesis runs, to compare with them.
+perf_gradual_threads: {"mixed": 400}
+perf_gradual_throttle_steps: {"mixed": ['35000', '100000', '150000', '200000', '250000', 'unthrottled']}
+perf_gradual_step_duration: {"mixed": '30m'}
+
+# No history yet: the fixed steps keep the default P99 limits, the unthrottled step has none.
+latency_decorator_error_thresholds:
+  mixed:
+    unthrottled:
+      P99 write:
+        fixed_limit: null
+      P99 read:
+        fixed_limit: null
