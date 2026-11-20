@@ -9,6 +9,13 @@ user_prefix: 'longevity-logstor-50gb-3d'
 experimental_features:
   - logstor
 
+# The sweep's layout: one zone, 3 simulated racks of 2 nodes. The base job's 3 zones with
+# simulated_racks: 0 hit i7i.4xlarge capacity errors in eu-west-1a (build #2), and its zone alone
+# leaves a single rack, so the RF3 tablet keyspace is rejected (build #3).
+# simulated_racks puts every node in the first zone listed.
+availability_zone: 'c'
+simulated_racks: 3
+
 # Merged with the rpc-compression and auth keys of the other overlays.
 # logstor_disk_size_in_mb is per shard. It is sized for the sweep's fill, not copied: the rows here
 # are ~190 B, not 2 KB. Estimates for i7i.4xlarge (~15 shards): 100M rows with RF3 on 6 nodes are
