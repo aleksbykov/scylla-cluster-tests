@@ -7,7 +7,7 @@ test_metadata:
   description: >-
     2-hour longevity on strongly consistent tables: 100 GB of 512 B rows preloaded, then checked
     linearizability on two fast streams and one slow stream plus bulk mixed load on a 6-node,
-    3-rack cluster with table-property nemeses.
+    3-rack cluster with disruptive nemeses.
   test_type: longevity
   tier: tier2
   duration_class: short
@@ -106,9 +106,16 @@ stress_cmd:
     --bulk-op mixed --bulk-read-ratio 0.5 --bulk-pop seq=1099511627776..1099721342975 --bulk-threads 80
     --bulk-rate 10000 --connections-per-shard 16 --duration 120m
 
-# One thread of ALTER TABLE ... WITH <property> nemeses on the verified table; `not disruptive` drops the TWCS one.
+# SCT's disruptive nemeses, minus those that would create false failures or can't work on strongly consistent tables:
+# corrupt-then-repair/rebuild, repair and rebuild (NemesisSequence runs a Manager repair), restore, disk full and quota,
+# materialized views. AddDropColumnMonkey is not disruptive; it is named so a later selector can't bring it back (the tool
+# checks the table's columns against the profile only at start-up). A class name is a nemesis flag (registry.py).
 nemesis_class_name: 'SisyphusMonkey'
-nemesis_selector: 'modify_table and not disruptive'
+nemesis_selector: >-
+  disruptive and not (CorruptThenRebuildMonkey or CorruptThenRepairMonkey or MgmtCorruptThenRepair
+  or RepairStreamingErrMonkey or RebuildStreamingErrMonkey or RestartThenRepairNodeMonkey or NemesisSequence
+  or MgmtRestore or EnospcMonkey or EnospcAllNodesMonkey or EndOfQuotaNemesis
+  or AddRemoveMvNemesis or KillMVBuildingCoordinator or AddDropColumnMonkey)
 nemesis_seed: 32
 nemesis_interval: 10  # minutes; leaves room for quiet rows between disruptions
 nemesis_during_prepare: false  # the preload must run on a stable cluster
