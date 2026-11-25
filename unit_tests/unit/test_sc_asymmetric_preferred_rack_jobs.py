@@ -6,8 +6,11 @@ under the linter's cloud-API stubs.
 """
 
 import functools
+import json
+import socket
 
 import pytest
+import yaml
 
 from sdcm.sct_config import SCTConfiguration
 from sdcm.utils.common import get_sct_root_path
@@ -15,12 +18,41 @@ from sdcm.utils.lint.env_builder import build_env
 from sdcm.utils.lint.jenkins_parser import parse_jenkinsfile
 from sdcm.utils.lint.validator import resolve_pipeline_config
 
-PERF_DIR = get_sct_root_path() / "jenkins-pipelines/performance/branch-perf-v17/scylla-enterprise/perf-regression"
+SCT_ROOT = get_sct_root_path()
+PERF_DIR = SCT_ROOT / "jenkins-pipelines/performance/branch-perf-v17/scylla-enterprise/perf-regression"
 NEW_JOBS = {
     workload: PERF_DIR / f"scylla-enterprise-perf-regression-predefined-throughput-steps-cql-stress-{workload}"
     "-i8g-tablets-sc-asymmetric-preferred-rack.jenkinsfile"
     for workload in ("write", "read", "mixed")
 }
+LOCAL_HOSTS = frozenset({"127.0.0.1", "::1", "localhost", ""})
+
+
+@pytest.fixture(autouse=True)
+def refuse_remote_connections(monkeypatch):
+    """Keep job resolution offline: refuse every non-loopback connect and fail the test if one was tried.
+
+    `resolve_job` caches, so a job is resolved inside the first test that asks for it; the guard
+    therefore covers every test here. The failure is a `pytest.fail`, not an `AssertionError`, so
+    an `xfail(raises=AssertionError)` test cannot absorb it, and a refusal the code under test
+    swallows still fails the test.
+    """
+    attempts = []
+
+    def guard(real_connect):
+        def connect(self, address, *args, **kwargs):
+            if isinstance(address, tuple) and address and address[0] not in LOCAL_HOSTS:
+                attempts.append(address)
+                raise RuntimeError(f"tried to connect to {address!r}")
+            return real_connect(self, address, *args, **kwargs)
+
+        return connect
+
+    monkeypatch.setattr(socket.socket, "connect", guard(socket.socket.connect))
+    monkeypatch.setattr(socket.socket, "connect_ex", guard(socket.socket.connect_ex))
+    yield
+    if attempts:
+        pytest.fail(f"job resolution tried the network: {attempts!r}")
 
 
 @functools.cache
@@ -36,3 +68,70 @@ def test_at_1_write_job_resolves_to_five_db_nodes_laid_out_3_1_1():
     assert config.get("n_db_nodes") == [5]
     assert config.get("simulated_racks") == 3
     assert config.get("n_db_nodes_per_rack") == [3, 1, 1]
+
+
+def test_at_24_three_manual_predefined_steps_jobs():
+    expected_params = {
+        "backend": "aws",
+        "region": "us-east-1",
+        "provision_type": "on_demand",
+        "test_name": "performance_regression_gradual_grow_throughput.PerformanceRegressionPredefinedStepsTest",
+    }
+
+    assert sorted(PERF_DIR.glob("*-asymmetric-preferred-rack.jenkinsfile")) == sorted(NEW_JOBS.values())
+    for workload, path in NEW_JOBS.items():
+        job = parse_jenkinsfile(path)
+        assert job.pipeline_function == "perfRegressionParallelPipeline"
+        assert {key: job.params.get(key) for key in expected_params} == expected_params
+        assert json.loads(job.params["sub_tests"]) == [f"test_{workload}_gradual_increase_load"]
+
+
+def test_at_25_new_jobs_on_no_trigger_matrix_or_schedule():
+    trigger_files = [
+        path
+        for trigger_dir in (
+            "configurations/triggers",
+            "jenkins-pipelines/master-triggers",
+            "jenkins-pipelines/oss/sct_triggers",
+        )
+        for path in (SCT_ROOT / trigger_dir).rglob("*")
+        if path.is_file()
+    ]
+    job_names = [path.stem for path in NEW_JOBS.values()]
+
+    assert trigger_files
+    assert [
+        (str(path), name) for path in trigger_files for name in job_names if name in path.read_text(encoding="utf-8")
+    ] == []
+    for path in NEW_JOBS.values():
+        text = path.read_text(encoding="utf-8")
+        assert [directive for directive in ("cron(", "triggers {", "pipelineTriggers") if directive in text] == []
+
+
+def test_at_26_job_names_show_workload_and_setup():
+    names = {workload: path.name for workload, path in NEW_JOBS.items()}
+    every_jenkinsfile_name = [path.name for path in (SCT_ROOT / "jenkins-pipelines").rglob("*.jenkinsfile")]
+
+    assert len(set(names.values())) == 3
+    for workload, name in names.items():
+        assert f"-{workload}-" in name
+        assert "asymmetric-preferred-rack" in name
+        assert every_jenkinsfile_name.count(name) == 1
+
+
+@pytest.mark.parametrize("workload", NEW_JOBS)
+def test_at_10_jobs_use_the_pinned_leader_aware_image(workload):
+    pinned_image_file = SCT_ROOT / "configurations/stress_images/cql-stress-leader-aware.yaml"
+    pinned = yaml.safe_load(pinned_image_file.read_text(encoding="utf-8"))["stress_image"]
+    resolved = resolve_job(workload).get("stress_image")
+
+    assert resolved["cql-stress-cassandra-stress"] == pinned["cql-stress-cassandra-stress"]
+
+
+def test_at_13_mixed_load_as_in_its_reference():
+    config = resolve_job("mixed")
+
+    assert config.get("n_loaders") == [4]
+    assert config.get("perf_gradual_threads")["mixed"] == [1900]
+    assert config.get("perf_gradual_throttle_steps")["mixed"] == ["50000", "150000", "300000", "450000", "unthrottled"]
+    assert config.get("perf_gradual_step_duration")["mixed"] == "30m"
