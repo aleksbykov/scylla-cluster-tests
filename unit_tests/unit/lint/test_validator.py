@@ -7,9 +7,15 @@ path; linting it with the network refused proves that path is stubbed in `_CLOUD
 
 import pytest
 
+from sdcm.utils.common import get_sct_root_path
 from sdcm.utils.lint.env_builder import build_env
 from sdcm.utils.lint.jenkins_parser import parse_jenkinsfile
 from sdcm.utils.lint.validator import validate_pipeline
+
+REFERENCE_WRITE_JOB = (
+    "jenkins-pipelines/performance/branch-perf-v17/scylla-enterprise/perf-regression/"
+    "scylla-enterprise-perf-regression-predefined-throughput-steps-cql-stress-write-p99-ladder-i8g-tablets-sc.jenkinsfile"
+)
 
 
 @pytest.mark.parametrize(
@@ -35,4 +41,15 @@ def test_validate_pipeline_cloud_lookup_never_reaches_the_network(
     is_error, message = validate_pipeline(pipeline_path, env)
 
     assert remote_connections == [], f"linting {pipeline} reached the network: {remote_connections}"
+    assert not is_error, message
+
+
+def test_at_29_lint_passes_without_ssh_test_key(monkeypatch, tmp_path, restore_root_logger):
+    # CI agents have no ~/.ssh/scylla_test_id_ed25519; an empty HOME gives the same host here.
+    # The key is fetched from the KeyStore at runtime, so the file check must skip it.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    pipeline_path = get_sct_root_path() / REFERENCE_WRITE_JOB
+
+    is_error, message = validate_pipeline(pipeline_path, build_env(parse_jenkinsfile(pipeline_path)))
+
     assert not is_error, message

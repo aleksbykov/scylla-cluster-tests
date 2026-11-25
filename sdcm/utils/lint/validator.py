@@ -11,7 +11,11 @@ import pathlib
 import traceback
 from collections import namedtuple
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import patch
+
+if TYPE_CHECKING:
+    from sdcm.sct_config import SCTConfiguration
 
 logger = logging.getLogger(__name__)
 
@@ -110,15 +114,43 @@ _CLOUD_API_PATCHES = {
 }
 
 
+def resolve_pipeline_config(env: dict[str, str]) -> "SCTConfiguration":
+    """Build and check the SCT configuration that a pipeline environment resolves to.
+
+    Only the given environment variables are set, and the cloud API calls (AMI lookups, repo
+    resolution, etc.) are stubbed. SCTConfiguration is instantiated, then verify_configuration()
+    and check_required_files() run, all under the same stubs. The returned configuration stays
+    usable after the stubs are removed.
+
+    Args:
+        env: Environment variables to set (from build_env()).
+
+    Returns:
+        The resolved and checked SCTConfiguration.
+
+    Raises:
+        Exception: Whatever SCTConfiguration raises for an invalid configuration.
+    """
+    # Deferred import: runs in worker process to avoid importing heavy deps in main process
+    from sdcm.sct_config import SCTConfiguration  # noqa: PLC0415
+
+    with patch.dict(os.environ, env, clear=True), contextlib.ExitStack() as stack:
+        for target, mock_fn in _CLOUD_API_PATCHES.items():
+            stack.enter_context(patch(target, side_effect=mock_fn))
+        stack.enter_context(patch.object(SCTConfiguration, "_validate_cloud_backend_parameters"))
+        stack.enter_context(patch.object(SCTConfiguration, "_resolve_xcloud_version_tag"))
+        config = SCTConfiguration()
+        config.verify_configuration()
+        config.check_required_files()
+    return config
+
+
 def validate_pipeline(pipeline_path: Path, env: dict[str, str]) -> tuple[bool, str]:
     """Validate a single pipeline's SCT configuration.
 
-    Sets the given environment variables, instantiates SCTConfiguration,
-    and runs verify_configuration() and check_required_files().
-
-    Cloud API calls (AMI lookups, repo resolution, etc.) are mocked out
-    since linting only needs to verify configuration structure, not
-    resolve real cloud resources.
+    Resolves the configuration with resolve_pipeline_config(), which stubs the
+    cloud API calls since linting only needs to verify configuration structure,
+    not resolve real cloud resources.
 
     Args:
         pipeline_path: Path to the .jenkinsfile (for error messages).
@@ -132,18 +164,8 @@ def validate_pipeline(pipeline_path: Path, env: dict[str, str]) -> tuple[bool, s
     logging.getLogger().disabled = True
 
     try:
-        # Deferred import: runs in worker process to avoid importing heavy deps in main process
-        from sdcm.sct_config import SCTConfiguration  # noqa: PLC0415
-
-        with patch.dict(os.environ, env, clear=True), contextlib.ExitStack() as stack:
-            for target, mock_fn in _CLOUD_API_PATCHES.items():
-                stack.enter_context(patch(target, side_effect=mock_fn))
-            stack.enter_context(patch.object(SCTConfiguration, "_validate_cloud_backend_parameters"))
-            stack.enter_context(patch.object(SCTConfiguration, "_resolve_xcloud_version_tag"))
-            config = SCTConfiguration()
-            config.verify_configuration()
-            config.check_required_files()
-            return False, ""
+        resolve_pipeline_config(env)
+        return False, ""
     except Exception as exc:  # noqa: BLE001
         tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
         return True, tb
