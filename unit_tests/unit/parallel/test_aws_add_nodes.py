@@ -14,6 +14,7 @@
 """`AWSCluster.add_nodes` initializes the new nodes in parallel."""
 
 import threading
+from functools import partial
 from unittest.mock import MagicMock
 
 import pytest
@@ -34,6 +35,7 @@ def aws_cluster(cluster_of, monkeypatch):
     cluster._ec2_ami_username = "ubuntu"
     cluster.prepare_user_data.return_value = ""
     cluster._create_node.side_effect = create_node
+    cluster._new_node_racks = partial(AWSCluster._new_node_racks, cluster)
     return cluster
 
 

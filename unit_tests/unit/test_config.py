@@ -509,6 +509,59 @@ def test_n_db_nodes_per_rack_rejects_unset_n_db_nodes(monkeypatch, tmp_path):
     sct_config.SCTConfiguration().verify_configuration()
 
 
+@pytest.mark.parametrize(
+    "db_type_env",
+    [
+        pytest.param({"SCT_DB_TYPE": "cassandra", "SCT_AMI_ID_DB_CASSANDRA": "ami-cassandra-dummy"}, id="cassandra"),
+        pytest.param({"SCT_DB_TYPE": "mixed", "SCT_AMI_ID_DB_CASSANDRA": "ami-cassandra-dummy"}, id="mixed"),
+        pytest.param(
+            {
+                "SCT_DB_TYPE": "mixed_scylla",
+                "SCT_N_TEST_ORACLE_DB_NODES": "5",
+                # the oracle image is given explicitly, so version resolution stays off (no AWS calls)
+                "SCT_ORACLE_SCYLLA_VERSION": "",
+                "SCT_AMI_ID_DB_ORACLE": "ami-oracle-dummy",
+                "SCT_INSTANCE_TYPE_DB_ORACLE": "i4i.large",
+            },
+            id="mixed_scylla",
+        ),
+    ],
+)
+def test_n_db_nodes_per_rack_rejects_a_db_type_other_than_scylla(monkeypatch, db_type_env):
+    _set_aws_rack_layout_base(monkeypatch)
+    for key, value in db_type_env.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setenv("SCT_N_DB_NODES_PER_RACK", "[3, 1, 1]")
+
+    conf = sct_config.SCTConfiguration()
+    with pytest.raises(
+        ValueError,
+        match=rf"n_db_nodes_per_rack=\[3, 1, 1\] works only with db_type 'scylla', "
+        rf"but db_type is '{db_type_env['SCT_DB_TYPE']}'",
+    ):
+        conf.verify_configuration()
+
+    monkeypatch.delenv("SCT_N_DB_NODES_PER_RACK")
+    sct_config.SCTConfiguration().verify_configuration()
+
+
+def test_n_db_nodes_per_rack_rejects_zero_token_nodes(monkeypatch):
+    _set_aws_rack_layout_base(monkeypatch)
+    monkeypatch.setenv("SCT_USE_ZERO_NODES", "true")
+    monkeypatch.setenv("SCT_N_DB_ZERO_TOKEN_NODES", "1")
+    monkeypatch.setenv("SCT_N_DB_NODES_PER_RACK", "[3, 1, 1]")
+
+    conf = sct_config.SCTConfiguration()
+    with pytest.raises(
+        ValueError,
+        match=r"n_db_nodes_per_rack=\[3, 1, 1\] does not support zero-token nodes, but n_db_zero_token_nodes is \[1\]",
+    ):
+        conf.verify_configuration()
+
+    monkeypatch.setenv("SCT_N_DB_ZERO_TOKEN_NODES", "0")
+    sct_config.SCTConfiguration().verify_configuration()
+
+
 def test_conf_check_required_files_negative(monkeypatch):
     monkeypatch.setenv("SCT_CLUSTER_BACKEND", "aws")
     monkeypatch.setenv("SCT_CONFIG_FILES", "unit_tests/test_configs/stress_cmd_with_bad_profile.yaml")

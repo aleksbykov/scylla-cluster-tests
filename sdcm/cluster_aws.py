@@ -661,11 +661,10 @@ class AWSCluster(cluster.BaseCluster):
                 )
             )
         # node_index and rack follow the instance order, whichever node finishes its init first.
+        node_racks = self._new_node_racks(len(instances)) if rack is None else [rack] * len(instances)
         node_specs = []
-        for node_index, instance in enumerate(instances):
+        for instance, node_rack in zip(instances, node_racks, strict=True):
             self._node_index += 1
-            # in case rack is not specified, spread nodes to different racks
-            node_rack = node_index % self.racks_count if rack is None else rack
             node_specs.append((instance, self._node_index, node_rack))
 
         def _create_and_init_node(node_spec):
@@ -712,6 +711,10 @@ class AWSCluster(cluster.BaseCluster):
         # Not `self.nodes[-count:]`: another thread (a nemesis, the cluster growth) can add nodes at the same time,
         # and the tail of the list would then hold its nodes.
         return new_nodes
+
+    def _new_node_racks(self, count: int) -> list[int]:
+        """Racks of the `count` nodes that one `add_nodes` call creates without an explicit rack: round-robin."""
+        return [i % self.racks_count for i in range(count)]
 
     def _create_node(
         self, instance, ami_username, node_prefix, node_index, base_logdir, dc_idx, rack, after_config=None
@@ -1296,6 +1299,17 @@ class ScyllaAWSCluster(cluster.BaseScyllaCluster, AWSCluster):
             **kwargs,
         )
         return added_nodes
+
+    def _new_node_racks(self, count: int) -> list[int]:
+        """Racks of the new DB nodes: `n_db_nodes_per_rack` expanded in rack order, else round-robin."""
+        if not (layout := self.params.get("n_db_nodes_per_rack")):
+            return super()._new_node_racks(count)
+        if count != sum(layout):
+            raise ValueError(
+                f"n_db_nodes_per_rack={layout} totals {sum(layout)}, but add_nodes is adding {count}; "
+                "a rack layout covers only the add_nodes call that creates the whole DB cluster"
+            )
+        return [rack for rack, nodes_in_rack in enumerate(layout) for _ in range(nodes_in_rack)]
 
     @staticmethod
     def _wait_for_preinstalled_scylla(node):

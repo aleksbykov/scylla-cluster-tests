@@ -234,8 +234,9 @@ class CommonConfigMixin(BaseModel):
     )
     n_db_nodes_per_rack: IntOrList = SctField(
         description="DB nodes per simulated rack, in rack order: `[3, 1, 1]` puts 3 DB nodes in RACK0 and 1 each "
-        "in RACK1 and RACK2. Works only on the aws backend, with `simulated_racks` > 1, one availability zone and "
-        "one region; the list needs one entry per simulated rack, each at least 1, and its entries must add up to `n_db_nodes`. "
+        "in RACK1 and RACK2. Works only on the aws backend with db_type `scylla`, with `simulated_racks` > 1, one "
+        "availability zone, one region and no zero-token nodes; the list needs one entry per simulated rack, "
+        "each at least 1, and its entries must add up to `n_db_nodes`. "
         "Any other combination fails the configuration check. Loaders and monitors stay round-robin over the "
         "racks. Adding DB nodes later (grow) without an explicit rack is unsupported. "
         "Default: empty, which spreads DB nodes round-robin over the racks.",

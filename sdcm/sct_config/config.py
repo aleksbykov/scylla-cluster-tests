@@ -2457,12 +2457,18 @@ class SCTConfiguration(*CONFIG_GROUPS):
         n_db_nodes = self.get("n_db_nodes")
         if backend != "aws":
             problem = f"works only on the aws backend, but cluster_backend is {backend!r}"
+        elif (db_type := self.get("db_type")) != "scylla":
+            problem = f"works only with db_type 'scylla', but db_type is {db_type!r}"
         elif racks <= 1:
             problem = f"needs simulated_racks > 1, but simulated_racks is {racks}"
         elif az_count != 1:
             problem = f"needs one availability zone, but availability_zone is {zones!r}"
         elif not n_db_nodes or len(n_db_nodes) != 1:
             problem = f"needs one region, but n_db_nodes is {n_db_nodes}"
+        elif self.total_db_nodes[0] != n_db_nodes[0]:
+            problem = (
+                f"does not support zero-token nodes, but n_db_zero_token_nodes is {self.get('n_db_zero_token_nodes')}"
+            )
         elif len(layout) != racks:
             problem = f"lists {len(layout)} racks, but simulated_racks is {racks}"
         elif sum(layout) != n_db_nodes[0]:
