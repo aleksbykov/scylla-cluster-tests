@@ -128,6 +128,35 @@ def test_at_10_jobs_use_the_pinned_leader_aware_image(workload):
     assert resolved["cql-stress-cassandra-stress"] == pinned["cql-stress-cassandra-stress"]
 
 
+@pytest.mark.parametrize("workload", NEW_JOBS)
+def test_at_6_leases_on_under_the_build_option_names(workload):
+    expected = {
+        "strong_consistency_enable_leases": True,
+        "strong_consistency_lease_duration_in_ms": 1000,
+        "strong_consistency_lease_clock_source": "clockbound",
+    }
+    config = resolve_job(workload)
+    resolved = config.get("append_scylla_yaml")
+
+    assert {key: resolved.get(key) for key in expected} == expected
+    assert "strongly_consistent_raft_leader_" not in json.dumps(config.model_dump(exclude_none=True), default=str)
+
+
+@pytest.mark.parametrize("workload", NEW_JOBS)
+def test_at_7_tablet_balancing_stays_on(workload):
+    assert not resolve_job(workload).get("disable_tablet_balancing")
+
+
+@pytest.mark.parametrize("workload", NEW_JOBS)
+def test_at_8_clockbound_rc0_built_on_aarch64_db_nodes(workload):
+    """The offline resolution reports every instance as x86_64, so the instance type stands for aarch64."""
+    config = resolve_job(workload)
+
+    assert config.get("clockbound_version") == "3.0.0-rc.0"
+    assert config.get("clockbound_from_source") is True
+    assert config.get("instance_type_db") == "i8g.4xlarge"
+
+
 def test_at_13_mixed_load_as_in_its_reference():
     config = resolve_job("mixed")
 

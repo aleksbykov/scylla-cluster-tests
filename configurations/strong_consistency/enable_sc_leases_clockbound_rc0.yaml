@@ -1,0 +1,13 @@
+# LeaseGuard leader leases for strongly-consistent tables (SCYLLADB-6474, scylladb/scylladb#30777), AWS ClockBound clock.
+# #30777 renamed the lease options to strong_consistency_*: a build with it only warns about the old
+# strongly_consistent_raft_leader_* names of enable_sc_leaseguard*.yaml and runs without leases.
+# The ClockBound daemon has to match the clock-bound library Scylla links, 3.0.0-rc.0 in #30777. That version
+# has no release RPM, so SCT builds the daemon from source on each db node, for the node's architecture.
+# Tablet balancing stays on: unlike enable_sc_leaseguard*.yaml, this file does not set disable_tablet_balancing.
+clockbound_version: '3.0.0-rc.0'
+clockbound_from_source: true
+
+append_scylla_yaml:
+  strong_consistency_enable_leases: true
+  strong_consistency_lease_duration_in_ms: 1000
+  strong_consistency_lease_clock_source: clockbound
