@@ -15,6 +15,7 @@ import logging
 import os
 import unittest.mock
 from collections import namedtuple
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -365,6 +366,147 @@ def test_14_check_rackaware_config_multi_az_and_region(monkeypatch):
 
     conf = sct_config.SCTConfiguration()
     conf.verify_configuration()
+
+
+def _set_aws_rack_layout_base(monkeypatch):
+    """One AWS region and zone with 5 DB nodes over 3 simulated racks: a cluster a DB rack layout fits."""
+    monkeypatch.setenv("SCT_CLUSTER_BACKEND", "aws")
+    monkeypatch.setenv("SCT_REGION_NAME", "eu-west-1")
+    monkeypatch.setenv("SCT_AVAILABILITY_ZONE", "a")
+    monkeypatch.setenv("SCT_SIMULATED_RACKS", "3")
+    monkeypatch.setenv("SCT_N_DB_NODES", "5")
+    monkeypatch.setenv("SCT_INSTANCE_TYPE_DB", "i4i.large")
+    monkeypatch.setenv("SCT_AMI_ID_DB_SCYLLA", "ami-dummy")
+    monkeypatch.setenv("SCT_CONFIG_FILES", "unit_tests/test_configs/minimal_test_case.yaml")
+
+
+def test_at_18_rejects_layout_whose_total_differs_from_n_db_nodes(monkeypatch):
+    _set_aws_rack_layout_base(monkeypatch)
+    monkeypatch.setenv("SCT_N_DB_NODES_PER_RACK", "[3, 1, 1]")
+    monkeypatch.setenv("SCT_N_DB_NODES", "4")
+
+    conf = sct_config.SCTConfiguration()
+    with pytest.raises(ValueError, match=r"n_db_nodes_per_rack=\[3, 1, 1\] totals 5, but n_db_nodes is 4"):
+        conf.verify_configuration()
+
+    monkeypatch.setenv("SCT_N_DB_NODES", "5")
+    sct_config.SCTConfiguration().verify_configuration()
+
+
+def test_at_19_rejects_layout_whose_length_differs_from_simulated_racks(monkeypatch):
+    _set_aws_rack_layout_base(monkeypatch)
+    monkeypatch.setenv("SCT_N_DB_NODES_PER_RACK", "[3, 2]")
+
+    conf = sct_config.SCTConfiguration()
+    with pytest.raises(ValueError, match=r"n_db_nodes_per_rack=\[3, 2\] lists 2 racks, but simulated_racks is 3"):
+        conf.verify_configuration()
+
+    monkeypatch.setenv("SCT_N_DB_NODES_PER_RACK", "[3, 1, 1]")
+    sct_config.SCTConfiguration().verify_configuration()
+
+
+def test_at_20_rejects_layout_on_a_non_aws_backend(monkeypatch):
+    monkeypatch.setenv("SCT_CLUSTER_BACKEND", "gce")
+    _set_gce_instance_types(monkeypatch)
+    monkeypatch.setenv(
+        "SCT_GCE_IMAGE_DB",
+        "https://www.googleapis.com/compute/v1/projects/centos-cloud/global/images/family/centos-stream-9",
+    )
+    monkeypatch.setenv("SCT_SIMULATED_RACKS", "3")
+    monkeypatch.setenv("SCT_N_DB_NODES", "5")
+    monkeypatch.setenv("SCT_N_DB_NODES_PER_RACK", "[3, 1, 1]")
+
+    conf = sct_config.SCTConfiguration()
+    with pytest.raises(
+        ValueError, match=r"n_db_nodes_per_rack=\[3, 1, 1\] works only on the aws backend, but cluster_backend is 'gce'"
+    ):
+        conf.verify_configuration()
+
+    _set_aws_rack_layout_base(monkeypatch)
+    sct_config.SCTConfiguration().verify_configuration()
+
+
+def test_n_db_nodes_per_rack_requires_more_than_one_simulated_rack(monkeypatch):
+    _set_aws_rack_layout_base(monkeypatch)
+    monkeypatch.setenv("SCT_SIMULATED_RACKS", "1")
+    monkeypatch.setenv("SCT_N_DB_NODES_PER_RACK", "[5]")
+
+    conf = sct_config.SCTConfiguration()
+    with pytest.raises(
+        ValueError, match=r"n_db_nodes_per_rack=\[5\] needs simulated_racks > 1, but simulated_racks is 1"
+    ):
+        conf.verify_configuration()
+
+    monkeypatch.delenv("SCT_N_DB_NODES_PER_RACK")
+    sct_config.SCTConfiguration().verify_configuration()
+
+
+def test_n_db_nodes_per_rack_rejects_more_than_one_availability_zone(monkeypatch):
+    _set_aws_rack_layout_base(monkeypatch)
+    monkeypatch.setenv("SCT_AVAILABILITY_ZONE", "a,b")
+    monkeypatch.setenv("SCT_N_DB_NODES", "6")
+    monkeypatch.setenv("SCT_N_DB_NODES_PER_RACK", "[3, 2, 1]")
+
+    conf = sct_config.SCTConfiguration()
+    with pytest.raises(
+        ValueError, match=r"n_db_nodes_per_rack=\[3, 2, 1\] needs one availability zone, but availability_zone is 'a,b'"
+    ):
+        conf.verify_configuration()
+
+    monkeypatch.delenv("SCT_N_DB_NODES_PER_RACK")
+    sct_config.SCTConfiguration().verify_configuration()
+
+
+def test_n_db_nodes_per_rack_rejects_more_than_one_region(monkeypatch):
+    _set_aws_rack_layout_base(monkeypatch)
+    monkeypatch.setenv("SCT_REGION_NAME", '["eu-west-1", "us-east-1"]')
+    monkeypatch.setenv("SCT_N_DB_NODES", "[5, 5]")
+    monkeypatch.setenv("SCT_N_LOADERS", "[1, 0]")
+    monkeypatch.setenv("SCT_AMI_ID_DB_SCYLLA", "ami-dummy ami-dummy2")
+    monkeypatch.setenv("SCT_AMI_ID_LOADER", "ami-loader1 ami-loader2")
+    monkeypatch.setenv("SCT_N_DB_NODES_PER_RACK", "[3, 1, 1]")
+
+    conf = sct_config.SCTConfiguration()
+    with pytest.raises(
+        ValueError, match=r"n_db_nodes_per_rack=\[3, 1, 1\] needs one region, but n_db_nodes is \[5, 5\]"
+    ):
+        conf.verify_configuration()
+
+    monkeypatch.delenv("SCT_N_DB_NODES_PER_RACK")
+    sct_config.SCTConfiguration().verify_configuration()
+
+
+def test_n_db_nodes_per_rack_rejects_an_empty_rack(monkeypatch):
+    _set_aws_rack_layout_base(monkeypatch)
+    monkeypatch.setenv("SCT_N_DB_NODES_PER_RACK", "[3, 2, 0]")
+
+    conf = sct_config.SCTConfiguration()
+    with pytest.raises(
+        ValueError,
+        match=r"n_db_nodes_per_rack=\[3, 2, 0\] needs at least 1 DB node per rack, but its smallest entry is 0",
+    ):
+        conf.verify_configuration()
+
+    monkeypatch.setenv("SCT_N_DB_NODES_PER_RACK", "[3, 1, 1]")
+    sct_config.SCTConfiguration().verify_configuration()
+
+
+def test_n_db_nodes_per_rack_rejects_unset_n_db_nodes(monkeypatch, tmp_path):
+    _set_aws_rack_layout_base(monkeypatch)
+    minimal_config = yaml.safe_load(Path("unit_tests/test_configs/minimal_test_case.yaml").read_text(encoding="utf-8"))
+    del minimal_config["n_db_nodes"]
+    config_without_n_db_nodes = tmp_path / "no_n_db_nodes.yaml"
+    config_without_n_db_nodes.write_text(yaml.safe_dump(minimal_config), encoding="utf-8")
+    monkeypatch.setenv("SCT_CONFIG_FILES", str(config_without_n_db_nodes))
+    monkeypatch.delenv("SCT_N_DB_NODES")
+    monkeypatch.setenv("SCT_N_DB_NODES_PER_RACK", "[3, 1, 1]")
+
+    conf = sct_config.SCTConfiguration()
+    with pytest.raises(ValueError, match=r"n_db_nodes_per_rack=\[3, 1, 1\] needs one region, but n_db_nodes is None"):
+        conf.verify_configuration()
+
+    monkeypatch.setenv("SCT_N_DB_NODES", "5")
+    sct_config.SCTConfiguration().verify_configuration()
 
 
 def test_conf_check_required_files_negative(monkeypatch):

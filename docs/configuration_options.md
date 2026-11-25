@@ -28,11 +28,11 @@ concerns first, then one page per backend, then one per test type.
 
 ## Groups
 
-548 options across 29 groups.
+549 options across 29 groups.
 
 | Group | Options | What it covers |
 |---|---:|---|
-| [General and provisioning](configuration_options/general-and-provisioning.md) | 77 | Cluster topology, region/AZ placement, instance provisioning, credentials and test-level plumbing. Options here apply to every... |
+| [General and provisioning](configuration_options/general-and-provisioning.md) | 78 | Cluster topology, region/AZ placement, instance provisioning, credentials and test-level plumbing. Options here apply to every... |
 | [Scylla installation and configuration](configuration_options/scylla-installation-and-configuration.md) | 47 | Which Scylla to install and how it is configured: repos, versions, distro, `scylla.yaml`/command-line options, experimental... |
 | [Nemesis (chaos testing)](configuration_options/nemesis-chaos-testing.md) | 12 | Which disruptions run, how often, and how targets are selected. |
 | [Stress commands and load generation](configuration_options/stress-commands-and-load-generation.md) | 74 | The load applied to the cluster: stress tool command lines, loader-side settings and stress duration. **Which option belongs... |
@@ -375,6 +375,7 @@ concerns first, then one page per backend, then one per test type.
 | [`monitor_nodes_private_ip`](configuration_options/baremetal-backend.md#monitor_nodes_private_ip) | `SCT_MONITOR_NODES_PRIVATE_IP` | [Baremetal backend](configuration_options/baremetal-backend.md) |
 | [`monitor_nodes_public_ip`](configuration_options/baremetal-backend.md#monitor_nodes_public_ip) | `SCT_MONITOR_NODES_PUBLIC_IP` | [Baremetal backend](configuration_options/baremetal-backend.md) |
 | [`n_db_nodes`](configuration_options/general-and-provisioning.md#n_db_nodes) | `SCT_N_DB_NODES` | [General and provisioning](configuration_options/general-and-provisioning.md) |
+| [`n_db_nodes_per_rack`](configuration_options/general-and-provisioning.md#n_db_nodes_per_rack) | `SCT_N_DB_NODES_PER_RACK` | [General and provisioning](configuration_options/general-and-provisioning.md) |
 | [`n_db_zero_token_nodes`](configuration_options/general-and-provisioning.md#n_db_zero_token_nodes) | `SCT_N_DB_ZERO_TOKEN_NODES` | [General and provisioning](configuration_options/general-and-provisioning.md) |
 | [`n_loaders`](configuration_options/general-and-provisioning.md#n_loaders) | `SCT_N_LOADERS` | [General and provisioning](configuration_options/general-and-provisioning.md) |
 | [`n_monitor_nodes`](configuration_options/general-and-provisioning.md#n_monitor_nodes) | `SCT_N_MONITOR_NODES` | [General and provisioning](configuration_options/general-and-provisioning.md) |

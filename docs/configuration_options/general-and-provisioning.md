@@ -5,7 +5,7 @@
 Cluster topology, region/AZ placement, instance provisioning, credentials and test-level
 plumbing. Options here apply to every backend and every test type.
 
-**77 options.**
+**78 options.**
 
 
 <a id="adaptive_timeout_multipliers"></a>
@@ -474,6 +474,17 @@ Number list of database nodes in multiple data centers.
 **backend overrides:**
 - `4`: k8s-local-kind, k8s-local-kind-aws, k8s-local-kind-gce, k8s-gke, k8s-eks
 - `3`: xcloud
+
+
+<a id="n_db_nodes_per_rack"></a>
+
+## **n_db_nodes_per_rack** / SCT_N_DB_NODES_PER_RACK
+
+DB nodes per simulated rack, in rack order: `[3, 1, 1]` puts 3 DB nodes in RACK0 and 1 each in RACK1 and RACK2. Works only on the aws backend, with [`simulated_racks`](#simulated_racks) > 1, one availability zone and one region; the list needs one entry per simulated rack, each at least 1, and its entries must add up to [`n_db_nodes`](#n_db_nodes). Any other combination fails the configuration check. Loaders and monitors stay round-robin over the racks. Adding DB nodes later (grow) without an explicit rack is unsupported. Default: empty, which spreads DB nodes round-robin over the racks.
+
+**default:** []
+
+**type:** int | list[int] → list[int]
 
 
 <a id="n_db_zero_token_nodes"></a>

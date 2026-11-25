@@ -1942,6 +1942,7 @@ class SCTConfiguration(*CONFIG_GROUPS):
         db_type = self.get("db_type")
         self._check_version_supplied(backend)
         self._check_per_backend_required_values(backend)
+        self._validate_n_db_nodes_per_rack()
         if backend in ("aws", "gce") and db_type != "cloud_scylla" and (self.get("simulated_regions") or 0) < 2:
             self._check_multi_region_params(backend)
         if backend == "xcloud":
@@ -2444,6 +2445,33 @@ class SCTConfiguration(*CONFIG_GROUPS):
             assert nodes_num % az_count == 0, (
                 f"Number of db nodes ({nodes_num}) should be divisible by number of availability zones ({az_count})"
             )
+
+    def _validate_n_db_nodes_per_rack(self) -> None:
+        """Reject a DB rack layout the cluster would not place as written, instead of silently ignoring it."""
+        if not (layout := self.get("n_db_nodes_per_rack")):
+            return
+        backend = self.get("cluster_backend")
+        racks = self.get("simulated_racks")
+        zones = self.get("availability_zone")
+        az_count = len(zones.split(",")) if zones else 1
+        n_db_nodes = self.get("n_db_nodes")
+        if backend != "aws":
+            problem = f"works only on the aws backend, but cluster_backend is {backend!r}"
+        elif racks <= 1:
+            problem = f"needs simulated_racks > 1, but simulated_racks is {racks}"
+        elif az_count != 1:
+            problem = f"needs one availability zone, but availability_zone is {zones!r}"
+        elif not n_db_nodes or len(n_db_nodes) != 1:
+            problem = f"needs one region, but n_db_nodes is {n_db_nodes}"
+        elif len(layout) != racks:
+            problem = f"lists {len(layout)} racks, but simulated_racks is {racks}"
+        elif sum(layout) != n_db_nodes[0]:
+            problem = f"totals {sum(layout)}, but n_db_nodes is {n_db_nodes[0]}"
+        elif min(layout) < 1:
+            problem = f"needs at least 1 DB node per rack, but its smallest entry is {min(layout)}"
+        else:
+            return
+        raise ValueError(f"n_db_nodes_per_rack={layout} {problem}")
 
     def _validate_placement_group_required_values(self):
         if self.get("use_placement_group"):
