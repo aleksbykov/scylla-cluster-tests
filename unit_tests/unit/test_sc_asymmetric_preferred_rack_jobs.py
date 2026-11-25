@@ -61,7 +61,6 @@ def resolve_job(workload: str) -> SCTConfiguration:
     return resolve_pipeline_config(build_env(parse_jenkinsfile(NEW_JOBS[workload])))
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="the write job has no 3/1/1 rack layout yet")
 def test_at_1_write_job_resolves_to_five_db_nodes_laid_out_3_1_1():
     config = resolve_job("write")
 
@@ -164,3 +163,62 @@ def test_at_13_mixed_load_as_in_its_reference():
     assert config.get("perf_gradual_threads")["mixed"] == [1900]
     assert config.get("perf_gradual_throttle_steps")["mixed"] == ["50000", "150000", "300000", "450000", "unthrottled"]
     assert config.get("perf_gradual_step_duration")["mixed"] == "30m"
+
+
+@pytest.mark.parametrize("workload", NEW_JOBS)
+def test_at_3_keyspace_is_a_global_rack_list_over_three_racks(workload):
+    statements = resolve_job(workload).get("pre_create_keyspace")
+    required = (
+        "CREATE KEYSPACE keyspace1",
+        "'class': 'NetworkTopologyStrategy'",
+        "'us-east-1': ['RACK0', 'RACK1', 'RACK2']",
+        "consistency = 'global'",
+        "tablets = {'enabled': true}",
+    )
+
+    assert len(statements) == 1
+    assert [part for part in required if part not in statements[0]] == []
+    assert "replication_factor" not in statements[0]
+
+
+@pytest.mark.parametrize("workload", NEW_JOBS)
+def test_at_4_preferred_rack_is_the_three_node_rack(workload):
+    config = resolve_job(workload)
+    layout = config.get("n_db_nodes_per_rack")
+    rack = f"RACK{layout.index(max(layout))}"
+    dc = parse_jenkinsfile(NEW_JOBS[workload]).params["region"]
+
+    assert f"preferred_rack = {{'{dc}': '{rack}'}}" in config.get("pre_create_keyspace")[0]
+
+
+@pytest.mark.parametrize("workload", NEW_JOBS)
+def test_at_5_no_tablet_count_and_no_table_precreation(workload):
+    statements = resolve_job(workload).get("pre_create_keyspace")
+    forbidden = ("initial", "min_tablet_count", "pow2_count", "CREATE TABLE")
+
+    assert len(statements) == 1
+    assert [part for part in forbidden if part in statements[0]] == []
+
+
+def test_at_2_topology_comes_from_one_shared_file():
+    shared = "configurations/strong_consistency/asymmetric_preferred_rack.yaml"
+
+    for path in NEW_JOBS.values():
+        files = parse_jenkinsfile(path).test_config
+        loaded = {name: yaml.safe_load((SCT_ROOT / name).read_text(encoding="utf-8")) or {} for name in files}
+        sets_keyspace = [name for name in files if "pre_create_keyspace" in loaded[name]]
+
+        assert [name for name in files if "n_db_nodes_per_rack" in loaded[name]] == [shared]
+        assert len(sets_keyspace) == 2
+        assert sets_keyspace[-1] == shared
+    for workload in ("read", "mixed"):
+        config = resolve_job(workload)
+
+        assert config.get("n_db_nodes") == [5]
+        assert config.get("simulated_racks") == 3
+        assert config.get("n_db_nodes_per_rack") == [3, 1, 1]
+
+
+@pytest.mark.parametrize("workload", NEW_JOBS)
+def test_at_9_rack_aware_loader_off(workload):
+    assert resolve_job(workload).get("rack_aware_loader") is False

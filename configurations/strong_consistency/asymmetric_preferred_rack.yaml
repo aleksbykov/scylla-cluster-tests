@@ -1,0 +1,17 @@
+# Asymmetric cluster for strongly-consistent tables with a preferred rack (SCYLLADB-6474).
+# Five db nodes on three simulated racks, laid out 3/1/1: RACK0 gets 3 nodes, RACK1 and RACK2 one each.
+# keyspace1 is replicated over all three racks and names RACK0, the 3-node rack, as its preferred rack.
+# The literals must agree with the layout and the job: the preferred rack is RACK<index of the largest
+# n_db_nodes_per_rack entry>, and the DC is the job's region. Scylla accepts any existing rack as the
+# preferred rack, so a wrong rack goes unnoticed; a wrong DC fails CREATE KEYSPACE.
+# List this file after the job's prepare file: a later file replaces pre_create_keyspace, so the
+# prepare file's replication_factor keyspace would win otherwise.
+# No tablet count and no table: Scylla picks its default tablet count, and cql-stress creates standard1.
+# The loaders are not rack-aware: in this single-DC setup SCT would pass cql-stress rack= without
+# datacenter=, which cql-stress rejects.
+n_db_nodes: 5
+simulated_racks: 3
+n_db_nodes_per_rack: [3, 1, 1]
+rack_aware_loader: false
+
+pre_create_keyspace: ["CREATE KEYSPACE keyspace1 WITH replication = {'class': 'NetworkTopologyStrategy', 'us-east-1': ['RACK0', 'RACK1', 'RACK2']} AND consistency = 'global' AND tablets = {'enabled': true} AND preferred_rack = {'us-east-1': 'RACK0'};"]
