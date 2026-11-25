@@ -165,6 +165,31 @@ def test_at_13_mixed_load_as_in_its_reference():
     assert config.get("perf_gradual_step_duration")["mixed"] == "30m"
 
 
+def test_at_11_write_load_100k_then_unthrottled():
+    config = resolve_job("write")
+
+    assert config.get("n_loaders") == [4]
+    assert config.get("perf_gradual_threads")["write"] == [1000]
+    assert config.get("perf_gradual_throttle_steps")["write"] == ["100000", "unthrottled"]
+    assert config.get("perf_gradual_step_duration")["write"] == "15m"
+
+
+def test_at_12_read_load_with_throttled_steps():
+    config = resolve_job("read")
+
+    assert config.get("n_loaders") == [6]
+    assert config.get("perf_gradual_threads")["read"] == [620]
+    assert config.get("perf_gradual_throttle_steps")["read"] == [
+        "150000",
+        "300000",
+        "450000",
+        "600000",
+        "700000",
+        "unthrottled",
+    ]
+    assert config.get("perf_gradual_step_duration")["read"] == "30m"
+
+
 @pytest.mark.parametrize("workload", NEW_JOBS)
 def test_at_3_keyspace_is_a_global_rack_list_over_three_racks(workload):
     statements = resolve_job(workload).get("pre_create_keyspace")

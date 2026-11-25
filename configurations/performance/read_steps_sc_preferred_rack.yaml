@@ -1,0 +1,3 @@
+# SCYLLADB-6474: read steps for the SC asymmetric 3/1/1 preferred_rack job: throttled steps, then unthrottled.
+# List it after prepare_cql_stress_read_ks_with_sc_1kpershard.yaml, which runs the read load unthrottled only.
+perf_gradual_throttle_steps: {"read": ['150000', '300000', '450000', '600000', '700000', 'unthrottled']}
