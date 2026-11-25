@@ -293,6 +293,10 @@ FIREWALL_RULE_DUMP_COMMANDS = ("iptables-save", "ip6tables-save", "nft list rule
 # how `ss` prints a listener bound to every address of the node, per address family
 CQL_WILDCARD_ADDRESSES = frozenset({"0.0.0.0", "*", "::"})
 
+# Rust toolchain that builds the ClockBound daemon from source: the stable release that was current when
+# clock-bound 3.0.0-rc.0 was tagged. Its edition 2024 workspace needs Rust 1.85 or later.
+CLOCKBOUND_RUST_TOOLCHAIN = "1.99.1"
+
 # Tools the monitoring stack's scripts need on the monitor host, installed only when missing
 MONITOR_PREREQ_PACKAGES = ("curl", "unzip", "python3", "python3-pip")
 
@@ -7289,25 +7293,26 @@ class BaseScyllaCluster:
         if self.params.get("collect_nvme_diagnostics"):
             self._setup_nvme_diagnostics(node)
 
+        self._setup_clockbound(node)
+
+    def _setup_clockbound(self, node: BaseNode) -> None:
         if clockbound_version := self.params.get("clockbound_version"):
-            self._install_clockbound(node, clockbound_version)
+            self._install_clockbound(
+                node, clockbound_version, from_source=bool(self.params.get("clockbound_from_source"))
+            )
 
     @staticmethod
-    def _install_clockbound(node: BaseNode, version: str) -> None:
+    def _install_clockbound(node: BaseNode, version: str, from_source: bool = False) -> None:
         """Run the AWS ClockBound daemon in place of chrony, for Scylla's clockbound LeaseGuard clock source.
 
         Only the daemon binary is taken from the release RPM: the packaged unit also runs configure_phc,
         which reloads the ENA driver and drops the node's network.
+
+        With from_source, the daemon is built on the node from the `version` git tag instead, for versions
+        that have no release RPM for the node's architecture. The script is wrapped in double quotes and
+        expanded by the node's login shell first, so it uses literal paths and no shell variables.
         """
-        node.install_package("cpio" if node.distro.is_rhel_like else "rpm2cpio cpio")
-        arch = node.remoter.run("uname -m").stdout.strip()
-        node.remoter.sudo(
-            shell_script_cmd(f"""\
-            cd /tmp
-            curl -fsSL --retry 5 -o clockbound.rpm \\
-                https://github.com/aws/clock-bound/releases/download/{version}/clockbound-{version}-1.{arch}.rpm
-            rpm2cpio clockbound.rpm | cpio -idm ./usr/bin/clockbound
-            install -m 0755 usr/bin/clockbound /usr/bin/clockbound
+        start_daemon = dedent("""\
             systemctl disable --now chrony || true
             systemctl disable --now chronyd || true
             systemctl disable --now ntp || true
@@ -7329,7 +7334,42 @@ class BaseScyllaCluster:
             systemctl daemon-reload
             systemctl enable --now clockbound
             timeout 60 sh -c 'until ls /var/run/clockbound/* >/dev/null 2>&1; do sleep 1; done'
-            """),
+            """)
+        if from_source:
+            node.install_package("gcc" if node.distro.is_rhel_like else "gcc libc6-dev")
+            rustup_init = curl_with_retry(
+                "https://sh.rustup.rs", output="/tmp/clockbound-build/rustup-init.sh", fail_early=True
+            )
+            build = dedent(f"""\
+                mkdir -p /tmp/clockbound-build
+                cd /tmp/clockbound-build
+                {rustup_init}
+                RUSTUP_HOME=/tmp/clockbound-build/rustup CARGO_HOME=/tmp/clockbound-build/cargo \\
+                    sh /tmp/clockbound-build/rustup-init.sh -y --no-modify-path --profile minimal \\
+                    --default-toolchain {CLOCKBOUND_RUST_TOOLCHAIN}
+                RUSTUP_HOME=/tmp/clockbound-build/rustup CARGO_HOME=/tmp/clockbound-build/cargo \\
+                    /tmp/clockbound-build/cargo/bin/cargo install --locked \\
+                    --git https://github.com/aws/clock-bound --tag {version} \\
+                    --features daemon --bin clockbound --root /tmp/clockbound-build/out clock-bound
+                install -m 0755 /tmp/clockbound-build/out/bin/clockbound /usr/bin/clockbound
+                cd /tmp
+                rm -rf /tmp/clockbound-build
+                """)
+            node.remoter.sudo(shell_script_cmd(build + start_daemon), verbose=True, timeout=1800)
+            return
+        node.install_package("cpio" if node.distro.is_rhel_like else "rpm2cpio cpio")
+        arch = node.remoter.run("uname -m").stdout.strip()
+        node.remoter.sudo(
+            shell_script_cmd(
+                dedent(f"""\
+                cd /tmp
+                curl -fsSL --retry 5 -o clockbound.rpm \\
+                    https://github.com/aws/clock-bound/releases/download/{version}/clockbound-{version}-1.{arch}.rpm
+                rpm2cpio clockbound.rpm | cpio -idm ./usr/bin/clockbound
+                install -m 0755 usr/bin/clockbound /usr/bin/clockbound
+                """)
+                + start_daemon
+            ),
             verbose=True,
         )
 

@@ -5,7 +5,7 @@
 Which Scylla to install and how it is configured: repos, versions, distro,
 `scylla.yaml`/command-line options, experimental features, authentication and encryption.
 
-**46 options.**
+**47 options.**
 
 
 <a id="append_scylla_args"></a>
@@ -126,6 +126,17 @@ when enable scylla will use encryption on the client side
 ## **client_encrypt_mtls** / SCT_CLIENT_ENCRYPT_MTLS
 
 when enabled scylla will enforce mutual authentication when client-to-node encryption is enabled
+
+**default:** False
+
+**type:** bool
+
+
+<a id="clockbound_from_source"></a>
+
+## **clockbound_from_source** / SCT_CLOCKBOUND_FROM_SOURCE
+
+Build the [`clockbound_version`](#clockbound_version) git tag of aws/clock-bound on each db node, with Rust 1.99.1,<br>instead of installing the daemon from the release RPM. Use it for a version that has no RPM for the<br>node's architecture, such as '3.0.0-rc.0' on aarch64. It costs a Rust toolchain download and a build<br>during node setup, and needs egress from the db nodes to sh.rustup.rs, static.rust-lang.org,<br>github.com and crates.io. Off by default: the release RPM is used.
 
 **default:** False
 

@@ -98,6 +98,8 @@ peer_verification: true  # when client encryption is used, peer verification is 
 client_encrypt_mtls: false
 server_encrypt_mtls: false
 
+clockbound_from_source: false
+
 scylla_encryption_options: ''
 
 compaction_strategy: 'IncrementalCompactionStrategy'

@@ -28,12 +28,12 @@ concerns first, then one page per backend, then one per test type.
 
 ## Groups
 
-547 options across 29 groups.
+548 options across 29 groups.
 
 | Group | Options | What it covers |
 |---|---:|---|
 | [General and provisioning](configuration_options/general-and-provisioning.md) | 77 | Cluster topology, region/AZ placement, instance provisioning, credentials and test-level plumbing. Options here apply to every... |
-| [Scylla installation and configuration](configuration_options/scylla-installation-and-configuration.md) | 46 | Which Scylla to install and how it is configured: repos, versions, distro, `scylla.yaml`/command-line options, experimental... |
+| [Scylla installation and configuration](configuration_options/scylla-installation-and-configuration.md) | 47 | Which Scylla to install and how it is configured: repos, versions, distro, `scylla.yaml`/command-line options, experimental... |
 | [Nemesis (chaos testing)](configuration_options/nemesis-chaos-testing.md) | 12 | Which disruptions run, how often, and how targets are selected. |
 | [Stress commands and load generation](configuration_options/stress-commands-and-load-generation.md) | 74 | The load applied to the cluster: stress tool command lines, loader-side settings and stress duration. **Which option belongs... |
 | [Monitoring, events and reporting](configuration_options/monitoring-events-and-reporting.md) | 17 | The monitoring stack, event severities, Argus reporting and email reports. |
@@ -142,6 +142,7 @@ concerns first, then one page per backend, then one per test type.
 | [`cassandra_version`](configuration_options/auxiliary-db-cluster-oracle-cassandra.md#cassandra_version) | `SCT_CASSANDRA_VERSION` | [Auxiliary DB cluster (oracle / Cassandra)](configuration_options/auxiliary-db-cluster-oracle-cassandra.md) |
 | [`client_encrypt`](configuration_options/scylla-installation-and-configuration.md#client_encrypt) | `SCT_CLIENT_ENCRYPT` | [Scylla installation and configuration](configuration_options/scylla-installation-and-configuration.md) |
 | [`client_encrypt_mtls`](configuration_options/scylla-installation-and-configuration.md#client_encrypt_mtls) | `SCT_CLIENT_ENCRYPT_MTLS` | [Scylla installation and configuration](configuration_options/scylla-installation-and-configuration.md) |
+| [`clockbound_from_source`](configuration_options/scylla-installation-and-configuration.md#clockbound_from_source) | `SCT_CLOCKBOUND_FROM_SOURCE` | [Scylla installation and configuration](configuration_options/scylla-installation-and-configuration.md) |
 | [`clockbound_version`](configuration_options/scylla-installation-and-configuration.md#clockbound_version) | `SCT_CLOCKBOUND_VERSION` | [Scylla installation and configuration](configuration_options/scylla-installation-and-configuration.md) |
 | [`cloud_cluster_id`](configuration_options/scylla-cloud-xcloud-backend.md#cloud_cluster_id) | `SCT_CLOUD_CLUSTER_ID` | [Scylla Cloud (xcloud) backend](configuration_options/scylla-cloud-xcloud-backend.md) |
 | [`cloud_credentials_path`](configuration_options/scylla-cloud-xcloud-backend.md#cloud_credentials_path) | `SCT_CLOUD_CREDENTIALS_PATH` | [Scylla Cloud (xcloud) backend](configuration_options/scylla-cloud-xcloud-backend.md) |

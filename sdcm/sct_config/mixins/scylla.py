@@ -70,6 +70,13 @@ class ScyllaConfigMixin(BaseModel):
     client_encrypt_mtls: Boolean = SctField(
         description="when enabled scylla will enforce mutual authentication when client-to-node encryption is enabled",
     )
+    clockbound_from_source: Boolean = SctField(
+        description="""Build the clockbound_version git tag of aws/clock-bound on each db node, with Rust 1.99.1,
+            instead of installing the daemon from the release RPM. Use it for a version that has no RPM for the
+            node's architecture, such as '3.0.0-rc.0' on aarch64. It costs a Rust toolchain download and a build
+            during node setup, and needs egress from the db nodes to sh.rustup.rs, static.rust-lang.org,
+            github.com and crates.io. Off by default: the release RPM is used.""",
+    )
     clockbound_version: String = SctField(
         description="""Install and run this version of the AWS ClockBound daemon on the db nodes, in place of chrony,
             before Scylla starts (e.g. '3.0.0-alpha.1'). Needed when scylla.yaml sets
