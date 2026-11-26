@@ -1,6 +1,7 @@
 # A 3-node slice of a logstor feature store: one row per (gamer_id, featureset_id, version) key with a 150-1,100 B
 # payload (data_dir/c-s_logstor_feature_store.yaml), written as 7 versions of 60 M keys, unthrottled and at fixed
-# rates, with QUORUM reads in every step and a read-only ladder at the end. Add it after enable_logstor.yaml to
+# rates, with QUORUM reads in every step, a read-only ladder, then 30 minutes of overwrites of version 1 at 300k
+# writes/s and a reads-only pause: 15 steps. Add it after enable_logstor.yaml to
 # test-cases/performance/perf-regression-predefined-throughput-steps.yaml, in place of logstor-gradual-mixed.yaml.
 
 # Seeds are <version digit><8-digit index>: version v holds the 60 M seeds v00000001..v60000000.
@@ -43,7 +44,9 @@ perf_gradual_step_duration: {mixed: '15m'}
 
 # P2, P3: write versions 2 and 3 unthrottled. S1-S4: write versions 4-7 at rising rates, S4 unthrottled.
 # Q1-Q4: reads-only pauses after S1-S4. R1-R3: reads only, at 10k, 100k and unthrottled client reads/s.
-# ver is the version the 4 write commands write and wn the keys each of them writes; rver is the version the 4
+# S5: overwrites version 1 at 300k writes/s for 30 min; each command's wn is 9 times its 15 M seeds, and c-s starts
+# again at the first seed, so S5 adds no key. Q5: a reads-only pause after S5.
+# ver is the version the 4 write commands write and wn the writes each of them makes; rver is the version the 4
 # read commands read, and rrate and rthreads are their rate and threads per loader (the harness does not divide
 # these between the loaders; an empty rrate reads unthrottled). wn: 0 makes a step reads-only: its write commands
 # write nothing, and its rate is the client read rate, so the step's name says what ran.
@@ -64,6 +67,8 @@ perf_gradual_throttle_steps:
     - {rate: '10000', duration: '10m', ver: 7, wn: 0, rver: 7, rrate: 'fixed=2500/s', rthreads: 400, wait_no_compactions: false}  # R1
     - {rate: '100000', duration: '10m', ver: 7, wn: 0, rver: 7, rrate: 'fixed=25000/s', rthreads: 400, wait_no_compactions: false}  # R2
     - {rate: 'unthrottled', duration: '10m', ver: 7, wn: 0, rver: 7, rrate: '', rthreads: 400, wait_no_compactions: false}  # R3
+    - {rate: '300000', duration: '30m', ver: 1, wn: 135000000, rver: 7, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # S5
+    - {rate: '1000', ver: 1, wn: 0, rver: 7, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # Q5
 
 # The four unthrottled steps have no P99 limit; every other step keeps the default of 10 ms. A key is the name the
 # harness gives a step: its rate, numbered in run order when the rate repeats. Adding, removing or moving a step
