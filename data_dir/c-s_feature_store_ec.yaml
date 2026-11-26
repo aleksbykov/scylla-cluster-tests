@@ -1,0 +1,36 @@
+keyspace: app
+
+keyspace_definition: |
+  CREATE KEYSPACE IF NOT EXISTS app
+  WITH REPLICATION = {'class': 'NetworkTopologyStrategy', 'replication_factor': 3}
+  AND tablets = {'enabled': true};
+
+table: feature_versions
+
+table_definition: |
+  CREATE TABLE IF NOT EXISTS app.feature_versions (
+    gamer_id uuid,
+    featureset_id int,
+    version timeuuid,
+    payload blob,
+    PRIMARY KEY ((gamer_id, featureset_id, version))
+  ) WITH tablets = {'min_tablet_count': 512};
+
+columnspec:
+  - name: featureset_id
+    population: uniform(1..200)
+  - name: payload
+    size: gaussian(150..1100,330,100)
+
+insert:
+  partitions: fixed(1)
+  select: fixed(1)/1
+  batchtype: UNLOGGED
+
+queries:
+  write_row:
+    cql: INSERT INTO app.feature_versions (gamer_id, featureset_id, version, payload) VALUES (?, ?, ?, ?)
+    fields: samerow
+  read_row:
+    cql: SELECT payload FROM app.feature_versions WHERE gamer_id = ? AND featureset_id = ? AND version = ?
+    fields: samerow
