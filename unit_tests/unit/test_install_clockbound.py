@@ -1,5 +1,6 @@
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -61,13 +62,25 @@ def test_at_21_source_build_commands():
     node.install_package.assert_called_once_with("gcc libc6-dev")
     cmd = node.remoter.sudo.call_args.args[0]
     assert "--git https://github.com/aws/clock-bound --tag 3.0.0-rc.0" in cmd
-    assert "cargo install --locked" in cmd
+    # the cargo that rustup-init installs under CARGO_HOME, not whatever `cargo` the node's PATH has
+    assert "/tmp/clockbound-build/cargo/bin/cargo install --locked" in cmd
     assert "--features daemon --bin clockbound" in cmd
     assert "--target" not in cmd  # built for the node's own architecture
     assert "install -m 0755 /tmp/clockbound-build/out/bin/clockbound /usr/bin/clockbound" in cmd
     assert "releases/download" not in cmd
     for line in SHARED_TAIL_LINES:
         assert line in cmd
+    # get the toolchain, build, install, and only then start the daemon
+    steps = (
+        "-o /tmp/clockbound-build/rustup-init.sh https://sh.rustup.rs",
+        "sh /tmp/clockbound-build/rustup-init.sh -y",
+        "/tmp/clockbound-build/cargo/bin/cargo install",
+        "install -m 0755 /tmp/clockbound-build/out/bin/clockbound /usr/bin/clockbound",
+        "systemctl disable --now chrony || true",
+        "systemctl enable --now clockbound",
+    )
+    positions = [cmd.index(step) for step in steps]
+    assert positions == sorted(positions)
     assert node.remoter.sudo.call_args.kwargs == {"verbose": True, "timeout": 1800}
     result = _parse_with_bash(cmd)
     assert result.returncode == 0, result.stderr
@@ -95,14 +108,21 @@ def test_at_21_source_build_script_survives_the_outer_shell():
     assert "$" not in script.replace(RETRY_ALL_ERRORS_PROBE, "")
 
 
+def _cluster_with(params):
+    """A DB cluster stand-in: only its params are faked; the real ClockBound installer runs against the node."""
+    return SimpleNamespace(params=params, _install_clockbound=BaseScyllaCluster._install_clockbound)
+
+
 def test_at_21_cluster_config_selects_the_source_build():
-    cluster = MagicMock()
-    cluster.params = {"clockbound_version": "3.0.0-rc.0", "clockbound_from_source": True}
+    cluster = _cluster_with({"clockbound_version": "3.0.0-rc.0", "clockbound_from_source": True})
     node = _ubuntu_aarch64_node()
 
     BaseScyllaCluster._setup_clockbound(cluster, node)
 
-    cluster._install_clockbound.assert_called_once_with(node, "3.0.0-rc.0", from_source=True)
+    node.install_package.assert_called_once_with("gcc libc6-dev")
+    cmd = node.remoter.sudo.call_args.args[0]
+    assert "--git https://github.com/aws/clock-bound --tag 3.0.0-rc.0" in cmd
+    assert "releases/download" not in cmd
 
 
 def test_at_22_failed_build_fails_setup_without_fallback():
@@ -140,12 +160,14 @@ def test_at_23_rpm_install_builds_nothing_from_source():
 
 
 def test_at_23_cluster_config_defaults_to_the_rpm():
-    cluster = MagicMock()
-    cluster.params = {"clockbound_version": "3.0.0-alpha.1"}
+    cluster = _cluster_with({"clockbound_version": "3.0.0-alpha.1"})
     node = _ubuntu_aarch64_node()
 
     BaseScyllaCluster._setup_clockbound(cluster, node)
 
-    cluster._install_clockbound.assert_called_once_with(node, "3.0.0-alpha.1", from_source=False)
+    node.install_package.assert_called_once_with("rpm2cpio cpio")
+    cmd = node.remoter.sudo.call_args.args[0]
+    assert "releases/download/3.0.0-alpha.1/clockbound-3.0.0-alpha.1-1.aarch64.rpm" in cmd
+    assert "cargo" not in cmd
     defaults = yaml.safe_load((Path(get_sct_root_path()) / "defaults" / "test_default.yaml").read_text())
     assert defaults["clockbound_from_source"] is False

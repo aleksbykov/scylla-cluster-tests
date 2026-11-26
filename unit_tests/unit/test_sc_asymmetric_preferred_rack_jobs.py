@@ -125,6 +125,8 @@ def test_at_10_jobs_use_the_pinned_leader_aware_image(workload):
     resolved = resolve_job(workload).get("stress_image")
 
     assert resolved["cql-stress-cassandra-stress"] == pinned["cql-stress-cassandra-stress"]
+    # pinned by digest: a floating tag in the shared file would otherwise pass the equality above
+    assert "@sha256:" in resolved["cql-stress-cassandra-stress"]
 
 
 @pytest.mark.parametrize("workload", NEW_JOBS)
