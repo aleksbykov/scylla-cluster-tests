@@ -1,0 +1,77 @@
+# A 3-node slice of a logstor feature store: one row per (gamer_id, featureset_id, version) key with a 150-1,100 B
+# payload (data_dir/c-s_logstor_feature_store.yaml), written as 7 versions of 60 M keys, unthrottled and at fixed
+# rates, with QUORUM reads in every step and a read-only ladder at the end. Add it after enable_logstor.yaml to
+# test-cases/performance/perf-regression-predefined-throughput-steps.yaml, in place of logstor-gradual-mixed.yaml.
+
+# Seeds are <version digit><8-digit index>: version v holds the 60 M seeds v00000001..v60000000.
+perf_stress_keyspace: app
+perf_stress_table: feature_versions
+
+# Replaces the list of disable_speculative_retry.yaml, which names only tables this job does not create.
+post_prepare_cql_cmds: ["ALTER TABLE app.feature_versions WITH speculative_retry = 'NONE'"]
+
+# Per shard. 15 shards x 64000 MiB ~ 1 TB per node, 27% of the 3,750 GB NVMe. The other logstor keys of
+# enable_logstor.yaml stay, because dicts merge.
+append_scylla_yaml:
+  logstor_disk_size_in_mb: 64000
+
+# The base yaml's warm-up reads keyspace1.standard1, which this job does not create.
+stress_cmd_cache_warmup: []
+
+prepare_write_cmd:
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(write_row=1)' no-warmup cl=ALL n=15000000 -mode cql3 native -rate threads=200 -pop seq=100000001..115000000"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(write_row=1)' no-warmup cl=ALL n=15000000 -mode cql3 native -rate threads=200 -pop seq=115000001..130000000"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(write_row=1)' no-warmup cl=ALL n=15000000 -mode cql3 native -rate threads=200 -pop seq=130000001..145000000"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(write_row=1)' no-warmup cl=ALL n=15000000 -mode cql3 native -rate threads=200 -pop seq=145000001..160000000"
+
+# The 4 read commands come first: in the reads-only steps the write commands run with n=0, write nothing and print
+# no summary, and a step must not start with such a command. Then one write command per quarter of the version.
+stress_cmd_m:
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rver00000001..$rver60000000)'"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rver00000001..$rver60000000)'"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rver00000001..$rver60000000)'"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rver00000001..$rver60000000)'"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$threads $throttle' -pop seq=$ver00000001..$ver15000000"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$threads $throttle' -pop seq=$ver15000001..$ver30000000"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$threads $throttle' -pop seq=$ver30000001..$ver45000000"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$threads $throttle' -pop seq=$ver45000001..$ver60000000"
+
+# 400 write threads per loader in every step, so the harness names each step by its rate alone. The 15m default is
+# the length of the reads-only pauses; every other step sets its own duration.
+perf_gradual_threads: {mixed: 400}
+perf_gradual_step_duration: {mixed: '15m'}
+
+# P2, P3: write versions 2 and 3 unthrottled. S1-S4: write versions 4-7 at rising rates, S4 unthrottled.
+# Q1-Q4: reads-only pauses after S1-S4. R1-R3: reads only, at 10k, 100k and unthrottled client reads/s.
+# ver is the version the 4 write commands write and wn the keys each of them writes; rver is the version the 4
+# read commands read, and rrate and rthreads are their rate and threads per loader (the harness does not divide
+# these between the loaders; an empty rrate reads unthrottled). wn: 0 makes a step reads-only: its write commands
+# write nothing, and its rate is the client read rate, so the step's name says what ran.
+# wait_no_compactions is false because the harness's compaction wait does not see logstor compaction, and would
+# add at least 3 minutes to each step.
+perf_gradual_throttle_steps:
+  mixed:
+    - {rate: 'unthrottled', duration: '3m', ver: 2, wn: 15000000, rver: 1, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # P2
+    - {rate: 'unthrottled', duration: '3m', ver: 3, wn: 15000000, rver: 2, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # P3
+    - {rate: '113000', duration: '9m', ver: 4, wn: 15000000, rver: 3, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # S1
+    - {rate: '1000', ver: 4, wn: 0, rver: 4, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # Q1
+    - {rate: '211000', duration: '5m', ver: 5, wn: 15000000, rver: 4, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # S2
+    - {rate: '1000', ver: 5, wn: 0, rver: 5, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # Q2
+    - {rate: '333000', duration: '4m', ver: 6, wn: 15000000, rver: 5, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # S3
+    - {rate: '1000', ver: 6, wn: 0, rver: 6, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # Q3
+    - {rate: 'unthrottled', duration: '3m', ver: 7, wn: 15000000, rver: 6, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # S4
+    - {rate: '1000', ver: 7, wn: 0, rver: 7, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # Q4
+    - {rate: '10000', duration: '10m', ver: 7, wn: 0, rver: 7, rrate: 'fixed=2500/s', rthreads: 400, wait_no_compactions: false}  # R1
+    - {rate: '100000', duration: '10m', ver: 7, wn: 0, rver: 7, rrate: 'fixed=25000/s', rthreads: 400, wait_no_compactions: false}  # R2
+    - {rate: 'unthrottled', duration: '10m', ver: 7, wn: 0, rver: 7, rrate: '', rthreads: 400, wait_no_compactions: false}  # R3
+
+# The four unthrottled steps have no P99 limit; every other step keeps the default of 10 ms. A key is the name the
+# harness gives a step: its rate, numbered in run order when the rate repeats. Adding, removing or moving a step
+# with a repeated rate renumbers the others, and these keys must follow. The keys are quoted, as a name like 1000_1
+# must be: unquoted, it loads as the number 10001 and matches no step.
+latency_decorator_error_thresholds:
+  mixed:
+    'unthrottled_1': {P99 write: {fixed_limit: null}, P99 read: {fixed_limit: null}}  # P2
+    'unthrottled_2': {P99 write: {fixed_limit: null}, P99 read: {fixed_limit: null}}  # P3
+    'unthrottled_3': {P99 write: {fixed_limit: null}, P99 read: {fixed_limit: null}}  # S4
+    'unthrottled_4': {P99 write: {fixed_limit: null}, P99 read: {fixed_limit: null}}  # R3
