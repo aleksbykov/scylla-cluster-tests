@@ -1,7 +1,8 @@
 # A 3-node slice of a logstor feature store: one row per (gamer_id, featureset_id, version) key with a 150-1,100 B
-# payload (data_dir/c-s_logstor_feature_store.yaml), written as 7 versions of 60 M keys, unthrottled and at fixed
-# rates, with QUORUM reads in every step, a read-only ladder, then 30 minutes of overwrites of version 1 at 300k
-# writes/s and a reads-only pause: 15 steps. Add it after enable_logstor.yaml to
+# payload (data_dir/c-s_logstor_feature_store.yaml), written as 7 versions of 60 M keys, at max speed with 800,
+# 1,600 and 3,200 write threads per loader and at fixed rates, with QUORUM reads spread over the complete versions
+# in every step, a read-only ladder, then 30 minutes of overwrites of version 1 at 300k writes/s and a reads-only
+# pause: 15 steps. Add it after enable_logstor.yaml to
 # test-cases/performance/perf-regression-predefined-throughput-steps.yaml, in place of logstor-gradual-mixed.yaml.
 
 # Seeds are <version digit><8-digit index>: version v holds the 60 M seeds v00000001..v60000000.
@@ -28,17 +29,18 @@ prepare_write_cmd:
 # The 4 read commands come first: in the reads-only steps the write commands run with n=0, write nothing and print
 # no summary, and a step must not start with such a command. Then one write command per quarter of the version.
 stress_cmd_m:
-  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rver00000001..$rver60000000)'"
-  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rver00000001..$rver60000000)'"
-  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rver00000001..$rver60000000)'"
-  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rver00000001..$rver60000000)'"
-  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$threads $throttle' -pop seq=$ver00000001..$ver15000000"
-  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$threads $throttle' -pop seq=$ver15000001..$ver30000000"
-  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$threads $throttle' -pop seq=$ver30000001..$ver45000000"
-  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$threads $throttle' -pop seq=$ver45000001..$ver60000000"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rva00000001..$rva60000000)'"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rvb00000001..$rvb60000000)'"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rvc00000001..$rvc60000000)'"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rvd00000001..$rvd60000000)'"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$wthreads $throttle' -pop seq=$ver00000001..$ver15000000"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$wthreads $throttle' -pop seq=$ver15000001..$ver30000000"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$wthreads $throttle' -pop seq=$ver30000001..$ver45000000"
+  - "cassandra-stress user profile=/tmp/c-s_logstor_feature_store.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$wthreads $throttle' -pop seq=$ver45000001..$ver60000000"
 
-# 400 write threads per loader in every step, so the harness names each step by its rate alone. The 15m default is
-# the length of the reads-only pauses; every other step sets its own duration.
+# 400 threads in every step, so the harness names each step by its rate alone; a step with a different threads value
+# would rename every step <rate>_<threads>_threads. No command uses $threads: the write commands take theirs from each
+# step's wthreads. The 15m default is the length of the reads-only pauses; every other step sets its own duration.
 perf_gradual_threads: {mixed: 400}
 perf_gradual_step_duration: {mixed: '15m'}
 
@@ -46,29 +48,32 @@ perf_gradual_step_duration: {mixed: '15m'}
 # Q1-Q4: reads-only pauses after S1-S4. R1-R3: reads only, at 10k, 100k and unthrottled client reads/s.
 # S5: overwrites version 1 at 300k writes/s for 30 min; each command's wn is 9 times its 15 M seeds, and c-s starts
 # again at the first seed, so S5 adds no key. Q5: a reads-only pause after S5.
-# ver is the version the 4 write commands write and wn the writes each of them makes; rver is the version the 4
-# read commands read, and rrate and rthreads are their rate and threads per loader (the harness does not divide
-# these between the loaders; an empty rrate reads unthrottled). wn: 0 makes a step reads-only: its write commands
-# write nothing, and its rate is the client read rate, so the step's name says what ran.
+# ver is the version the 4 write commands write, wn the writes each of them makes and wthreads its threads per
+# loader: 800, 1,600 and 3,200 in P2, P3 and S4, doubled at each max-speed write, and 400 elsewhere.
+# rva, rvb, rvc and rvd are the versions the 4 read commands read, spread from version 1 to L, the newest complete
+# version, so the reads are not all of the version written last: 1,1,1,1 for L=1, then 1,2,1,2; 1,2,3,3; 1,2,3,4;
+# 1,3,4,5; 1,3,5,6; and 1,3,5,7 for L=7. rrate and rthreads are the reads' rate and threads per loader (the harness
+# does not divide these between the loaders; an empty rrate reads unthrottled). wn: 0 makes a step reads-only: its
+# write commands write nothing, and its rate is the client read rate, so the step's name says what ran.
 # wait_no_compactions is false because the harness's compaction wait does not see logstor compaction, and would
 # add at least 3 minutes to each step.
 perf_gradual_throttle_steps:
   mixed:
-    - {rate: 'unthrottled', duration: '3m', ver: 2, wn: 15000000, rver: 1, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # P2
-    - {rate: 'unthrottled', duration: '3m', ver: 3, wn: 15000000, rver: 2, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # P3
-    - {rate: '113000', duration: '9m', ver: 4, wn: 15000000, rver: 3, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # S1
-    - {rate: '1000', ver: 4, wn: 0, rver: 4, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # Q1
-    - {rate: '211000', duration: '5m', ver: 5, wn: 15000000, rver: 4, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # S2
-    - {rate: '1000', ver: 5, wn: 0, rver: 5, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # Q2
-    - {rate: '333000', duration: '4m', ver: 6, wn: 15000000, rver: 5, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # S3
-    - {rate: '1000', ver: 6, wn: 0, rver: 6, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # Q3
-    - {rate: 'unthrottled', duration: '3m', ver: 7, wn: 15000000, rver: 6, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # S4
-    - {rate: '1000', ver: 7, wn: 0, rver: 7, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # Q4
-    - {rate: '10000', duration: '10m', ver: 7, wn: 0, rver: 7, rrate: 'fixed=2500/s', rthreads: 400, wait_no_compactions: false}  # R1
-    - {rate: '100000', duration: '10m', ver: 7, wn: 0, rver: 7, rrate: 'fixed=25000/s', rthreads: 400, wait_no_compactions: false}  # R2
-    - {rate: 'unthrottled', duration: '10m', ver: 7, wn: 0, rver: 7, rrate: '', rthreads: 400, wait_no_compactions: false}  # R3
-    - {rate: '300000', duration: '30m', ver: 1, wn: 135000000, rver: 7, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # S5
-    - {rate: '1000', ver: 1, wn: 0, rver: 7, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # Q5
+    - {rate: 'unthrottled', duration: '3m', ver: 2, wn: 15000000, wthreads: 800, rva: 1, rvb: 1, rvc: 1, rvd: 1, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # P2
+    - {rate: 'unthrottled', duration: '3m', ver: 3, wn: 15000000, wthreads: 1600, rva: 1, rvb: 2, rvc: 1, rvd: 2, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # P3
+    - {rate: '113000', duration: '9m', ver: 4, wn: 15000000, wthreads: 400, rva: 1, rvb: 2, rvc: 3, rvd: 3, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # S1
+    - {rate: '1000', ver: 4, wn: 0, wthreads: 400, rva: 1, rvb: 2, rvc: 3, rvd: 4, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # Q1
+    - {rate: '211000', duration: '5m', ver: 5, wn: 15000000, wthreads: 400, rva: 1, rvb: 2, rvc: 3, rvd: 4, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # S2
+    - {rate: '1000', ver: 5, wn: 0, wthreads: 400, rva: 1, rvb: 3, rvc: 4, rvd: 5, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # Q2
+    - {rate: '333000', duration: '4m', ver: 6, wn: 15000000, wthreads: 400, rva: 1, rvb: 3, rvc: 4, rvd: 5, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # S3
+    - {rate: '1000', ver: 6, wn: 0, wthreads: 400, rva: 1, rvb: 3, rvc: 5, rvd: 6, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # Q3
+    - {rate: 'unthrottled', duration: '3m', ver: 7, wn: 15000000, wthreads: 3200, rva: 1, rvb: 3, rvc: 5, rvd: 6, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # S4
+    - {rate: '1000', ver: 7, wn: 0, wthreads: 400, rva: 1, rvb: 3, rvc: 5, rvd: 7, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # Q4
+    - {rate: '10000', duration: '10m', ver: 7, wn: 0, wthreads: 400, rva: 1, rvb: 3, rvc: 5, rvd: 7, rrate: 'fixed=2500/s', rthreads: 400, wait_no_compactions: false}  # R1
+    - {rate: '100000', duration: '10m', ver: 7, wn: 0, wthreads: 400, rva: 1, rvb: 3, rvc: 5, rvd: 7, rrate: 'fixed=25000/s', rthreads: 400, wait_no_compactions: false}  # R2
+    - {rate: 'unthrottled', duration: '10m', ver: 7, wn: 0, wthreads: 400, rva: 1, rvb: 3, rvc: 5, rvd: 7, rrate: '', rthreads: 400, wait_no_compactions: false}  # R3
+    - {rate: '300000', duration: '30m', ver: 1, wn: 135000000, wthreads: 400, rva: 1, rvb: 3, rvc: 5, rvd: 7, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # S5
+    - {rate: '1000', ver: 1, wn: 0, wthreads: 400, rva: 1, rvb: 3, rvc: 5, rvd: 7, rrate: 'fixed=250/s', rthreads: 50, wait_no_compactions: false}  # Q5
 
 # The four unthrottled steps have no P99 limit; every other step keeps the default of 10 ms. A key is the name the
 # harness gives a step: its rate, numbered in run order when the rate repeats. Adding, removing or moving a step

@@ -2,7 +2,8 @@
 # The gradual test's preload does not run pre_create_keyspace, so the table cannot be created ahead of the
 # profile. Instead the commands below use data_dir/c-s_feature_store_ec.yaml, the same profile without
 # storage_engine = 'logstor', so app.feature_versions is a regular table. The commands are those of
-# logstor-feature-store-slice.yaml with only the profile changed; keep them in step with it. Everything else,
+# logstor-feature-store-slice.yaml with only the profile changed, so they read the same step keys, the write
+# threads ($wthreads) and the 4 read versions ($rva..$rvd) included; keep them in step with it. Everything else,
 # enable_logstor.yaml included, stays as in the logstor job, so the storage engine is the only difference.
 
 prepare_write_cmd:
@@ -12,11 +13,11 @@ prepare_write_cmd:
   - "cassandra-stress user profile=/tmp/c-s_feature_store_ec.yaml 'ops(write_row=1)' no-warmup cl=ALL n=15000000 -mode cql3 native -rate threads=200 -pop seq=145000001..160000000"
 
 stress_cmd_m:
-  - "cassandra-stress user profile=/tmp/c-s_feature_store_ec.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rver00000001..$rver60000000)'"
-  - "cassandra-stress user profile=/tmp/c-s_feature_store_ec.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rver00000001..$rver60000000)'"
-  - "cassandra-stress user profile=/tmp/c-s_feature_store_ec.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rver00000001..$rver60000000)'"
-  - "cassandra-stress user profile=/tmp/c-s_feature_store_ec.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rver00000001..$rver60000000)'"
-  - "cassandra-stress user profile=/tmp/c-s_feature_store_ec.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$threads $throttle' -pop seq=$ver00000001..$ver15000000"
-  - "cassandra-stress user profile=/tmp/c-s_feature_store_ec.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$threads $throttle' -pop seq=$ver15000001..$ver30000000"
-  - "cassandra-stress user profile=/tmp/c-s_feature_store_ec.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$threads $throttle' -pop seq=$ver30000001..$ver45000000"
-  - "cassandra-stress user profile=/tmp/c-s_feature_store_ec.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$threads $throttle' -pop seq=$ver45000001..$ver60000000"
+  - "cassandra-stress user profile=/tmp/c-s_feature_store_ec.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rva00000001..$rva60000000)'"
+  - "cassandra-stress user profile=/tmp/c-s_feature_store_ec.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rvb00000001..$rvb60000000)'"
+  - "cassandra-stress user profile=/tmp/c-s_feature_store_ec.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rvc00000001..$rvc60000000)'"
+  - "cassandra-stress user profile=/tmp/c-s_feature_store_ec.yaml 'ops(read_row=1)' no-warmup cl=QUORUM duration=$duration -mode connectionsPerHost=8 cql3 native -rate 'threads=$rthreads $rrate' -pop 'dist=uniform($rvd00000001..$rvd60000000)'"
+  - "cassandra-stress user profile=/tmp/c-s_feature_store_ec.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$wthreads $throttle' -pop seq=$ver00000001..$ver15000000"
+  - "cassandra-stress user profile=/tmp/c-s_feature_store_ec.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$wthreads $throttle' -pop seq=$ver15000001..$ver30000000"
+  - "cassandra-stress user profile=/tmp/c-s_feature_store_ec.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$wthreads $throttle' -pop seq=$ver30000001..$ver45000000"
+  - "cassandra-stress user profile=/tmp/c-s_feature_store_ec.yaml 'ops(write_row=1)' no-warmup cl=QUORUM n=$wn -mode connectionsPerHost=8 cql3 native -rate 'threads=$wthreads $throttle' -pop seq=$ver45000001..$ver60000000"
