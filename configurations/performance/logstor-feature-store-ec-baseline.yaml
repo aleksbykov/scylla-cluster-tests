@@ -1,10 +1,12 @@
 # EC baseline for the logstor feature-store slice job. Add it after logstor-feature-store-slice.yaml.
 # The gradual test's preload does not run pre_create_keyspace, so the table cannot be created ahead of the
-# profile. Instead the commands below use data_dir/c-s_feature_store_ec.yaml, the same profile without
-# storage_engine = 'logstor', so app.feature_versions is a regular table. The commands are those of
-# logstor-feature-store-slice.yaml with only the profile changed, so they read the same step keys, the write
-# threads ($wthreads) and the 4 read versions ($rva..$rvd) included; keep them in step with it. Everything else,
-# enable_logstor.yaml included, stays as in the logstor job, so the storage engine is the only difference.
+# profile. Instead the commands below use data_dir/c-s_feature_store_ec.yaml, which writes one row per seed, with the
+# same columns and payload sizes, into a regular table on regular Scylla's schema: gamer_id is the partition key, the
+# feature set versions are clustering rows, newest first, a read takes the newest version with LIMIT 1, and gamer_id
+# has a wider population so that seeds rarely share one. The 12 commands are those of
+# logstor-feature-store-slice.yaml with only the profile path changed, so they read the same step keys, the write
+# threads ($wthreads) and the 4 read versions ($rva..$rvd) included; keep them in step with it. Every other job
+# setting, enable_logstor.yaml included, stays as in the slice job.
 
 prepare_write_cmd:
   - "cassandra-stress user profile=/tmp/c-s_feature_store_ec.yaml 'ops(write_row=1)' no-warmup cl=ALL n=15000000 -mode cql3 native -rate threads=200 -pop seq=100000001..115000000"

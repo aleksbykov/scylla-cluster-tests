@@ -1,3 +1,11 @@
+# Regular Scylla (EC) baseline of c-s_logstor_feature_store.yaml: the same columns, seeds, payload sizes and writes,
+# on the schema regular Scylla would use. Logstor allows no clustering columns, so the logstor profile makes every
+# (gamer, feature set, version) a partition of its own. Regular Scylla keeps a gamer's feature set versions as
+# clustering rows, newest first, and reads the newest version with LIMIT 1 without knowing which one it is.
+# c-s derives every column from the seed, so each seed is a new gamer partition with one row: a block of new seeds
+# (a new version in the job's commands) adds new gamers, not a new version of the gamers already written.
+# c-s builds gamer_id from one number drawn per seed (1..1e11 by default), and two seeds that draw the same number
+# write the same row. The wider gamer_id population below makes that rare at hundreds of millions of seeds.
 keyspace: app
 
 keyspace_definition: |
@@ -13,10 +21,12 @@ table_definition: |
     featureset_id int,
     version timeuuid,
     payload blob,
-    PRIMARY KEY ((gamer_id, featureset_id, version))
-  ) WITH tablets = {'min_tablet_count': 512};
+    PRIMARY KEY ((gamer_id), featureset_id, version)
+  ) WITH CLUSTERING ORDER BY (featureset_id ASC, version DESC) AND tablets = {'min_tablet_count': 512};
 
 columnspec:
+  - name: gamer_id
+    population: uniform(1..1000000000000000)
   - name: featureset_id
     population: uniform(1..200)
   - name: payload
@@ -32,5 +42,5 @@ queries:
     cql: INSERT INTO app.feature_versions (gamer_id, featureset_id, version, payload) VALUES (?, ?, ?, ?)
     fields: samerow
   read_row:
-    cql: SELECT payload FROM app.feature_versions WHERE gamer_id = ? AND featureset_id = ? AND version = ?
+    cql: SELECT payload FROM app.feature_versions WHERE gamer_id = ? AND featureset_id = ? LIMIT 1
     fields: samerow
